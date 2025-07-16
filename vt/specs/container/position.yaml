@@ -1,0 +1,28 @@
+---
+title: Position
+description: A container's position
+specs:
+  - "`x`, `y` should be correct"
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "container"
+      x: 100
+      y: 100
+      children:
+        - id: 'b'
+          type: "sprite"
+          url: "file:circle-red"
+          x: 0
+          y: 0
+        - id: 'c'
+          type: "sprite"
+          url: "file:circle-blue"
+          x: 50
+          y: 50
+        - id: 'd'
+          type: "sprite"
+          url: "file:circle-red"
+          x: 50%
+          y: 50%

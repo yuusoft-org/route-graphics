@@ -1,0 +1,36 @@
+---
+title: Dimensions
+description: A sprite's dimensions
+specs:
+  - "`width` should be correct"
+  - "`height` should be correct"
+---
+states:
+  - elements:
+      - id: 'a'
+        type: "sprite"
+        url: "file:bg1"
+        x: 0
+        y: 0
+      - id: 'b'
+        type: "sprite"
+        url: "file:circle-red"
+      - id: 'c'
+        type: "sprite"
+        url: "file:circle-red"
+        width: 300
+        height: 300
+        x: 400
+        y: 400
+      - id: 'd'
+        type: "sprite"
+        url: "file:circle-red"
+        width: 200
+        height: 100
+        x: 400
+      - id: 'e'
+        type: "sprite"
+        url: "file:circle-red"
+        width: 100
+        height: 200
+        y: 400

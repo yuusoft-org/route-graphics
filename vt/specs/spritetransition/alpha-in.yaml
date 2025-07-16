@@ -1,0 +1,31 @@
+---
+title: Alpha In
+description: A sprite's alpha
+specs:
+  - "`alpha` should be correct"
+---
+states:
+  - elements:
+      - id: 'a'
+        type: "sprite"
+        url: "file:bg1"
+  - elements:
+      - id: 'a'
+        type: "sprite"
+        url: "file:bg1"
+      - id: 'b'
+        type: "sprite"
+        url: "file:circle-red"
+    transitions:
+      - id: 'a'
+        elementId: 'b'
+        type: keyframes
+        event: add
+        animationProperties:
+          alpha:
+            initialValue: 0.2
+            keyframes:
+              - duration: 5000
+                value: 1
+                easing: linear
+              

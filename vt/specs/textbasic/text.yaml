@@ -1,0 +1,29 @@
+---
+title: Text
+---
+states:
+  - elements:
+      - id: 'a'
+        type: "text"
+        text: "Hello World"
+        x: 20
+        y: 20
+        style: 
+          fontSize: 24
+          fill: "white"
+      - id: 'b'
+        type: "text"
+        text: "Hi, how are you?"
+        x: 20
+        y: 60
+        style: 
+          fontSize: 24
+          fill: "white"
+      - id: 'c'
+        type: "text"
+        text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        x: 20
+        y: 100
+        style: 
+          fontSize: 24
+          fill: "white"

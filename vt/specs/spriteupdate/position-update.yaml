@@ -1,0 +1,57 @@
+---
+title: Position - Update
+description: A sprite's position
+specs:
+  - "`y` should be correct"
+  - "`x` should be correct"
+  - default position should be 0
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 200
+      y: 200
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 400
+      y: 400
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 10%
+      y: 10%
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 50%
+      y: 50%
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+

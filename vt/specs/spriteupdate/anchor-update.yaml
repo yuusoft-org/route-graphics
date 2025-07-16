@@ -1,0 +1,72 @@
+---
+title: Anchor - Update
+description: A sprite's anchor
+specs:
+  - "`xa` should be correct"
+  - "`ya` should be correct"
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 50%
+      y: 50%
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 50%
+      y: 50%
+      xa: 0
+      ya: 0
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 50%
+      y: 50%
+      xa: 1
+      ya: 0
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 50%
+      y: 50%
+      xa: 1
+      ya: 1
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 50%
+      y: 50%
+      xa: 0
+      ya: 1
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 50%
+      y: 50%
+      xa: 0.5
+      ya: 0.5

@@ -1,0 +1,39 @@
+---
+title: Position Out
+description: A sprite's position
+specs:
+  - "`y` should be correct"
+  - "`x` should be correct"
+  - default position should be 0
+---
+states:
+  - elements:
+      - id: 'a'
+        type: "sprite"
+        url: "file:bg1"
+      - id: 'b'
+        type: "sprite"
+        url: "file:circle-red"
+  - elements:
+      - id: 'a'
+        type: "sprite"
+        url: "file:bg1"
+    transitions:
+      - id: 'a'
+        elementId: 'b'
+        type: keyframes
+        event: remove
+        animationProperties:
+          x:
+            initialValue: 0
+            keyframes:
+              - duration: 1000
+                value: 500
+                easing: linear
+          y:
+            initialValue: 0
+            keyframes:
+              - duration: 1000
+                value: 200
+                easing: linear
+              

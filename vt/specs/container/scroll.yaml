@@ -1,0 +1,80 @@
+---
+title: Scroll
+description: A container's scroll
+specs:
+  - "`scroll` should be correct"
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "container"
+      anchor: "TopLeft"
+      direction: "horizontal"
+      scroll: true
+      gap: 20
+      width: 300
+      x: 10%
+      y: 10%
+      children:
+        - id: 'b'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'c'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'd'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'e'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'f'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+    - id: 'aa'
+      type: "container"
+      anchor: "TopLeft"
+      direction: "vertical"
+      gap: 20
+      height: 300 
+      scroll: true
+      x: 50%
+      y: 10%
+      children:
+        - id: 'bb'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'cc'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'dd'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'ee'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'ff'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+            
+          

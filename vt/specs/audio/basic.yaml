@@ -1,0 +1,9 @@
+---
+title: Basic Audio
+description: ""
+---
+states:
+  - elements:
+      - id: "a"
+        type: "audio"
+        url: "file:bgm-1"

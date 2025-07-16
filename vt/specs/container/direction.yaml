@@ -1,0 +1,40 @@
+---
+title: Direction 
+description: A container's direction
+specs:
+  - "`direction` should be correct"
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "container"
+      direction: "horizontal"
+      x: 100
+      y: 100
+      children:
+        - id: 'b'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 200
+          height: 200
+        - id: 'c'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 200
+          height: 200
+    - id: 'd'
+      type: "container"
+      direction: "vertical"
+      x: 100
+      y: 400
+      children:
+        - id: 'e'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 200
+          height: 200
+        - id: 'f'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 200
+          height: 200

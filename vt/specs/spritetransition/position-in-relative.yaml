@@ -1,0 +1,37 @@
+---
+title: Position In Relative
+description: A sprite's position
+specs:
+  - "`y` should be correct"
+  - "`x` should be correct"
+  - default position should be 0
+---
+states:
+  - elements:
+      - id: 'a'
+        type: "sprite"
+        url: "file:bg1"
+      - id: 'b'
+        type: "sprite"
+        url: "file:circle-red"
+        x: 200
+        y: 200
+    transitions:
+      - id: 'a'
+        elementId: 'b'
+        type: keyframes
+        event: add
+        animationProperties:
+          x:
+            keyframes:
+              - duration: 1000
+                relative: true
+                value: 500
+                easing: linear
+          y:
+            keyframes:
+              - duration: 1000
+                relative: true
+                value: 200
+                easing: linear
+              

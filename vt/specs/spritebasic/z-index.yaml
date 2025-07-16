@@ -1,0 +1,29 @@
+---
+title: Z-Index
+description: A sprite's z-index
+specs:
+  - "`zIndex` should be correct"
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+    - id: 'c'
+      type: "sprite"
+      url: "file:circle-blue"
+      x: 100
+      y: 100
+    - id: 'd'
+      type: "sprite"
+      url: "file:circle-red"
+      zIndex: 1
+      x: 400
+    - id: 'd'
+      type: "sprite"
+      url: "file:circle-blue"
+      x: 500
+      y: 100

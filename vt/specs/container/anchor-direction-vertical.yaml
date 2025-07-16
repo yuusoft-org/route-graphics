@@ -1,0 +1,161 @@
+---
+title: Anchor - Direction Vertical
+description: A container's anchor
+specs:
+  - "`anchor` should be correct"
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "container"
+      anchor: "TopLeft"
+      direction: "vertical"
+      x: 10%
+      y: 10%
+      children:
+        - id: 'b'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'c'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'd'
+      type: "container"
+      direction: "vertical"
+      anchor: "TopCenter"
+      x: 50%
+      y: 10%
+      children:
+        - id: 'e'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'f'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'g'
+      type: "container"
+      direction: "vertical"
+      anchor: "TopRight"
+      x: 90%
+      y: 10%
+      children:
+        - id: 'h'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'i'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'l'
+      type: "container"
+      direction: "vertical"
+      anchor: "CenterLeft"
+      x: 10%
+      y: 50%
+      children:
+        - id: 'm'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'n'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'o'
+      type: "container"
+      direction: "vertical"
+      anchor: "CenterCenter"
+      x: 50%
+      y: 50%
+      children:
+        - id: 'p'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'q'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'centerright'
+      type: "container"
+      direction: "vertical"
+      anchor: "CenterRight"
+      x: 90%
+      y: 50%
+      children:
+        - id: 'centerright-a'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'centerright-b'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'r'
+      type: "container"
+      direction: "vertical"
+      anchor: "BottomLeft"
+      x: 10%
+      y: 90%
+      children:
+        - id: 's'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 't'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'u'
+      type: "container"
+      direction: "vertical"
+      anchor: "BottomCenter"
+      x: 50%
+      y: 90%
+      children:
+        - id: 'v'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'w'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100
+    - id: 'x'
+      type: "container"
+      direction: "vertical"
+      anchor: "BottomRight"
+      x: 90%
+      y: 90%
+      children:
+        - id: 'y'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 100
+          height: 100
+        - id: 'z'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 100
+          height: 100

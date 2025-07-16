@@ -1,0 +1,16 @@
+---
+title: Interactive
+description: A sprite's interactive
+specs:
+  - hover on sprite should change the sprite's texture
+  - click on sprite should change the sprite's texture
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:button"
+      hoverUrl: "file:button_over"
+      clickUrl: "file:button_down"
+      x: 100
+      y: 100

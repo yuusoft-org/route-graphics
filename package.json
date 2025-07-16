@@ -1,0 +1,42 @@
+{
+  "name": "route-graphics",
+  "version": "0.0.2-rc2",
+  "description": "A 2D graphics rendering interface that takes JSON input and renders pixels using PixiJS",
+  "main": "dist/RouteGraphics.js",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yuusoft-org/route-graphics.git"
+  },
+  "keywords": [
+    "2d",
+    "graphics",
+    "pixi",
+    "rendering",
+    "canvas",
+    "json"
+  ],
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "lint": "bunx prettier --check src",
+    "lint:fix": "bunx prettier --check --write src",
+    "vt:generate": "bun run esbuild.js && rtgl vt generate --skip-screenshots",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "pixi.js": "^8.7.1",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^1.6.0",
+    "esbuild": "^0.25.6",
+    "js-yaml": "^4.1.0",
+    "pixelmatch": "^5.3.0",
+    "playwright": "^1.44.0",
+    "pngjs": "^7.0.0"
+  }
+}
