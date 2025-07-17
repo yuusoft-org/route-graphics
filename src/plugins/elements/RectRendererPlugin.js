@@ -8,28 +8,28 @@ import { TransitionEvent, BaseRendererPlugin } from "../../types";
  */
 
 /**
- * @typedef {Object} GraphicsElementOptions
- * @property {number} x1
- * @property {number} y1
- * @property {number} x2
- * @property {number} y2
+ * @typedef {Object} RectElementOptions
+ * @property {number} x
+ * @property {number} y
+ * @property {number} width
+ * @property {number} height
  * @property {string} fill
- * @typedef {ContainerElement & GraphicsElementOptions} GraphicsContainerElement
+ * @typedef {ContainerElement & RectElementOptions} RectContainerElement
  */
 
 /**
  * @implements {BaseRendererPlugin}
  */
-export class GraphicsRendererPlugin {
+export class RectRendererPlugin {
   static rendererName = "pixi";
   rendererName = "pixi";
-  rendererType = "graphics";
+  rendererType = "rect";
 
   /**
    * @param {Application} app
    * @param {Object} options
    * @param {Container} options.parent
-   * @param {GraphicsContainerElement} options.element
+   * @param {RectContainerElement} options.element
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
    * @returns {Promise<undefined>}
@@ -46,27 +46,29 @@ export class GraphicsRendererPlugin {
     const graphics = new Graphics();
     graphics.label = element.id;
 
-    if (element.xp !== undefined) {
-      graphics.x = element.xp * app.screen.width;
-    }
     if (element.x !== undefined) {
       graphics.x = element.x;
     }
     if (element.y !== undefined) {
       graphics.y = element.y;
     }
-    if (element.yp !== undefined) {
-      graphics.y = element.yp * app.screen.height;
-    }
     if (element.alpha !== undefined) {
       graphics.alpha = element.alpha;
     }
 
-    if (element.zIndex !== undefined) {
-      graphics.zIndex = element.zIndex;
+    if (element.sx !== undefined) {
+      graphics.scale.x = element.sx;
+    }
+    if (element.sy !== undefined) {
+      graphics.scale.y = element.sy;
+    }
+    if (element.r !== undefined) {
+      graphics.rotation = (element.r * Math.PI) / 180;
     }
 
-    graphics.rect(element.x1, element.y1, element.x2, element.y2);
+    const width = element.width !== undefined ? element.width : element.w;
+    const height = element.height !== undefined ? element.height : element.h;
+    graphics.rect(0, 0, width, height);
     graphics.fill(element.fill);
 
     if (
@@ -117,7 +119,7 @@ export class GraphicsRendererPlugin {
    * @param {Application} app
    * @param {Object} options
    * @param {Container} options.parent
-   * @param {GraphicsContainerElement} options.element
+   * @param {RectContainerElement} options.element
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
    * @returns {Promise<undefined>}
@@ -135,8 +137,8 @@ export class GraphicsRendererPlugin {
    * @param {Application} app
    * @param {Object} options
    * @param {Container} options.parent
-   * @param {GraphicsContainerElement} options.prevElement
-   * @param {GraphicsContainerElement} options.nextElement
+   * @param {RectContainerElement} options.prevElement
+   * @param {RectContainerElement} options.nextElement
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
    * @returns {Promise<undefined>}

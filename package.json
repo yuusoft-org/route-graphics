@@ -1,6 +1,6 @@
 {
   "name": "route-graphics",
-  "version": "0.0.2-rc2",
+  "version": "0.0.2-rc3",
   "description": "A 2D graphics rendering interface that takes JSON input and renders pixels using PixiJS",
   "main": "dist/RouteGraphics.js",
   "type": "module",
@@ -24,8 +24,10 @@
   "scripts": {
     "lint": "bunx prettier --check src",
     "lint:fix": "bunx prettier --check --write src",
+    "build": "bun run esbuild.js",
     "vt:generate": "bun run esbuild.js && rtgl vt generate --skip-screenshots",
-    "test": "vitest"
+    "test": "vitest",
+    "serve": "bunx serve -p 3005 .rettangoli/vt/_site"
   },
   "dependencies": {
     "pixi.js": "^8.7.1",

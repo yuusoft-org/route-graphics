@@ -1,0 +1,40 @@
+---
+title: Rotation
+description: A rect's rotation property
+specs:
+  - "`r` should control rotation in degrees"
+  - "Rotation should be around the rect's origin point"
+---
+states:
+  - elements:
+    - id: 'rect-no-rotation'
+      type: "rect"
+      x: 100
+      y: 100
+      width: 80
+      height: 80
+      fill: red
+    - id: 'rect-quarter-turn'
+      type: "rect"
+      x: 250
+      y: 100
+      width: 80
+      height: 80
+      fill: "#00FF00"
+      r: 90
+    - id: 'rect-half-turn'
+      type: "rect"
+      x: 400
+      y: 100
+      width: 80
+      height: 80
+      fill: blue
+      r: 180
+    - id: 'rect-custom-rotation'
+      type: "rect"
+      x: 550
+      y: 100
+      width: 80
+      height: 80
+      fill: yellow
+      r: 45
