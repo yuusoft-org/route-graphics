@@ -9,12 +9,12 @@ vt:
         - title: "Container"
           files: "container"
           description: "Container layout and positioning tests"
-    - title: "Graphics"
+    - title: "Rect"
       type: "groupLabel"
       items:
-        - title: "Graphics"
-          files: "graphics"
-          description: "Graphics primitive rendering tests"
+        - title: "Rect"
+          files: "rect"
+          description: "Rect primitive rendering tests"
     - title: "Sprite"
       type: "groupLabel"
       items:

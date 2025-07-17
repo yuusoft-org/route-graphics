@@ -1,0 +1,44 @@
+---
+title: Position
+description: A rect's position
+specs:
+  - "`x`, `y` should position rect correctly"
+  - "Multiple rects should be positioned independently"
+---
+states:
+  - elements:
+    - id: 'rect-top-left'
+      type: "rect"
+      x: 50
+      y: 50
+      width: 100
+      height: 100
+      fill: red
+    - id: 'rect-top-right'
+      type: "rect"
+      x: 200
+      y: 50
+      width: 100
+      height: 100
+      fill: "#00FF00"
+    - id: 'rect-bottom-left'
+      type: "rect"
+      x: 50
+      y: 200
+      width: 100
+      height: 100
+      fill: blue
+    - id: 'rect-bottom-right'
+      type: "rect"
+      x: 200
+      y: 200
+      width: 100
+      height: 100
+      fill: yellow
+    - id: 'rect-center'
+      type: "rect"
+      x: 125
+      y: 125
+      width: 100
+      height: 100
+      fill: purple

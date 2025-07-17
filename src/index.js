@@ -4,7 +4,7 @@ import { TextRendererPlugin } from "./plugins/elements/TextRendererPlugin";
 import { TextRevealingRendererPlugin } from "./plugins/elements/TextRevealingRendererPlugin";
 import { ContainerRendererPlugin } from "./plugins/elements/ContainerRendererPlugin";
 import { KeyframeTransitionPlugin } from "./plugins/transitions/KeyframeTransitionPlugin";
-import { GraphicsRendererPlugin } from "./plugins/elements/GraphicsRendererPlugin";
+import { RectRendererPlugin } from "./plugins/elements/RectRendererPlugin";
 import { SliderRendererPlugin } from "./plugins/elements/SliderRendererPlugin";
 import { AudioPlugin } from "./plugins/elements/AudioPlugin";
 import { createAssetBufferManager } from "./utils.js";
@@ -17,7 +17,7 @@ export {
   ContainerRendererPlugin,
   TextRevealingRendererPlugin,
   KeyframeTransitionPlugin,
-  GraphicsRendererPlugin,
+  RectRendererPlugin,
   AudioPlugin,
   SliderRendererPlugin,
   createAssetBufferManager,
