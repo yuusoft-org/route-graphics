@@ -81,38 +81,28 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         sprite.cursor = "pointer";
         sprite.eventMode = "static";
       }
-
-      if (element.xa !== undefined) {
-        if (typeof element.xa === "string" && element.xa.endsWith("%")) {
-          sprite.pivot.x =
-            (Number(element.xa.replace("%", "")) * sprite.width) / 100;
-        } else {
-          sprite.pivot.x = element.xa;
-        }
+      if (element.anchorX !== undefined) {
+        sprite.pivot.x = sprite.width * element.anchorX;
+        console.log("sprite.width", sprite.width);
       }
-      if (element.ya !== undefined) {
-        if (typeof element.ya === "string" && element.ya.endsWith("%")) {
-          sprite.pivot.y =
-            (Number(element.ya.replace("%", "")) * sprite.height) / 100;
-        } else {
-          sprite.pivot.y = element.ya;
-        }
+      if (element.anchorY !== undefined) {
+        sprite.pivot.y = sprite.height * element.anchorY;
+        console.log("sprite.height", sprite.height);
+      }
+      if (element.scaleX !== undefined) {
+        sprite.scale.x = element.scaleX;
+      }
+      if (element.scaleY !== undefined) {
+        sprite.scale.y = element.scaleY;
+      }
+      if (element.rotation !== undefined) {
+        sprite.rotation = (element.rotation * Math.PI) / 180;
       }
       if (element.x !== undefined) {
-        if (typeof element.x === "string" && element.x.endsWith("%")) {
-          sprite.x =
-            (Number(element.x.replace("%", "")) * app.screen.width) / 100;
-        } else {
-          sprite.x = element.x;
-        }
+        sprite.x = element.x;
       }
       if (element.y !== undefined) {
-        if (typeof element.y === "string" && element.y.endsWith("%")) {
-          sprite.y =
-            (Number(element.y.replace("%", "")) * app.screen.height) / 100;
-        } else {
-          sprite.y = element.y;
-        }
+        sprite.y = element.y;
       }
       if (element.width !== undefined) {
         sprite.width = element.width;
@@ -339,27 +329,10 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       } else {
         // For minor changes, update properties directly
         if (nextElement.x !== undefined) {
-          if (
-            typeof nextElement.x === "string" &&
-            nextElement.x.endsWith("%")
-          ) {
-            sprite.x =
-              (Number(nextElement.x.replace("%", "")) * app.screen.width) / 100;
-          } else {
-            sprite.x = nextElement.x;
-          }
+          sprite.x = nextElement.x;
         }
         if (nextElement.y !== undefined) {
-          if (
-            typeof nextElement.y === "string" &&
-            nextElement.y.endsWith("%")
-          ) {
-            sprite.y =
-              (Number(nextElement.y.replace("%", "")) * app.screen.height) /
-              100;
-          } else {
-            sprite.y = nextElement.y;
-          }
+          sprite.y = nextElement.y;
         }
         if (
           nextElement.width !== undefined &&
