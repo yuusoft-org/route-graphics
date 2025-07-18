@@ -8,7 +8,8 @@ states:
   - elements:
     - id: 'a'
       type: "container"
-      anchor: "TopLeft"
+      anchorX: 0
+      anchorY: 0
       direction: "horizontal"
       x: 10%
       y: 10%
@@ -26,7 +27,8 @@ states:
     - id: 'd'
       type: "container"
       direction: "horizontal"
-      anchor: "TopCenter"
+      anchorX: 0.5
+      anchorY: 0
       x: 50%
       y: 10%
       children:
@@ -43,7 +45,8 @@ states:
     - id: 'g'
       type: "container"
       direction: "horizontal"
-      anchor: "TopRight"
+      anchorX: 1
+      anchorY: 0
       x: 90%
       y: 10%
       children:
@@ -60,7 +63,8 @@ states:
     - id: 'l'
       type: "container"
       direction: "horizontal"
-      anchor: "CenterLeft"
+      anchorX: 0
+      anchorY: 0.5
       x: 10%
       y: 50%
       children:
@@ -77,7 +81,8 @@ states:
     - id: 'o'
       type: "container"
       direction: "horizontal"
-      anchor: "CenterCenter"
+      anchorX: 0.5
+      anchorY: 0.5
       x: 50%
       y: 50%
       children:
@@ -94,7 +99,8 @@ states:
     - id: 'centerright'
       type: "container"
       direction: "horizontal"
-      anchor: "CenterRight"
+      anchorX: 1
+      anchorY: 0.5
       x: 90%
       y: 50%
       children:
@@ -111,7 +117,8 @@ states:
     - id: 'r'
       type: "container"
       direction: "horizontal"
-      anchor: "BottomLeft"
+      anchorX: 0
+      anchorY: 1
       x: 10%
       y: 90%
       children:
@@ -128,7 +135,8 @@ states:
     - id: 'u'
       type: "container"
       direction: "horizontal"
-      anchor: "BottomCenter"
+      anchorX: 0.5
+      anchorY: 1
       x: 50%
       y: 90%
       children:
@@ -145,7 +153,8 @@ states:
     - id: 'x'
       type: "container"
       direction: "horizontal"
-      anchor: "BottomRight"
+      anchorX: 1
+      anchorY: 1
       x: 90%
       y: 90%
       children:

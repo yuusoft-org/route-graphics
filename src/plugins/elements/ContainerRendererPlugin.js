@@ -15,30 +15,6 @@ import { finalize, from, mergeMap, Observable } from "rxjs";
  * @typedef {ContainerElement & ContainerElementOptions} ContainerContainerElement
  */
 
-const AnchorLayoutValues = {
-  TopLeft: "TopLeft",
-  TopCenter: "TopCenter",
-  TopRight: "TopRight",
-  CenterLeft: "CenterLeft",
-  CenterCenter: "CenterCenter",
-  CenterRight: "CenterRight",
-  BottomLeft: "BottomLeft",
-  BottomCenter: "BottomCenter",
-  BottomRight: "BottomRight",
-};
-
-const AnchorLayoutAnchorMapping = {
-  [AnchorLayoutValues.TopLeft]: { x: 0, y: 0 },
-  [AnchorLayoutValues.TopCenter]: { x: 0.5, y: 0 },
-  [AnchorLayoutValues.TopRight]: { x: 1, y: 0 },
-  [AnchorLayoutValues.CenterLeft]: { x: 0, y: 0.5 },
-  [AnchorLayoutValues.CenterCenter]: { x: 0.5, y: 0.5 },
-  [AnchorLayoutValues.CenterRight]: { x: 1, y: 0.5 },
-  [AnchorLayoutValues.BottomLeft]: { x: 0, y: 1 },
-  [AnchorLayoutValues.BottomCenter]: { x: 0.5, y: 1 },
-  [AnchorLayoutValues.BottomRight]: { x: 1, y: 1 },
-};
-
 /**
  * @implements {BaseRendererPlugin}
  */
@@ -104,6 +80,10 @@ export class ContainerRendererPlugin {
 
       if (element.zIndex !== undefined) {
         container.zIndex = element.zIndex;
+      }
+
+      if (element.rotation !== undefined) {
+        container.rotation = (element.rotation * Math.PI) / 180;
       }
 
       if (element.propagateEvents) {
@@ -205,10 +185,22 @@ export class ContainerRendererPlugin {
           );
         }
 
-        const anchor =
-          AnchorLayoutAnchorMapping[
-            element.anchor || AnchorLayoutValues.TopLeft
-          ];
+        const validAnchorValues = [0, 0.5, 1];
+        const anchorX = element.anchorX ?? 0;
+        const anchorY = element.anchorY ?? 0;
+
+        if (!validAnchorValues.includes(anchorX)) {
+          throw new Error(
+            `Invalid anchorX value: ${anchorX}. Must be 0, 0.5, or 1`,
+          );
+        }
+        if (!validAnchorValues.includes(anchorY)) {
+          throw new Error(
+            `Invalid anchorY value: ${anchorY}. Must be 0, 0.5, or 1`,
+          );
+        }
+
+        const anchor = { x: anchorX, y: anchorY };
 
         if (element.direction === "horizontal") {
           this.layoutChildren({
@@ -291,6 +283,13 @@ export class ContainerRendererPlugin {
           );
         }
       }
+
+      // Set pivot point based on anchor values (default to 0 if not specified)
+      // This needs to happen after the container's dimensions are established
+      const pivotX = (element.anchorX ?? 0) * (element.width || 0);
+      const pivotY = (element.anchorY ?? 0) * (element.height || 0);
+      container.pivot.x = pivotX;
+      container.pivot.y = pivotY;
 
       parent.addChild(container);
 
@@ -380,6 +379,18 @@ export class ContainerRendererPlugin {
       if (nextElement.y !== undefined && nextElement.y !== prevElement.y) {
         container.y = nextElement.y;
       }
+      if (
+        nextElement.rotation !== undefined &&
+        nextElement.rotation !== prevElement.rotation
+      ) {
+        container.rotation = (nextElement.rotation * Math.PI) / 180;
+      }
+
+      // Always update pivot point based on anchor values (default to 0 if not specified)
+      const pivotX = (nextElement.anchorX ?? 0) * (nextElement.width || 0);
+      const pivotY = (nextElement.anchorY ?? 0) * (nextElement.height || 0);
+      container.pivot.x = pivotX;
+      container.pivot.y = pivotY;
 
       // Re-layout children if direction or other layout-related properties have changed
       if (nextElement.direction) {
@@ -407,10 +418,22 @@ export class ContainerRendererPlugin {
           );
         }
 
-        const anchor =
-          AnchorLayoutAnchorMapping[
-            nextElement.anchor || AnchorLayoutValues.TopLeft
-          ];
+        const validAnchorValues = [0, 0.5, 1];
+        const anchorX = nextElement.anchorX ?? 0;
+        const anchorY = nextElement.anchorY ?? 0;
+
+        if (!validAnchorValues.includes(anchorX)) {
+          throw new Error(
+            `Invalid anchorX value: ${anchorX}. Must be 0, 0.5, or 1`,
+          );
+        }
+        if (!validAnchorValues.includes(anchorY)) {
+          throw new Error(
+            `Invalid anchorY value: ${anchorY}. Must be 0, 0.5, or 1`,
+          );
+        }
+
+        const anchor = { x: anchorX, y: anchorY };
 
         if (nextElement.direction === "horizontal") {
           this.layoutChildren({
@@ -737,8 +760,14 @@ export class ContainerRendererPlugin {
     if (anchor.x === 1) {
       graphic.x -= element.width;
     }
-    if (anchor.x === -0.5) {
+    if (anchor.x === 0.5) {
       graphic.x -= element.width / 2;
+    }
+    if (anchor.y === 1) {
+      graphic.y -= element.height;
+    }
+    if (anchor.y === 0.5) {
+      graphic.y -= element.height / 2;
     }
 
     return graphic;

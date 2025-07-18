@@ -1,0 +1,45 @@
+---
+title: Rotation
+description: Container rotation angles
+specs:
+  - "Container rotates correctly at various angles"
+---
+states:
+  - elements:
+    - id: 'container-0'
+      type: "container"
+      x: 100
+      y: 100
+      width: 150
+      height: 100
+      rotation: 0
+      children:
+        - id: 'child-0'
+          type: "sprite"
+          url: "file:button"
+          x: 0
+          y: 0
+        - id: 'child-0-blue'
+          type: "sprite"
+          url: "file:button"
+          x: 50
+          y: 50
+
+    - id: 'container-45'
+      type: "container"
+      x: 300
+      y: 100
+      width: 150
+      height: 100
+      rotation: 45
+      children:
+        - id: 'child-45'
+          type: "sprite"
+          url: "file:button"
+          x: 0
+          y: 0
+        - id: 'child-45-blue'
+          type: "sprite"
+          url: "file:button"
+          x: 50
+          y: 50
