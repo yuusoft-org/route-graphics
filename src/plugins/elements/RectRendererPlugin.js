@@ -55,21 +55,27 @@ export class RectRendererPlugin {
     if (element.alpha !== undefined) {
       graphics.alpha = element.alpha;
     }
+    if (element.scaleX !== undefined) {
+      graphics.scale.x = element.scaleX;
+    }
+    if (element.scaleY !== undefined) {
+      graphics.scale.y = element.scaleY;
+    }
+    if (element.rotation !== undefined) {
+      graphics.rotation = (element.rotation * Math.PI) / 180;
+    }
 
-    if (element.sx !== undefined) {
-      graphics.scale.x = element.sx;
-    }
-    if (element.sy !== undefined) {
-      graphics.scale.y = element.sy;
-    }
-    if (element.r !== undefined) {
-      graphics.rotation = (element.r * Math.PI) / 180;
-    }
-
-    const width = element.width !== undefined ? element.width : element.w;
-    const height = element.height !== undefined ? element.height : element.h;
+    const width = element.width;
+    const height = element.height;
     graphics.rect(0, 0, width, height);
     graphics.fill(element.fill);
+
+    if (element.anchorX !== undefined) {
+      graphics.pivot.x = width * element.anchorX;
+    }
+    if (element.anchorY !== undefined) {
+      graphics.pivot.y = height * element.anchorY;
+    }
 
     if (
       (element.clickEventName || element.rightClickEventName) &&

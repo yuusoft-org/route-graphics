@@ -1,0 +1,54 @@
+---
+title: Scale
+description: A sprite's scale transformation
+specs:
+  - "`scaleX` should be correct"
+  - "`scaleY` should be correct"
+---
+states:
+  - elements:
+    - id: 'a'
+      type: "sprite"
+      url: "file:bg1"
+    - id: 'b'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 160
+      y: 160
+      scaleX: 1
+      scaleY: 1
+    - id: 'c'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 480
+      y: 160
+      scaleX: 1.5
+      scaleY: 1.5
+    - id: 'd'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 800
+      y: 160
+      scaleX: 0.5
+      scaleY: 0.5
+    - id: 'e'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 160
+      y: 600
+      scaleX: 1.5
+      scaleY: 1
+    - id: 'f'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 480
+      y: 600
+      scaleX: 1
+      scaleY: 1.5
+    - id: 'g'
+      type: "sprite"
+      url: "file:circle-red"
+      x: 800
+      y: 600
+      scaleX: 0.5
+      scaleY: 1.5

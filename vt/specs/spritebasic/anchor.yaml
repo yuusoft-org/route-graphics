@@ -1,9 +1,9 @@
 ---
-title: Anchor 
+title: Anchor
 description: A sprite's anchor
 specs:
-  - "`xa` should be correct"
-  - "`ya` should be correct"
+  - "`anchorX` should be correct"
+  - "`anchorY` should be correct"
 ---
 states:
   - elements:
@@ -13,63 +13,70 @@ states:
     - id: 'b'
       type: "sprite"
       url: "file:circle-red"
-      x: 50%
-      y: 50%
-      xa: 0%
-      ya: 0%
+      x: 240
+      y: 240
+      anchorX: 0
+      anchorY: 0
     - id: 'c'
       type: "sprite"
       url: "file:circle-red"
-      x: 50%
-      y: 50%
-      xa: 100%
-      ya: 100%
+      x: 240
+      y: 240
+      anchorX: 1
+      anchorY: 1
     - id: 'd'
       type: "sprite"
       url: "file:circle-red"
-      x: 50%
-      y: 50%
-      xa: 100%
-      ya: 0%
+      x: 240
+      y: 240
+      anchorX: 1
+      anchorY: 0
     - id: 'e'
       type: "sprite"
       url: "file:circle-red"
-      x: 50%
-      y: 50%
-      xa: 0%
-      ya: 100%
+      x: 240
+      y: 240
+      anchorX: 0
+      anchorY: 1
     - id: 'f'
       type: "sprite"
-      url: "file:circle-red"
-      x: 120
-      y: 120
-      xa: 50%
-      ya: 50%
+      url: "file:circle-blue"
+      x: 720
+      y: 240
+      anchorX: 0
+      anchorY: -1
     - id: 'g'
       type: "sprite"
-      url: "file:circle-red"
-      x: 25%
-      y: 50%
-      xa: 200
-      ya: 200
+      url: "file:circle-blue"
+      x: 720
+      y: 240
+      anchorX: -1
+      anchorY: -1
     - id: 'h'
       type: "sprite"
-      url: "file:circle-red"
-      x: 25%
-      y: 50%
-      xa: 0
-      ya: 0
+      url: "file:circle-blue"
+      x: 720
+      y: 240
+      anchorX: 0
+      anchorY: 0
     - id: 'i'
       type: "sprite"
-      url: "file:circle-red"
-      x: 25%
-      y: 50%
-      xa: 200
-      ya: 0
+      url: "file:circle-blue"
+      x: 720
+      y: 240
+      anchorX: -1
+      anchorY: 0
     - id: 'l'
       type: "sprite"
-      url: "file:circle-red"
-      x: 25%
-      y: 50%
-      xa: 0
-      ya: 200
+      url: "file:circle-blue"
+      x: 240
+      y: 720
+      anchorX: 0.5
+      anchorY: 0.5
+    - id: 'm'
+      type: "sprite"
+      url: "file:circle-blue"
+      x: 240
+      y: 920
+      anchorX: 0.3
+      anchorY: 0.3

@@ -1,0 +1,88 @@
+---
+title: Combined Properties
+description: Testing multiple rect properties together
+specs:
+  - "Multiple properties should work together correctly"
+  - "Anchor should affect rotation and scaling origin"
+  - "Position, size, rotation, scale and anchor should combine properly"
+---
+states:
+  - elements:
+    - id: 'rect-basic'
+      type: "rect"
+      x: 50
+      y: 50
+      width: 60
+      height: 40
+      fill: red
+    - id: 'rect-center-anchor'
+      type: "rect"
+      x: 200
+      y: 50
+      width: 60
+      height: 40
+      fill: green
+      anchorX: 0.5
+      anchorY: 0.5
+    - id: 'rect-rotated'
+      type: "rect"
+      x: 350
+      y: 50
+      width: 60
+      height: 40
+      fill: blue
+      rotation: 45
+    - id: 'rect-scaled'
+      type: "rect"
+      x: 500
+      y: 50
+      width: 60
+      height: 40
+      fill: purple
+      scaleX: 1.5
+      scaleY: 0.8
+    - id: 'rect-rotated-center-anchor'
+      type: "rect"
+      x: 100
+      y: 150
+      width: 80
+      height: 60
+      fill: orange
+      rotation: 90
+      anchorX: 0.5
+      anchorY: 0.5
+    - id: 'rect-scaled-center-anchor'
+      type: "rect"
+      x: 300
+      y: 150
+      width: 60
+      height: 80
+      fill: cyan
+      scaleX: 2
+      scaleY: 0.5
+      anchorX: 0.5
+      anchorY: 0.5
+    - id: 'rect-negative-scale'
+      type: "rect"
+      x: 500
+      y: 150
+      width: 60
+      height: 40
+      fill: yellow
+      scaleX: -1
+      scaleY: 1
+      anchorX: 0.5
+      anchorY: 0.5
+    - id: 'rect-all-combined'
+      type: "rect"
+      x: 200
+      y: 250
+      width: 80
+      height: 60
+      fill: magenta
+      alpha: 0.7
+      rotation: 30
+      scaleX: 1.2
+      scaleY: 1.2
+      anchorX: 0.5
+      anchorY: 0.5
