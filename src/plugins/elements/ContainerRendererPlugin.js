@@ -164,6 +164,22 @@ export class ContainerRendererPlugin {
         .roundRect(0, 0, element.width || 0, element.height || 0, 1)
         .fill(element.fill ? element.fill.color : "transparent");
 
+      // Handle anchor validation even when direction is undefined
+      const validAnchorValues = [0, 0.5, 1];
+      const anchorX = element.anchorX ?? 0;
+      const anchorY = element.anchorY ?? 0;
+
+      if (!validAnchorValues.includes(anchorX)) {
+        throw new Error(
+          `Invalid anchorX value: ${anchorX}. Must be 0, 0.5, or 1`,
+        );
+      }
+      if (!validAnchorValues.includes(anchorY)) {
+        throw new Error(
+          `Invalid anchorY value: ${anchorY}. Must be 0, 0.5, or 1`,
+        );
+      }
+
       if (element.direction) {
         let totalWidth;
         let totalHeight;
@@ -182,21 +198,6 @@ export class ContainerRendererPlugin {
           totalHeight = element.children.reduce(
             (p, c) => p + c.height + gap,
             0,
-          );
-        }
-
-        const validAnchorValues = [0, 0.5, 1];
-        const anchorX = element.anchorX ?? 0;
-        const anchorY = element.anchorY ?? 0;
-
-        if (!validAnchorValues.includes(anchorX)) {
-          throw new Error(
-            `Invalid anchorX value: ${anchorX}. Must be 0, 0.5, or 1`,
-          );
-        }
-        if (!validAnchorValues.includes(anchorY)) {
-          throw new Error(
-            `Invalid anchorY value: ${anchorY}. Must be 0, 0.5, or 1`,
           );
         }
 
@@ -285,9 +286,9 @@ export class ContainerRendererPlugin {
       }
 
       // Set pivot point based on anchor values (default to 0 if not specified)
-      // This needs to happen after the container's dimensions are established
-      const pivotX = (element.anchorX ?? 0) * (element.width || 0);
-      const pivotY = (element.anchorY ?? 0) * (element.height || 0);
+      const { width: containerWidth, height: containerHeight } = this.getContainerDimensions(element);
+      const pivotX = anchorX * containerWidth;
+      const pivotY = anchorY * containerHeight;
       container.pivot.x = pivotX;
       container.pivot.y = pivotY;
 
@@ -386,9 +387,26 @@ export class ContainerRendererPlugin {
         container.rotation = (nextElement.rotation * Math.PI) / 180;
       }
 
+      // Handle anchor validation even when direction is undefined
+      const validAnchorValues = [0, 0.5, 1];
+      const anchorX = nextElement.anchorX ?? 0;
+      const anchorY = nextElement.anchorY ?? 0;
+
+      if (!validAnchorValues.includes(anchorX)) {
+        throw new Error(
+          `Invalid anchorX value: ${anchorX}. Must be 0, 0.5, or 1`,
+        );
+      }
+      if (!validAnchorValues.includes(anchorY)) {
+        throw new Error(
+          `Invalid anchorY value: ${anchorY}. Must be 0, 0.5, or 1`,
+        );
+      }
+
       // Always update pivot point based on anchor values (default to 0 if not specified)
-      const pivotX = (nextElement.anchorX ?? 0) * (nextElement.width || 0);
-      const pivotY = (nextElement.anchorY ?? 0) * (nextElement.height || 0);
+      const { width: containerWidth, height: containerHeight } = this.getContainerDimensions(nextElement);
+      const pivotX = anchorX * containerWidth;
+      const pivotY = anchorY * containerHeight;
       container.pivot.x = pivotX;
       container.pivot.y = pivotY;
 
@@ -415,21 +433,6 @@ export class ContainerRendererPlugin {
           totalHeight = nextElement.children.reduce(
             (p, c) => p + c.height + gap,
             0,
-          );
-        }
-
-        const validAnchorValues = [0, 0.5, 1];
-        const anchorX = nextElement.anchorX ?? 0;
-        const anchorY = nextElement.anchorY ?? 0;
-
-        if (!validAnchorValues.includes(anchorX)) {
-          throw new Error(
-            `Invalid anchorX value: ${anchorX}. Must be 0, 0.5, or 1`,
-          );
-        }
-        if (!validAnchorValues.includes(anchorY)) {
-          throw new Error(
-            `Invalid anchorY value: ${anchorY}. Must be 0, 0.5, or 1`,
           );
         }
 
@@ -771,6 +774,46 @@ export class ContainerRendererPlugin {
     }
 
     return graphic;
+  }
+
+  /**
+   * Calculate container dimensions, using children bounds if no explicit dimensions
+   * @param {ContainerContainerElement} element - The container element
+   * @returns {Object} - Object with width and height properties
+   */
+  getContainerDimensions(element) {
+    let containerWidth = element.width || 0;
+    let containerHeight = element.height || 0;
+    
+    // If no direction is set and no explicit width/height, calculate from children bounds
+    if (!element.direction && (!element.width || !element.height)) {
+      if (element.children && element.children.length > 0) {
+        // Calculate the bounding box of all children
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
+        element.children.forEach(child => {
+          const childX = child.x || 0;
+          const childY = child.y || 0;
+          const childWidth = child.width || 0;
+          const childHeight = child.height || 0;
+          
+          minX = Math.min(minX, childX);
+          maxX = Math.max(maxX, childX + childWidth);
+          minY = Math.min(minY, childY);
+          maxY = Math.max(maxY, childY + childHeight);
+        });
+        
+        if (!element.width) {
+          containerWidth = maxX - minX;
+        }
+        if (!element.height) {
+          containerHeight = maxY - minY;
+        }
+      }
+    }
+    
+    return { width: containerWidth, height: containerHeight };
   }
 
   /**
