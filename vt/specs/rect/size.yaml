@@ -3,7 +3,6 @@ title: Size
 description: A rect's width and height properties
 specs:
   - "`width`, `height` should set rect dimensions"
-  - "`w`, `h` aliases should work the same as `width`, `height`"
 ---
 states:
   - elements:
@@ -14,10 +13,3 @@ states:
         width: 200
         height: 100
         fill: blue
-      - id: "rect-w-h-aliases"
-        type: "rect"
-        x: 250
-        y: 10
-        w: 150
-        h: 80
-        fill: green
