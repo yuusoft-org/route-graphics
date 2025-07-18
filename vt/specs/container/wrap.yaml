@@ -8,7 +8,8 @@ states:
   - elements:
     - id: 'a'
       type: "container"
-      anchor: "TopLeft"
+      anchorX: 0
+      anchorY: 0
       direction: "horizontal"
       gap: 20
       width: 300
@@ -42,7 +43,8 @@ states:
           height: 100
     - id: 'aa'
       type: "container"
-      anchor: "TopLeft"
+      anchorX: 0
+      anchorY: 0
       direction: "vertical"
       gap: 20
       height: 300 

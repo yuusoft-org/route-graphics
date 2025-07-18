@@ -1,0 +1,103 @@
+---
+title: Scale
+description: Container scaling with scaleX and scaleY
+specs:
+  - "Container scales correctly with scaleX and scaleY"
+---
+states:
+  - elements:
+    # Normal scale (1, 1)
+    - id: 'container-normal'
+      type: "container"
+      x: 100
+      y: 100
+      width: 100
+      height: 80
+      scaleX: 1
+      scaleY: 1
+      children:
+        - id: 'child-normal'
+          type: "sprite"
+          url: "file:button"
+          x: 10
+          y: 10
+
+    # Scale X only
+    - id: 'container-scalex'
+      type: "container"
+      x: 300
+      y: 100
+      width: 100
+      height: 80
+      scaleX: 1.5
+      scaleY: 1
+      children:
+        - id: 'child-scalex'
+          type: "sprite"
+          url: "file:button"
+          x: 10
+          y: 10
+
+    # Scale Y only
+    - id: 'container-scaley'
+      type: "container"
+      x: 500
+      y: 100
+      width: 100
+      height: 80
+      scaleX: 1
+      scaleY: 1.5
+      children:
+        - id: 'child-scaley'
+          type: "sprite"
+          url: "file:button"
+          x: 10
+          y: 10
+
+    # Scale both X and Y
+    - id: 'container-scalexy'
+      type: "container"
+      x: 100
+      y: 250
+      width: 100
+      height: 80
+      scaleX: 1.5
+      scaleY: 1.5
+      children:
+        - id: 'child-scalexy'
+          type: "sprite"
+          url: "file:button"
+          x: 10
+          y: 10
+
+    # Scale down
+    - id: 'container-scaledown'
+      type: "container"
+      x: 300
+      y: 250
+      width: 100
+      height: 80
+      scaleX: 0.5
+      scaleY: 0.5
+      children:
+        - id: 'child-scaledown'
+          type: "sprite"
+          url: "file:button"
+          x: 10
+          y: 10
+
+    # Negative scale (flip)
+    - id: 'container-scaleflip'
+      type: "container"
+      x: 500
+      y: 250
+      width: 100
+      height: 80
+      scaleX: -1
+      scaleY: 1
+      children:
+        - id: 'child-scaleflip'
+          type: "sprite"
+          url: "file:button"
+          x: 10
+          y: 10
