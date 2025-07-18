@@ -1,4 +1,4 @@
-import { CanvasTextMetrics, Container, Graphics, TextStyle } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import { TransitionEvent, BaseRendererPlugin } from "../../types";
 import { diffElements } from "../../common";
 import { finalize, from, mergeMap, Observable } from "rxjs";
@@ -63,12 +63,15 @@ export class ContainerRendererPlugin {
     return new Observable((observer) => {
       const {
         parent,
-        element,
+        element: originalElement,
         transitions = [],
         getTransitionByType,
         getRendererByElement,
         eventHandler,
       } = options;
+
+      // Create a deep clone to avoid mutating read-only element objects
+      const element = structuredClone(originalElement);
       const container = new Container();
       container.label = element.id;
 
@@ -353,13 +356,17 @@ export class ContainerRendererPlugin {
     return new Observable((observer) => {
       const {
         parent,
-        prevElement,
-        nextElement,
+        prevElement: originalPrevElement,
+        nextElement: originalNextElement,
         getRendererByElement,
         transitions = [],
         getTransitionByType,
         eventHandler,
       } = options;
+
+      // Create deep clones to avoid mutating read-only element objects
+      const prevElement = structuredClone(originalPrevElement);
+      const nextElement = structuredClone(originalNextElement);
       const container = parent.getChildByName(prevElement.id);
       if (!container) {
         console.warn(`Container with id ${prevElement.id} not found`);
