@@ -401,14 +401,6 @@ export class ContainerRendererPlugin {
         );
       }
 
-      // Always update pivot point based on anchor values (default to 0 if not specified)
-      const { width: containerWidth, height: containerHeight } =
-        this.getContainerDimensions(nextElement, container);
-      const pivotX = anchorX * containerWidth;
-      const pivotY = anchorY * containerHeight;
-      container.pivot.x = pivotX;
-      container.pivot.y = pivotY;
-
       // Re-layout children if direction or other layout-related properties have changed
       if (nextElement.direction) {
         const gap = nextElement.gap || 0;
@@ -555,6 +547,13 @@ export class ContainerRendererPlugin {
         .pipe(
           mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
           finalize(() => {
+            // Always update pivot point based on anchor values (default to 0 if not specified)
+            const { width: containerWidth, height: containerHeight } =
+              this.getContainerDimensions(nextElement, container);
+            const pivotX = anchorX * containerWidth;
+            const pivotY = anchorY * containerHeight;
+            container.pivot.x = pivotX;
+            container.pivot.y = pivotY;
             observer.complete();
           }),
         )
@@ -786,7 +785,6 @@ export class ContainerRendererPlugin {
 
     // If no direction is set and no explicit width/height, calculate from children bounds
     if (!element.direction && (!element.width || !element.height)) {
-      console.log("container.children", container.children);
       if (container.children && container.children.length > 0) {
         // Calculate the bounding box of all children
         let minX = Infinity,
