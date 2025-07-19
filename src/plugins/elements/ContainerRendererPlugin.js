@@ -302,13 +302,6 @@ export class ContainerRendererPlugin {
             const pivotY = anchorY * containerHeight;
             container.pivot.x = pivotX;
             container.pivot.y = pivotY;
-
-            console.log("complete", {
-              pivotX,
-              pivotY,
-              containerWidth,
-              containerHeight,
-            });
             observer.complete();
           },
         });
