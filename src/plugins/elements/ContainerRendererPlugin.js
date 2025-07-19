@@ -284,14 +284,6 @@ export class ContainerRendererPlugin {
           );
         }
       }
-
-      // Set pivot point based on anchor values (default to 0 if not specified)
-      const { width: containerWidth, height: containerHeight } = this.getContainerDimensions(element);
-      const pivotX = anchorX * containerWidth;
-      const pivotY = anchorY * containerHeight;
-      container.pivot.x = pivotX;
-      container.pivot.y = pivotY;
-
       parent.addChild(container);
 
       const subscription = from(renderObservables)
@@ -303,7 +295,13 @@ export class ContainerRendererPlugin {
             console.error("Error:", err);
           },
           complete: () => {
-            console.log("complete");
+            // Set pivot point based on anchor values (default to 0 if not specified)
+            const { width: containerWidth, height: containerHeight } =
+              this.getContainerDimensions(element, container);
+            const pivotX = anchorX * containerWidth;
+            const pivotY = anchorY * containerHeight;
+            container.pivot.x = pivotX;
+            container.pivot.y = pivotY;
             observer.complete();
           },
         });
@@ -402,13 +400,6 @@ export class ContainerRendererPlugin {
           `Invalid anchorY value: ${anchorY}. Must be 0, 0.5, or 1`,
         );
       }
-
-      // Always update pivot point based on anchor values (default to 0 if not specified)
-      const { width: containerWidth, height: containerHeight } = this.getContainerDimensions(nextElement);
-      const pivotX = anchorX * containerWidth;
-      const pivotY = anchorY * containerHeight;
-      container.pivot.x = pivotX;
-      container.pivot.y = pivotY;
 
       // Re-layout children if direction or other layout-related properties have changed
       if (nextElement.direction) {
@@ -556,6 +547,13 @@ export class ContainerRendererPlugin {
         .pipe(
           mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
           finalize(() => {
+            // Always update pivot point based on anchor values (default to 0 if not specified)
+            const { width: containerWidth, height: containerHeight } =
+              this.getContainerDimensions(nextElement, container);
+            const pivotX = anchorX * containerWidth;
+            const pivotY = anchorY * containerHeight;
+            container.pivot.x = pivotX;
+            container.pivot.y = pivotY;
             observer.complete();
           }),
         )
@@ -781,38 +779,48 @@ export class ContainerRendererPlugin {
    * @param {ContainerContainerElement} element - The container element
    * @returns {Object} - Object with width and height properties
    */
-  getContainerDimensions(element) {
+  getContainerDimensions(element, container) {
     let containerWidth = element.width || 0;
     let containerHeight = element.height || 0;
-    
+
     // If no direction is set and no explicit width/height, calculate from children bounds
     if (!element.direction && (!element.width || !element.height)) {
-      if (element.children && element.children.length > 0) {
+      if (container.children && container.children.length > 0) {
         // Calculate the bounding box of all children
-        let minX = Infinity, maxX = -Infinity;
-        let minY = Infinity, maxY = -Infinity;
-        
-        element.children.forEach(child => {
+        let minX = Infinity,
+          maxX = -Infinity;
+        let minY = Infinity,
+          maxY = -Infinity;
+
+        container.children.forEach((child) => {
           const childX = child.x || 0;
           const childY = child.y || 0;
           const childWidth = child.width || 0;
           const childHeight = child.height || 0;
-          
+
           minX = Math.min(minX, childX);
           maxX = Math.max(maxX, childX + childWidth);
           minY = Math.min(minY, childY);
           maxY = Math.max(maxY, childY + childHeight);
         });
-        
+
         if (!element.width) {
           containerWidth = maxX - minX;
+          // Handle NaN case (when no valid children dimensions found)
+          if (isNaN(containerWidth) || !isFinite(containerWidth)) {
+            containerWidth = 0;
+          }
         }
         if (!element.height) {
           containerHeight = maxY - minY;
+          // Handle NaN case (when no valid children dimensions found)
+          if (isNaN(containerHeight) || !isFinite(containerHeight)) {
+            containerHeight = 0;
+          }
         }
       }
     }
-    
+
     return { width: containerWidth, height: containerHeight };
   }
 
