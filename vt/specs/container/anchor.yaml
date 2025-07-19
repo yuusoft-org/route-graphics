@@ -16,31 +16,46 @@ states:
         - id: 'b'
           type: "sprite"
           url: "file:circle-red"
-          width: 100
-          height: 100
+          width: 200
+          height: 200
         - id: 'c'
           type: "sprite"
           url: "file:circle-blue"
-          width: 100
-          height: 100
+          width: 200
+          height: 200
           x: 100
           y: 100
     - id: 'd'
       type: "container"
-      anchorX: 1
-      anchorY: 1
+      anchorX: 0.5
+      anchorY: 0.5
       x: 800
       y: 300
       children:
         - id: 'e'
           type: "sprite"
           url: "file:circle-red"
-          width: 100
-          height: 100
+          width: 200
+          height: 200
         - id: 'f'
           type: "sprite"
           url: "file:circle-blue"
-          width: 100
-          height: 100
+          width: 200
+          height: 200
+          x: 100
+          y: 100
+    - id: 'h'
+      type: "container"
+      anchorX: 1
+      anchorY: 1
+      x: 1300
+      y: 300
+      children:
+        - id: 'i'
+          type: "sprite"
+          url: "file:circle-red"
+        - id: 'i'
+          type: "sprite"
+          url: "file:circle-blue"
           x: 100
           y: 100
