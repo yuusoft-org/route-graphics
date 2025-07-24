@@ -111,4 +111,34 @@ states:
           height: 20
           anchorX: 1
           anchorY: 1
-    
+    # Test 6: Sim
+    - id: 'container6'
+      type: "container"
+      x: 960
+      y: 540
+      width: 100
+      height: 100
+      anchorX: 0.5
+      anchorY: 0.5
+      fill:
+        color: "rgba(255, 255, 255, 0.3)"
+      children:
+        - id: 'rect0'
+          type: "rect"
+          x: 0
+          y: 0
+          width: 1848
+          height: 320
+          anchorX: 0.5
+          anchorY: 0.5
+          fill: white
+        - id: '1'
+          type: "sprite"
+          x: 0
+          y: 0
+          width: 1848
+          height: 320
+          anchorX: 0.5
+          anchorY: 0.5
+          url: "file:circle-blue"
+          alpha: 1
