@@ -251,13 +251,25 @@ export class ContainerRendererPlugin {
 
       (element.children || []).forEach((childElement) => {
         const renderer = getRendererByElement(childElement);
+        
+        // Adjust child coordinates based on container's anchor
+        // The child coordinates should be relative to the container's anchor point
+        const containerWidth = element.width || 0;
+        const containerHeight = element.height || 0;
+        const anchorOffsetX = anchorX * containerWidth;
+        const anchorOffsetY = anchorY * containerHeight;
+        
+        const adjustedChild = {
+          zIndex: element.zIndex,
+          ...childElement,
+          x: (childElement.x || 0) + anchorOffsetX,
+          y: (childElement.y || 0) + anchorOffsetY,
+        };
+        
         renderObservables.push(
           renderer.add(app, {
             parent: container,
-            element: {
-              zIndex: element.zIndex,
-              ...childElement,
-            },
+            element: adjustedChild,
             transitions,
             getTransitionByType,
             getRendererByElement,
@@ -504,10 +516,23 @@ export class ContainerRendererPlugin {
 
       for (const element of toAddElements) {
         const renderer = getRendererByElement(element);
+        
+        // Adjust child coordinates based on container's anchor
+        const containerWidth = nextElement.width || 0;
+        const containerHeight = nextElement.height || 0;
+        const anchorOffsetX = anchorX * containerWidth;
+        const anchorOffsetY = anchorY * containerHeight;
+        
+        const adjustedElement = {
+          ...element,
+          x: (element.x || 0) + anchorOffsetX,
+          y: (element.y || 0) + anchorOffsetY,
+        };
+        
         $updates.push(
           renderer.add(app, {
             parent: container,
-            element,
+            element: adjustedElement,
             transitions,
             getTransitionByType,
             getRendererByElement,
@@ -547,7 +572,7 @@ export class ContainerRendererPlugin {
         .pipe(
           mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
           finalize(() => {
-            // Always update pivot point based on anchor values (default to 0 if not specified)
+            // Update pivot point based on anchor values
             const { width: containerWidth, height: containerHeight } =
               this.getContainerDimensions(nextElement, container);
             const pivotX = anchorX * containerWidth;
