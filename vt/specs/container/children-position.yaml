@@ -1,0 +1,144 @@
+---
+title: Children Position
+description: should be correct
+specs:
+  - "Test different anchor combinations"
+---
+states:
+  # Test 1: Both container and child anchor (0,0) - top-left
+  - elements:
+    - id: 'container1'
+      type: "container"
+      x: 100
+      y: 100
+      width: 80
+      height: 80
+      anchorX: 0
+      anchorY: 0
+      fill:
+        color: "rgba(255, 0, 0, 0.3)"
+      children:
+        - id: 'sprite1'
+          type: "sprite"
+          url: "file:circle-blue"
+          x: 0
+          y: 0
+          width: 20
+          height: 20
+          anchorX: 0
+          anchorY: 0
+    # Test 2: Container center, child top-left
+    - id: 'container2'
+      type: "container"
+      x: 250
+      y: 100
+      width: 80
+      height: 80
+      anchorX: 0.5
+      anchorY: 0.5
+      fill:
+        color: "rgba(0, 255, 0, 0.3)"
+      children:
+        - id: 'sprite2'
+          type: "sprite"
+          url: "file:circle-red"
+          x: 0
+          y: 0
+          width: 20
+          height: 20
+          anchorX: 0
+          anchorY: 0
+    # Test 3: Both container and child center
+    - id: 'container3'
+      type: "container"
+      x: 400
+      y: 100
+      width: 80
+      height: 80
+      anchorX: 0.5
+      anchorY: 0.5
+      fill:
+        color: "rgba(0, 0, 255, 0.3)"
+      children:
+        - id: 'sprite3'
+          type: "sprite"
+          url: "file:circle-blue"
+          x: 0
+          y: 0
+          width: 20
+          height: 20
+          anchorX: 0.5
+          anchorY: 0.5
+    # Test 4: Container bottom-right, child top-left
+    - id: 'container4'
+      type: "container"
+      x: 550
+      y: 100
+      width: 80
+      height: 80
+      anchorX: 1
+      anchorY: 1
+      fill:
+        color: "rgba(255, 255, 0, 0.3)"
+      children:
+        - id: 'sprite4'
+          type: "sprite"
+          url: "file:circle-red"
+          x: 0
+          y: 0
+          width: 20
+          height: 20
+          anchorX: 0
+          anchorY: 0
+    # Test 5: Container top-left, child bottom-right
+    - id: 'container5'
+      type: "container"
+      x: 700
+      y: 100
+      width: 80
+      height: 80
+      anchorX: 0
+      anchorY: 0
+      fill:
+        color: "rgba(255, 0, 255, 0.3)"
+      children:
+        - id: 'sprite5'
+          type: "sprite"
+          url: "file:circle-blue"
+          x: 60
+          y: 60
+          width: 20
+          height: 20
+          anchorX: 1
+          anchorY: 1
+    # Test 6: Sim
+    - id: 'container6'
+      type: "container"
+      x: 960
+      y: 540
+      width: 100
+      height: 100
+      anchorX: 0.5
+      anchorY: 0.5
+      fill:
+        color: "rgba(255, 255, 255, 0.3)"
+      children:
+        - id: 'rect0'
+          type: "rect"
+          x: 0
+          y: 0
+          width: 1848
+          height: 320
+          anchorX: 0.5
+          anchorY: 0.5
+          fill: white
+        - id: '1'
+          type: "sprite"
+          x: 0
+          y: 0
+          width: 1848
+          height: 320
+          anchorX: 0.5
+          anchorY: 0.5
+          url: "file:circle-blue"
+          alpha: 1
