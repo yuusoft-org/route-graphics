@@ -84,10 +84,10 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         sprite.eventMode = "static";
       }
       if (element.anchorX !== undefined) {
-        sprite.pivot.x = sprite.width * element.anchorX * scaleX;
+        sprite.pivot.x = sprite.width * element.anchorX;
       }
       if (element.anchorY !== undefined) {
-        sprite.pivot.y = sprite.height * element.anchorY * scaleY;
+        sprite.pivot.y = sprite.height * element.anchorY;
       }
       if (element.rotation !== undefined) {
         sprite.rotation = (element.rotation * Math.PI) / 180;
