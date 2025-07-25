@@ -66,6 +66,8 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       // TODO fix texture is undefined in test environment
       let textureButtonHover;
       let textureButtonClicked;
+      const scaleX = element.scaleX ?? 1;
+      const scaleY = element.scaleY ?? 1;
 
       if (element.hoverUrl) {
         textureButtonHover = Texture.from(element.hoverUrl);
@@ -82,18 +84,10 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         sprite.eventMode = "static";
       }
       if (element.anchorX !== undefined) {
-        sprite.pivot.x = sprite.width * element.anchorX;
-        console.log("sprite.width", sprite.width);
+        sprite.pivot.x = sprite.width * element.anchorX * scaleX;
       }
       if (element.anchorY !== undefined) {
-        sprite.pivot.y = sprite.height * element.anchorY;
-        console.log("sprite.height", sprite.height);
-      }
-      if (element.scaleX !== undefined) {
-        sprite.scale.x = element.scaleX;
-      }
-      if (element.scaleY !== undefined) {
-        sprite.scale.y = element.scaleY;
+        sprite.pivot.y = sprite.height * element.anchorY * scaleY;
       }
       if (element.rotation !== undefined) {
         sprite.rotation = (element.rotation * Math.PI) / 180;
@@ -105,12 +99,15 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         sprite.y = element.y;
       }
       if (element.width !== undefined) {
-        sprite.width = element.width;
+        sprite.width = element.width * scaleX;
+      } else {
+        sprite.width *= scaleX;
       }
       if (element.height !== undefined) {
-        sprite.height = element.height;
+        sprite.height = element.height * scaleY;
+      } else {
+        sprite.height *= scaleY;
       }
-
       if (element.zIndex !== undefined) {
         sprite.zIndex = element.zIndex;
       }
