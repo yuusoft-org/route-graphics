@@ -1,0 +1,191 @@
+---
+title: Align
+---
+states:
+  - elements:
+    - id: 'anchor'
+      type: "rect"
+      x: 660
+      y: 240
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'tl'
+      type: "text"
+      text: "This text is aligned to the top left corner"
+      x: 660
+      y: 240
+      anchorX: 0
+      anchorY: 0
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+    - id: 'anchor'
+      type: "rect"
+      x: 960
+      y: 240
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'tc'
+      type: "text"
+      text: "This text is aligned to the top center"
+      x: 960
+      y: 240
+      anchorX: 0.5
+      anchorY: 0
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+        align: "center"
+    - id: 'anchor'
+      type: "rect"
+      x: 1260
+      y: 240
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'tr'
+      type: "text"
+      text: "This text is aligned to the top right corner"
+      x: 1260
+      y: 240
+      anchorX: 1
+      anchorY: 0
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+        align: "right"
+    - id: 'anchor'
+      type: "rect"
+      x: 660
+      y: 540
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'cl'
+      type: "text"
+      text: "This text is aligned to the center left"
+      x: 660
+      y: 540
+      anchorX: 0
+      anchorY: 0.5
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+    - id: 'anchor'
+      type: "rect"
+      x: 960
+      y: 540
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'cc'
+      type: "text"
+      text: "This text is aligned to the center"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+        align: "center"
+    - id: 'anchor'
+      type: "rect"
+      x: 1260
+      y: 540
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'cr'
+      type: "text"
+      text: "This text is aligned to the center right"
+      x: 1260
+      y: 540
+      anchorX: 1
+      anchorY: 0.5
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+        align: "right"
+    - id: 'anchor'
+      type: "rect"
+      x: 660
+      y: 840
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'bl'
+      type: "text"
+      text: "This text is aligned to the bottom left corner"
+      x: 660
+      y: 840
+      anchorX: 0
+      anchorY: 1
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+    - id: 'anchor'
+      type: "rect"
+      x: 960
+      y: 840
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'bc'
+      type: "text"
+      text: "This text is aligned to the bottom center"
+      x: 960
+      y: 840
+      anchorX: 0.5
+      anchorY: 1
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+        align: "center"
+    - id: 'anchor'
+      type: "rect"
+      x: 1260
+      y: 840
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
+    - id: 'br'
+      type: "text"
+      text: "This text is aligned to the bottom right corner"
+      x: 1260
+      y: 840
+      anchorX: 1
+      anchorY: 1
+      style: 
+        fontSize: 24
+        fill: "white"
+        wordWrapWidth: 150
+        align: "right"
