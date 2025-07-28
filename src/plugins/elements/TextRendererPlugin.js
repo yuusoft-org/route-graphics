@@ -102,13 +102,13 @@ export class TextRendererPlugin {
       if (element.y !== undefined) {
         newText.y = element.y;
       }
-      if (element.xa !== undefined) {
-        newText.anchor.x = element.xa;
+      if (element.anchorX !== undefined) {
+        newText.anchor.x = element.anchorX;
       }
-      if (element.ya !== undefined) {
-        newText.anchor.y = element.ya;
+      if (element.anchorY !== undefined) {
+        newText.anchor.y = element.anchorY;
       }
-      if (element.xa !== undefined || element.ya !== undefined) {
+      if (element.anchorX !== undefined || element.anchorY !== undefined) {
         const bounds = newText.getLocalBounds();
         newText.hitArea = new Rectangle(
           -bounds.width * newText.anchor.x,
