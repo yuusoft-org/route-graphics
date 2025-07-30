@@ -69,6 +69,10 @@ class App {
         url: "/public/bgm-1.mp3",
         type: "audio/mpeg",
       },
+      "Inkfree": {
+        url: "/public/Inkfree.ttf",
+        type: "application/x-font-ttf",
+      },
     };
     const assetBufferManager = createAssetBufferManager();
     await assetBufferManager.load(assets);
