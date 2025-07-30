@@ -31,10 +31,10 @@ import { from, mergeMap, Observable } from "rxjs";
  * @typedef {Application & { soundStage?: SoundStage }} ApplicationWithSoundStage
  */
 
-const createTextStyle = (style, breakWords = false) => {
+const createTextStyle = (style) => {
   return new TextStyle({
     wordWrap: style.wordWrap || true,
-    breakWords,
+    breakWords: style.breakWords || false,
     align: style.align,
     fill: style.fill,
     fontSize: style.fontSize,
