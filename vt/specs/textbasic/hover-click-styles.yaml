@@ -1,0 +1,200 @@
+---
+title: Hover & Click Styles
+---
+states:
+  - elements:
+      - id: 'title'
+        type: "text"
+        text: "Hover & Click Styles Test"
+        x: 400
+        y: 50
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontSize: 32
+          fill: "white"
+      - id: 'instruction'
+        type: "text"
+        text: "Move mouse over text to see hover effects, click to see click effects"
+        x: 400
+        y: 100
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontSize: 16
+          fill: "gray"
+      # Basic hover test
+      - id: 'hover-basic'
+        type: "text"
+        text: "Hover me - Basic color change"
+        x: 100
+        y: 180
+        style: 
+          fontSize: 20
+          fill: "white"
+        hoverStyle:
+          fontSize: 20
+          fill: "yellow"
+      # Hover with size change
+      - id: 'hover-size'
+        type: "text"
+        text: "Hover me - Size change"
+        x: 100
+        y: 230
+        style: 
+          fontSize: 18
+          fill: "lightblue"
+        hoverStyle:
+          fontSize: 24
+          fill: "lightblue"
+      # Click style test
+      - id: 'click-basic'
+        type: "text"
+        text: "Click me - Color change"
+        x: 100
+        y: 280
+        eventName: "button_clicked"
+        style: 
+          fontSize: 20
+          fill: "lightgreen"
+        clickedStyle:
+          fontSize: 20
+          fill: "red"
+      # Hover + Click combination
+      - id: 'hover-click-combo'
+        type: "text"
+        text: "Hover & Click me - Full combo"
+        x: 100
+        y: 330
+        eventName: "combo_clicked"
+        style: 
+          fontSize: 20
+          fill: "white"
+        hoverStyle:
+          fontSize: 22
+          fill: "orange"
+        clickedStyle:
+          fontSize: 20
+          fill: "purple"
+      # Different font family on hover
+      - id: 'hover-font'
+        type: "text"
+        text: "Hover me - Font change"
+        x: 100
+        y: 380
+        style: 
+          fontSize: 20
+          fill: "white"
+          fontFamily: "Arial"
+        hoverStyle:
+          fontSize: 20
+          fill: "cyan"
+          fontFamily: "Inkfree"
+      # Stroke effect on hover
+      - id: 'hover-stroke'
+        type: "text"
+        text: "Hover me - Stroke effect"
+        x: 100
+        y: 430
+        style: 
+          fontSize: 20
+          fill: "white"
+        hoverStyle:
+          fontSize: 20
+          fill: "yellow"
+          strokeColor: "red"
+          strokeWidth: 2
+      # Multiple interactive texts in a row
+      - id: 'multi1'
+        type: "text"
+        text: "Button 1"
+        x: 500
+        y: 180
+        eventName: "btn1_clicked"
+        style: 
+          fontSize: 18
+          fill: "lightblue"
+        hoverStyle:
+          fontSize: 20
+          fill: "blue"
+        clickedStyle:
+          fontSize: 18
+          fill: "darkblue"
+      - id: 'multi2'
+        type: "text"
+        text: "Button 2"
+        x: 600
+        y: 180
+        eventName: "btn2_clicked"
+        style: 
+          fontSize: 18
+          fill: "lightcoral"
+        hoverStyle:
+          fontSize: 20
+          fill: "coral"
+        clickedStyle:
+          fontSize: 18
+          fill: "darkred"
+      - id: 'multi3'
+        type: "text"
+        text: "Button 3"
+        x: 700
+        y: 180
+        eventName: "btn3_clicked"
+        style: 
+          fontSize: 18
+          fill: "lightgreen"
+        hoverStyle:
+          fontSize: 20
+          fill: "lime"
+        clickedStyle:
+          fontSize: 18
+          fill: "darkgreen"
+      # Large clickable area test
+      - id: 'large-area'
+        type: "text"
+        text: "Large clickable text with anchoring"
+        x: 600
+        y: 250
+        anchorX: 0.5
+        anchorY: 0.5
+        eventName: "large_clicked"
+        style: 
+          fontSize: 24
+          fill: "white"
+        hoverStyle:
+          fontSize: 26
+          fill: "gold"
+        clickedStyle:
+          fontSize: 24
+          fill: "darkorange"
+      # Text with wordWrap and hover
+      - id: 'wrap-hover'
+        type: "text"
+        text: "This is a long text that wraps and has hover effects. Try hovering over different parts of this multi-line text."
+        x: 500
+        y: 320
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 250
+        hoverStyle:
+          fontSize: 16
+          fill: "pink"
+          wordWrapWidth: 250
+      # Disabled-looking text that still responds
+      - id: 'disabled-look'
+        type: "text"
+        text: "Looks disabled but still interactive"
+        x: 500
+        y: 420
+        eventName: "disabled_clicked"
+        style: 
+          fontSize: 16
+          fill: "gray"
+        hoverStyle:
+          fontSize: 18
+          fill: "white"
+        clickedStyle:
+          fontSize: 16
+          fill: "red"

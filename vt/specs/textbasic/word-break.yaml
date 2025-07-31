@@ -1,0 +1,167 @@
+---
+title: Word Break
+---
+states:
+  - elements:
+      - id: 'title'
+        type: "text"
+        text: "Word Break Test (breakWords: false vs true)"
+        x: 400
+        y: 50
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontSize: 32
+          fill: "white"
+      # English - breakWords: true (left column)
+      - id: 'en-label-true'
+        type: "text"
+        text: "English (breakWords: true):"
+        x: 50
+        y: 120
+        style: 
+          fontSize: 18
+          fill: "yellow"
+      - id: 'en-text-true'
+        type: "text"
+        text: "This is a very long English sentence that demonstrates how word wrapping behaves with breakWords set to true. SupercalifragilisticexpialidociousAntidisestablishmentarianism"
+        x: 50
+        y: 150
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: true
+      # English - breakWords: false (right column)
+      - id: 'en-label-false'
+        type: "text"
+        text: "English (breakWords: false):"
+        x: 450
+        y: 120
+        style: 
+          fontSize: 18
+          fill: "yellow"
+      - id: 'en-text-false'
+        type: "text"
+        text: "This is a very long English sentence that demonstrates how word wrapping behaves with breakWords set to false. SupercalifragilisticexpialidociousAntidisestablishmentarianism"
+        x: 450
+        y: 150
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: false
+      # Chinese - breakWords: true (left column)
+      - id: 'zh-label-true'
+        type: "text"
+        text: "中文 (breakWords: true):"
+        x: 50
+        y: 280
+        style: 
+          fontSize: 18
+          fill: "lightgreen"
+      - id: 'zh-text-true'
+        type: "text"
+        text: "这是一段很长的中文文本用来演示当breakWords设置为true时中文文本的换行行为表现。中文通常不使用空格分隔单词所以换行规则与英文有所不同。"
+        x: 50
+        y: 310
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: true
+      # Chinese - breakWords: false (right column)
+      - id: 'zh-label-false'
+        type: "text"
+        text: "中文 (breakWords: false):"
+        x: 450
+        y: 280
+        style: 
+          fontSize: 18
+          fill: "lightgreen"
+      - id: 'zh-text-false'
+        type: "text"
+        text: "这是一段很长的中文文本用来演示当breakWords设置为false时中文文本的换行行为表现。中文通常不使用空格分隔单词所以换行规则与英文有所不同。"
+        x: 450
+        y: 310
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: false
+      # Japanese - breakWords: true (left column)
+      - id: 'ja-label-true'
+        type: "text"
+        text: "日本語 (breakWords: true):"
+        x: 50
+        y: 440
+        style: 
+          fontSize: 18
+          fill: "lightblue"
+      - id: 'ja-text-true'
+        type: "text"
+        text: "これは非常に長い日本語のテキストでbreakWordsがtrueに設定されている時の改行動作を示すためのものです。ひらがなカタカナ漢字が混在する日本語の改行ルールは複雑です。"
+        x: 50
+        y: 470
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: true
+      # Japanese - breakWords: false (right column)
+      - id: 'ja-label-false'
+        type: "text"
+        text: "日本語 (breakWords: false):"
+        x: 450
+        y: 440
+        style: 
+          fontSize: 18
+          fill: "lightblue"
+      - id: 'ja-text-false'
+        type: "text"
+        text: "これは非常に長い日本語のテキストでbreakWordsがfalseに設定されている時の改行動作を示すためのものです。ひらがなカタカナ漢字が混在する日本語の改行ルールは複雑です。"
+        x: 450
+        y: 470
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: false
+      # Korean - breakWords: true (left column)
+      - id: 'ko-label-true'
+        type: "text"
+        text: "한국어 (breakWords: true):"
+        x: 50
+        y: 600
+        style: 
+          fontSize: 18
+          fill: "orange"
+      - id: 'ko-text-true'
+        type: "text"
+        text: "이것은 매우 긴 한국어 텍스트로서 breakWords가 true로 설정되었을 때의 줄바꿈 동작을 보여주기 위한 것입니다. 한글의 특성상 단어 구분과 줄바꿈 규칙이 독특합니다."
+        x: 50
+        y: 630
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: true
+      # Korean - breakWords: false (right column)
+      - id: 'ko-label-false'
+        type: "text"
+        text: "한국어 (breakWords: false):"
+        x: 450
+        y: 600
+        style: 
+          fontSize: 18
+          fill: "orange"
+      - id: 'ko-text-false'
+        type: "text"
+        text: "이것은 매우 긴 한국어 텍스트로서 breakWords가 false로 설정되었을 때의 줄바꿈 동작을 보여주기 위한 것입니다. 한글의 특성상 단어 구분과 줄바꿈 규칙이 독특합니다."
+        x: 450
+        y: 630
+        style: 
+          fontSize: 16
+          fill: "white"
+          wordWrapWidth: 350
+          breakWords: false

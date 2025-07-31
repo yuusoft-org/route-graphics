@@ -1,0 +1,71 @@
+---
+title: Font Loading
+---
+states:
+  - elements:
+      - id: 'title'
+        type: "text"
+        text: "Font Loading Test"
+        x: 400
+        y: 50
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontFamily: "Inkfree"
+          fontSize: 48
+          fill: "white"
+      - id: 'sample1'
+        type: "text"
+        text: "This text uses the Inkfree font"
+        x: 400
+        y: 150
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontFamily: "Inkfree"
+          fontSize: 24
+          fill: "lightgreen"
+      - id: 'uppercase'
+        type: "text"
+        text: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        x: 400
+        y: 220
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontFamily: "Inkfree"
+          fontSize: 20
+          fill: "orange"
+      - id: 'lowercase'
+        type: "text"
+        text: "abcdefghijklmnopqrstuvwxyz"
+        x: 400
+        y: 280
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontFamily: "Inkfree"
+          fontSize: 20
+          fill: "lightblue"
+      - id: 'numbers'
+        type: "text"
+        text: "1234567890 !@#$%^&*()"
+        x: 400
+        y: 340
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontFamily: "Inkfree"
+          fontSize: 18
+          fill: "magenta"
+      - id: 'comparison'
+        type: "text"
+        text: "This uses default font for comparison"
+        x: 400
+        y: 420
+        anchorX: 0.5
+        anchorY: 0
+        style: 
+          fontFamily: "Arial"
+          fontSize: 16
+          fill: "gray"

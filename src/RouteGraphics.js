@@ -170,6 +170,28 @@ class RouteGraphics extends BaseRouteGraphics {
   };
 
   /**
+   * Classify asset by type
+   * @param {string} mimeType - The MIME type of the asset
+   * @returns {string} Asset category
+   */
+  _classifyAsset = (mimeType) => {
+    if (!mimeType) return 'texture';
+    
+    if (mimeType.startsWith('audio/')) return 'audio';
+    
+    if (mimeType.startsWith('font/') || 
+        ['application/font-woff', 'application/font-woff2', 
+         'application/x-font-ttf', 'application/x-font-otf'].includes(mimeType)) {
+      return 'font';
+    }
+    
+    // Future: video support can be added here
+    // if (mimeType.startsWith('video/')) return 'video';
+    
+    return 'texture';
+  };
+
+  /**
    * Load assets using buffer data stored in memory
    * @param {Object<string, {buffer: ArrayBuffer, type: string}>} assetBufferMap - Result from assetBufferManager.getBufferMap()
    * @returns {Promise<Array>} Promise that resolves to an array of loaded assets
@@ -179,28 +201,46 @@ class RouteGraphics extends BaseRouteGraphics {
       throw new Error("assetBufferMap is required");
     }
 
-
-    // Filter out audio assets and load them separately
-    const nonAudioAssets = {};
-    const audioAssets = {};
+    // Classify assets by type
+    const assetsByType = {
+      audio: {},
+      font: {},
+      texture: {} // includes images and other PIXI-compatible assets
+    };
 
     for (const [key, asset] of Object.entries(assetBufferMap)) {
-      if (asset.type && asset.type.startsWith("audio/")) {
-        audioAssets[key] = asset;
-      } else {
-        nonAudioAssets[key] = asset;
-      }
+      const assetType = this._classifyAsset(asset.type);
+      assetsByType[assetType][key] = asset;
     }
 
     // Load audio assets using AudioAsset.load in parallel
     await Promise.all(
-      Object.entries(audioAssets).map(([key, asset]) => 
+      Object.entries(assetsByType.audio).map(([key, asset]) => 
         AudioAsset.load(key, asset.buffer)
       )
     );
 
+    // Load font assets
+    await Promise.all(
+      Object.entries(assetsByType.font).map(async ([key, asset]) => {
+        const blob = new Blob([asset.buffer], { type: asset.type });
+        const url = URL.createObjectURL(blob);
+        // Use the key as font family name - this should match the fontFamily in text styles
+        const fontFace = new FontFace(key, `url(${url})`);
+        try {
+          await fontFace.load();
+          document.fonts.add(fontFace);
+          console.log(`Font loaded successfully: ${key}`);
+        } catch (error) {
+          console.error(`Failed to load font ${key}:`, error);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      })
+    );
+
     if (!this._advancedLoader) {
-      this._advancedLoader = new AdvancedBufferLoader(nonAudioAssets);
+      this._advancedLoader = new AdvancedBufferLoader(assetsByType.texture);
 
       Assets.loader.parsers.length = 0;
       Assets.reset();
@@ -215,11 +255,11 @@ class RouteGraphics extends BaseRouteGraphics {
         Assets.registerPlugin(this._advancedLoader);
       }
     } else {
-      // Merge new non-audio assets into existing buffer map
-      Object.assign(this._advancedLoader.bufferMap, nonAudioAssets);
+      // Merge new texture assets into existing buffer map
+      Object.assign(this._advancedLoader.bufferMap, assetsByType.texture);
     }
 
-    const urls = Object.keys(nonAudioAssets);
+    const urls = Object.keys(assetsByType.texture);
     return Promise.all(urls.map((url) => Assets.load(url)));
   };
 
