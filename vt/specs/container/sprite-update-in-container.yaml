@@ -1,0 +1,281 @@
+---
+title: Sprite Update in Container
+description: Test that sprites inside containers update correctly without layer issues
+specs:
+  - "Sprites in containers should update without changing layer order"
+  - "Empty sprites in containers should display images immediately"
+  - "Container hierarchy should be maintained during sprite updates"
+---
+states:
+  # State 1: Initial state with containers and sprites
+  - elements:
+    - id: 'container1'
+      type: "container"
+      x: 100
+      y: 100
+      width: 300
+      height: 200
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'sprite1-1'
+          type: "sprite"
+          url: "file:circle-red"
+          x: 50
+          y: 50
+          width: 60
+          height: 60
+        - id: 'sprite1-2'
+          type: "sprite"
+          url: ""  # Empty sprite
+          x: 150
+          y: 50
+          width: 60
+          height: 60
+        - id: 'sprite1-3'
+          type: "sprite"
+          url: "file:circle-blue"
+          x: 100
+          y: 100
+          width: 60
+          height: 60
+    
+    - id: 'container2'
+      type: "container"
+      x: 450
+      y: 100
+      width: 300
+      height: 200
+      fill:
+        color: "rgba(0,255,0,0.2)"
+      children:
+        - id: 'sprite2-1'
+          type: "sprite"
+          url: "file:circle-green"
+          x: 50
+          y: 50
+          width: 60
+          height: 60
+        - id: 'sprite2-2'
+          type: "sprite"
+          url: "file:circle-grey"
+          x: 150
+          y: 100
+          width: 60
+          height: 60
+
+  # State 2: Add image to empty sprite in container1
+  - elements:
+    - id: 'container1'
+      type: "container"
+      x: 100
+      y: 100
+      width: 300
+      height: 200
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'sprite1-1'
+          type: "sprite"
+          url: "file:circle-red"
+          x: 50
+          y: 50
+          width: 60
+          height: 60
+        - id: 'sprite1-2'
+          type: "sprite"
+          url: "file:button"  # Now has image
+          x: 150
+          y: 50
+          width: 100
+          height: 40
+        - id: 'sprite1-3'
+          type: "sprite"
+          url: "file:circle-blue"
+          x: 100
+          y: 100
+          width: 60
+          height: 60
+    
+    - id: 'container2'
+      type: "container"
+      x: 450
+      y: 100
+      width: 300
+      height: 200
+      fill:
+        color: "rgba(0,255,0,0.2)"
+      children:
+        - id: 'sprite2-1'
+          type: "sprite"
+          url: "file:circle-green"
+          x: 50
+          y: 50
+          width: 60
+          height: 60
+        - id: 'sprite2-2'
+          type: "sprite"
+          url: "file:circle-grey"
+          x: 150
+          y: 100
+          width: 60
+          height: 60
+
+  # State 3: Update multiple sprites in different containers
+  - elements:
+    - id: 'container1'
+      type: "container"
+      x: 100
+      y: 100
+      width: 300
+      height: 200
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'sprite1-1'
+          type: "sprite"
+          url: "file:button_down"  # Changed
+          x: 50
+          y: 50
+          width: 100
+          height: 40
+        - id: 'sprite1-2'
+          type: "sprite"
+          url: "file:button"
+          x: 150
+          y: 50
+          width: 100
+          height: 40
+        - id: 'sprite1-3'
+          type: "sprite"
+          url: "file:circle-blue"  # Unchanged
+          x: 100
+          y: 100
+          width: 60
+          height: 60
+    
+    - id: 'container2'
+      type: "container"
+      x: 450
+      y: 100
+      width: 300
+      height: 200
+      fill:
+        color: "rgba(0,255,0,0.2)"
+      children:
+        - id: 'sprite2-1'
+          type: "sprite"
+          url: "file:button_over"  # Changed
+          x: 50
+          y: 50
+          width: 100
+          height: 40
+        - id: 'sprite2-2'
+          type: "sprite"
+          url: "file:circle-grey"  # Unchanged
+          x: 150
+          y: 100
+          width: 60
+          height: 60
+
+  # State 4: Test nested containers with sprite updates
+  - elements:
+    - id: 'outer-container'
+      type: "container"
+      x: 200
+      y: 150
+      width: 400
+      height: 300
+      fill:
+        color: "rgba(0,0,255,0.1)"
+      children:
+        - id: 'inner-container1'
+          type: "container"
+          x: 50
+          y: 50
+          width: 150
+          height: 100
+          fill:
+            color: "rgba(255,0,0,0.3)"
+          children:
+            - id: 'nested-sprite1'
+              type: "sprite"
+              url: "file:circle-red"
+              x: 30
+              y: 30
+              width: 40
+              height: 40
+            - id: 'nested-sprite2'
+              type: "sprite"
+              url: ""  # Empty
+              x: 80
+              y: 30
+              width: 40
+              height: 40
+        - id: 'inner-container2'
+          type: "container"
+          x: 220
+          y: 50
+          width: 150
+          height: 100
+          fill:
+            color: "rgba(0,255,0,0.3)"
+          children:
+            - id: 'nested-sprite3'
+              type: "sprite"
+              url: "file:circle-green"
+              x: 30
+              y: 30
+              width: 40
+              height: 40
+
+  # State 5: Update nested sprites
+  - elements:
+    - id: 'outer-container'
+      type: "container"
+      x: 200
+      y: 150
+      width: 400
+      height: 300
+      fill:
+        color: "rgba(0,0,255,0.1)"
+      children:
+        - id: 'inner-container1'
+          type: "container"
+          x: 50
+          y: 50
+          width: 150
+          height: 100
+          fill:
+            color: "rgba(255,0,0,0.3)"
+          children:
+            - id: 'nested-sprite1'
+              type: "sprite"
+              url: "file:button"  # Changed
+              x: 25
+              y: 30
+              width: 100
+              height: 30
+            - id: 'nested-sprite2'
+              type: "sprite"
+              url: "file:circle-blue"  # Added image
+              x: 80
+              y: 30
+              width: 40
+              height: 40
+        - id: 'inner-container2'
+          type: "container"
+          x: 220
+          y: 50
+          width: 150
+          height: 100
+          fill:
+            color: "rgba(0,255,0,0.3)"
+          children:
+            - id: 'nested-sprite3'
+              type: "sprite"
+              url: "file:button_over"  # Changed
+              x: 25
+              y: 30
+              width: 100
+              height: 30

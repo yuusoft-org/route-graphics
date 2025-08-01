@@ -290,68 +290,98 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         throw new Error(`Sprite with id ${prevElement.id} not found`);
       }
 
-      // Handle basic positional updates if there are minor changes
-      if (JSON.stringify(prevElement) !== JSON.stringify(nextElement)) {
-        // For significant changes, remove old and add new
-        const tasks = [
-          this.add(app, {
-            parent,
-            element: nextElement,
-            transitions,
-            getTransitionByType,
-            eventHandler,
-          }),
-          this.remove(app, {
-            parent,
-            element: prevElement,
-            transitions,
-            getTransitionByType,
-          }),
-        ];
+      // Check if URL changed (image update)
+      const urlChanged = prevElement.url !== nextElement.url ||
+                        prevElement.hoverUrl !== nextElement.hoverUrl ||
+                        prevElement.clickUrl !== nextElement.clickUrl;
 
-        const subscription = from(tasks)
-          .pipe(
-            mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
-          )
-          .subscribe({
-            error: (err) => {
-              console.error("Error:", err);
-            },
-            complete: () => observer.complete(),
+      if (urlChanged) {
+        // For URL changes, we need to update the texture
+        if (nextElement.url) {
+          const textureButton = Texture.from(nextElement.url);
+          sprite.texture = textureButton;
+          
+          // Reset size when texture changes, especially for empty sprites getting their first image
+          if (!prevElement.url && nextElement.url) {
+            // This is a new image for an empty sprite
+            // Wait for texture to load to get correct dimensions
+            if (textureButton.baseTexture.valid) {
+              const scaleX = nextElement.scaleX ?? 1;
+              const scaleY = nextElement.scaleY ?? 1;
+              sprite.width = (nextElement.width ?? textureButton.width) * scaleX;
+              sprite.height = (nextElement.height ?? textureButton.height) * scaleY;
+            } else {
+              textureButton.baseTexture.once('loaded', () => {
+                const scaleX = nextElement.scaleX ?? 1;
+                const scaleY = nextElement.scaleY ?? 1;
+                sprite.width = (nextElement.width ?? textureButton.width) * scaleX;
+                sprite.height = (nextElement.height ?? textureButton.height) * scaleY;
+              });
+            }
+          }
+        }
+        
+        // Update hover and click textures if needed
+        if (nextElement.hoverUrl) {
+          const textureButtonHover = Texture.from(nextElement.hoverUrl);
+          sprite.off('pointerenter'); // Remove old listener
+          sprite.on('pointerenter', () => {
+            sprite.texture = textureButtonHover;
           });
-
-        return () => {
-          subscription.unsubscribe();
-        };
-      } else {
-        // For minor changes, update properties directly
-        if (nextElement.x !== undefined) {
-          sprite.x = nextElement.x;
         }
-        if (nextElement.y !== undefined) {
-          sprite.y = nextElement.y;
+        
+        if (nextElement.clickUrl) {
+          const textureButtonClicked = Texture.from(nextElement.clickUrl);
+          sprite.off('pointerdown'); // Remove old listener
+          sprite.on('pointerdown', () => {
+            sprite.texture = textureButtonClicked;
+          });
         }
-        if (
-          nextElement.width !== undefined &&
-          nextElement.width !== prevElement.width
-        ) {
-          sprite.width = nextElement.width;
-        }
-        if (
-          nextElement.height !== undefined &&
-          nextElement.height !== prevElement.height
-        ) {
-          sprite.height = nextElement.height;
-        }
-        if (
-          nextElement.alpha !== undefined &&
-          nextElement.alpha !== prevElement.alpha
-        ) {
-          sprite.alpha = nextElement.alpha;
-        }
-        observer.complete();
       }
 
+      // Update other properties directly
+      if (nextElement.x !== undefined && nextElement.x !== prevElement.x) {
+        sprite.x = nextElement.x;
+      }
+      if (nextElement.y !== undefined && nextElement.y !== prevElement.y) {
+        sprite.y = nextElement.y;
+      }
+      if (nextElement.rotation !== undefined && nextElement.rotation !== prevElement.rotation) {
+        sprite.rotation = (nextElement.rotation * Math.PI) / 180;
+      }
+      
+      const scaleX = nextElement.scaleX ?? 1;
+      const scaleY = nextElement.scaleY ?? 1;
+      
+      if (nextElement.width !== undefined && (nextElement.width !== prevElement.width || scaleX !== (prevElement.scaleX ?? 1))) {
+        sprite.width = nextElement.width * scaleX;
+      }
+      if (nextElement.height !== undefined && (nextElement.height !== prevElement.height || scaleY !== (prevElement.scaleY ?? 1))) {
+        sprite.height = nextElement.height * scaleY;
+      }
+      
+      if (nextElement.anchorX !== undefined && nextElement.anchorX !== prevElement.anchorX) {
+        sprite.pivot.x = sprite.width * nextElement.anchorX / scaleX;
+      }
+      if (nextElement.anchorY !== undefined && nextElement.anchorY !== prevElement.anchorY) {
+        sprite.pivot.y = sprite.height * nextElement.anchorY / scaleY;
+      }
+      
+      if (nextElement.zIndex !== undefined && nextElement.zIndex !== prevElement.zIndex) {
+        sprite.zIndex = nextElement.zIndex;
+      }
+      
+      if (nextElement.alpha !== undefined && nextElement.alpha !== prevElement.alpha) {
+        sprite.alpha = nextElement.alpha;
+      }
+
+      // Update interactivity
+      if ((nextElement.eventName || nextElement.hoverUrl || nextElement.clickUrl) && !sprite.eventMode) {
+        sprite.cursor = "pointer";
+        sprite.eventMode = "static";
+      }
+
+      observer.complete();
       return () => {};
     });
   };
