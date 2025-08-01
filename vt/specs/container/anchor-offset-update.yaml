@@ -1,0 +1,201 @@
+---
+title: Update Offset Fix
+---
+states:
+  # Initial state: Container with anchor at (0,0) and children at various positions
+  - elements:
+    - id: 'container1'
+      type: "container"
+      anchorX: 0
+      anchorY: 0
+      x: 400
+      y: 300
+      width: 200
+      height: 200
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'child1'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 50
+          height: 50
+          anchorX: 0
+          anchorY: 0
+          x: 50
+          y: 50
+        - id: 'child2'
+          type: "sprite"
+          url: "file:circle-red"
+          anchorX: 0
+          anchorY: 0
+          width: 50
+          height: 50
+          x: 100
+          y: 100
+
+  # Update 1: Change anchor to center (0.5, 0.5)
+  - elements:
+    - id: 'container1'
+      type: "container"
+      anchorX: 0.5
+      anchorY: 0.5
+      x: 400
+      y: 300
+      width: 200
+      height: 200
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'child1'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 50
+          height: 50
+          x: 50
+          y: 50
+        - id: 'child2'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 50
+          height: 50
+          x: 100
+          y: 100
+
+  # Update 2: Change anchor to bottom-right (1, 1)
+  - elements:
+    - id: 'container1'
+      type: "container"
+      anchorX: 1
+      anchorY: 1
+      x: 400
+      y: 300
+      width: 200
+      height: 200
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'child1'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 50
+          height: 50
+          x: 50
+          y: 50
+        - id: 'child2'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 50
+          height: 50
+          x: 100
+          y: 100
+
+  # Update 3: Change container size while maintaining anchor at (1, 1)
+  - elements:
+    - id: 'container1'
+      type: "container"
+      anchorX: 1
+      anchorY: 1
+      x: 400
+      y: 300
+      width: 300
+      height: 150
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'child1'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 50
+          height: 50
+          x: 50
+          y: 50
+        - id: 'child2'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 50
+          height: 50
+          x: 100
+          y: 100
+
+  # Update 4: Back to anchor (0, 0) - should return to original relative positions
+  - elements:
+    - id: 'container1'
+      type: "container"
+      anchorX: 0
+      anchorY: 0
+      x: 400
+      y: 300
+      width: 300
+      height: 150
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'child1'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 50
+          height: 50
+          x: 50
+          y: 50
+        - id: 'child2'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 50
+          height: 50
+          x: 100
+          y: 100
+
+  - elements:
+    - id: 'container1'
+      type: "container"
+      anchorX: 0
+      anchorY: 0
+      x: 400
+      y: 300
+      width: 300
+      height: 150
+      fill:
+        color: "rgba(255,0,0,0.8)"
+      children:
+        - id: 'child1'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 50
+          height: 50
+          x: 50
+          y: 50
+        - id: 'child2'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 50
+          height: 50
+          x: 100
+          y: 100
+
+  - elements:
+    - id: 'container1'
+      type: "container"
+      anchorX: 0
+      anchorY: 0
+      x: 500
+      y: 600
+      width: 300
+      height: 150
+      fill:
+        color: "rgba(255,0,0,0.2)"
+      children:
+        - id: 'child1'
+          type: "sprite"
+          url: "file:circle-blue"
+          width: 50
+          height: 50
+          x: 50
+          y: 50
+        - id: 'child2'
+          type: "sprite"
+          url: "file:circle-red"
+          width: 50
+          height: 50
+          x: 100
+          y: 100

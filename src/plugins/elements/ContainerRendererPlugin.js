@@ -543,12 +543,39 @@ export class ContainerRendererPlugin {
 
       for (const element of toUpdateElements) {
         const renderer = getRendererByElement(element.next);
+        
+        // Apply anchor offset to updated elements, similar to how we handle added elements
+        const containerWidth = nextElement.width || 0;
+        const containerHeight = nextElement.height || 0;
+        const anchorOffsetX = anchorX * containerWidth;
+        const anchorOffsetY = anchorY * containerHeight;
+        
+        // Calculate previous anchor offset for comparison
+        const prevAnchorX = prevElement.anchorX ?? 0;
+        const prevAnchorY = prevElement.anchorY ?? 0;
+        const prevContainerWidth = prevElement.width || 0;
+        const prevContainerHeight = prevElement.height || 0;
+        const prevAnchorOffsetX = prevAnchorX * prevContainerWidth;
+        const prevAnchorOffsetY = prevAnchorY * prevContainerHeight;
+        
+        // Adjust coordinates if anchor or container size changed
+        const adjustedPrevElement = {
+          ...element.prev,
+          x: (element.prev.x || 0) + prevAnchorOffsetX,
+          y: (element.prev.y || 0) + prevAnchorOffsetY,
+        };
+        
+        const adjustedNextElement = {
+          ...element.next,
+          x: (element.next.x || 0) + anchorOffsetX,
+          y: (element.next.y || 0) + anchorOffsetY,
+        };
+        
         $updates.push(
           renderer.update(app, {
             parent: container,
-            // TODO fix diff
-            prevElement: element.prev,
-            nextElement: element.next,
+            prevElement: adjustedPrevElement,
+            nextElement: adjustedNextElement,
             transitions,
             getTransitionByType,
             getRendererByElement,
