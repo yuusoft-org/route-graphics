@@ -53,6 +53,14 @@ class App {
         url: "/public/circle-blue.png",
         type: "image/png",
       },
+      "file:circle-green": {
+        url: "/public/circle-green.png",
+        type: "image/png",
+      },
+      "file:circle-grey": {
+        url: "/public/circle-grey.png",
+        type: "image/png",
+      },
       "file:button": {
         url: "/public/button.png",
         type: "image/png",
