@@ -1,0 +1,143 @@
+---
+title: Hover Click State Test
+description: Test adding hover and click states to sprites
+specs:
+  - "Sprite with main image should accept hover state"
+  - "Sprite with main image should accept click state"
+  - "Empty sprite getting all states at once should work"
+---
+states:
+  # State 1: Normal sprite with just main image
+  - elements:
+    - id: 'test-sprite'
+      type: "sprite"
+      url: "file:button"
+      x: 200
+      y: 200
+      width: 150
+      height: 50
+    - id: 'label'
+      type: "text"
+      text: "Normal button"
+      x: 200
+      y: 270
+      style:
+        fontSize: 16
+        fill: "white"
+        fontFamily: "Arial"
+
+  # State 2: Add hover state
+  - elements:
+    - id: 'test-sprite'
+      type: "sprite"
+      url: "file:button"
+      hoverUrl: "file:button_over"
+      x: 200
+      y: 200
+      width: 150
+      height: 50
+    - id: 'label'
+      type: "text"
+      text: "Hover over button"
+      x: 200
+      y: 270
+      style:
+        fontSize: 16
+        fill: "white"
+        fontFamily: "Arial"
+
+  # State 3: Add click state
+  - elements:
+    - id: 'test-sprite'
+      type: "sprite"
+      url: "file:button"
+      hoverUrl: "file:button_over"
+      clickUrl: "file:button_down"
+      x: 200
+      y: 200
+      width: 150
+      height: 50
+    - id: 'label'
+      type: "text"
+      text: "Hover and click button"
+      x: 200
+      y: 270
+      style:
+        fontSize: 16
+        fill: "white"
+        fontFamily: "Arial"
+
+  # State 4: Empty sprite getting all states at once
+  - elements:
+    - id: 'empty-sprite'
+      type: "sprite"
+      x: 200
+      y: 100
+      width: 150
+      height: 50
+    - id: 'test-sprite'
+      type: "sprite"
+      url: "file:button"
+      hoverUrl: "file:button_over"
+      clickUrl: "file:button_down"
+      x: 200
+      y: 200
+      width: 150
+      height: 50
+    - id: 'label1'
+      type: "text"
+      text: "Empty sprite"
+      x: 200
+      y: 60
+      style:
+        fontSize: 16
+        fill: "white"
+        fontFamily: "Arial"
+    - id: 'label2'
+      type: "text"
+      text: "Interactive button"
+      x: 200
+      y: 270
+      style:
+        fontSize: 16
+        fill: "white"
+        fontFamily: "Arial"
+
+  # State 5: Give empty sprite all states
+  - elements:
+    - id: 'empty-sprite'
+      type: "sprite"
+      url: "file:button"
+      hoverUrl: "file:button_over"
+      clickUrl: "file:button_down"
+      x: 200
+      y: 100
+      width: 150
+      height: 50
+    - id: 'test-sprite'
+      type: "sprite"
+      url: "file:button"
+      hoverUrl: "file:button_over"
+      clickUrl: "file:button_down"
+      x: 200
+      y: 200
+      width: 150
+      height: 50
+    - id: 'label1'
+      type: "text"
+      text: "Now interactive"
+      x: 200
+      y: 60
+      style:
+        fontSize: 16
+        fill: "white"
+        fontFamily: "Arial"
+    - id: 'label2'
+      type: "text"
+      text: "Interactive button"
+      x: 200
+      y: 270
+      style:
+        fontSize: 16
+        fill: "white"
+        fontFamily: "Arial"

@@ -62,7 +62,8 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         eventHandler,
       } = options;
 
-      const textureButton = Texture.from(element.url);
+      // Handle empty sprites - use EMPTY texture if no URL provided
+      const textureButton = element.url ? Texture.from(element.url) : Texture.EMPTY;
       // TODO fix texture is undefined in test environment
       let textureButtonHover;
       let textureButtonClicked;
@@ -116,16 +117,20 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         sprite.alpha = element.alpha;
       }
 
-      sprite
-        .on("pointerup", () => {
-          sprite.texture = textureButton;
-        })
-        .on("pointerupoutside", () => {
-          sprite.texture = textureButton;
-        })
-        .on("pointerleave", () => {
-          sprite.texture = textureButton;
-        });
+      // Only add reset listeners if we have hover or click textures
+      if (textureButtonHover || textureButtonClicked) {
+        sprite
+          .on("pointerup", () => {
+            sprite.texture = textureButton;
+          })
+          .on("pointerupoutside", () => {
+            sprite.texture = textureButton;
+          })
+          .on("pointerleave", () => {
+            sprite.texture = textureButton;
+          });
+      }
+      
       if (textureButtonClicked) {
         sprite.on("pointerdown", () => {
           sprite.texture = textureButtonClicked;
@@ -321,6 +326,25 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
           }
         }
         
+        // Check if we need to add reset listeners (when first adding hover or click)
+        const hadInteractiveTextures = prevElement.hoverUrl || prevElement.clickUrl;
+        const hasInteractiveTextures = nextElement.hoverUrl || nextElement.clickUrl;
+        
+        if (!hadInteractiveTextures && hasInteractiveTextures) {
+          // Get the current main texture
+          const mainTexture = sprite.texture;
+          sprite
+            .on("pointerup", () => {
+              sprite.texture = mainTexture;
+            })
+            .on("pointerupoutside", () => {
+              sprite.texture = mainTexture;
+            })
+            .on("pointerleave", () => {
+              sprite.texture = mainTexture;
+            });
+        }
+        
         // Update hover and click textures if needed
         if (nextElement.hoverUrl) {
           const textureButtonHover = Texture.from(nextElement.hoverUrl);
@@ -376,7 +400,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       }
 
       // Update interactivity
-      if ((nextElement.eventName || nextElement.hoverUrl || nextElement.clickUrl) && !sprite.eventMode) {
+      if (nextElement.eventName || nextElement.hoverUrl || nextElement.clickUrl) {
         sprite.cursor = "pointer";
         sprite.eventMode = "static";
       }
