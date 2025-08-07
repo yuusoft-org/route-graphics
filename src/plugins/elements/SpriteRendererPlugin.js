@@ -84,6 +84,20 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         sprite.cursor = "pointer";
         sprite.eventMode = "static";
       }
+      
+      // Set dimensions first before calculating anchor
+      if (element.width !== undefined) {
+        sprite.width = element.width * scaleX;
+      } else {
+        sprite.width *= scaleX;
+      }
+      if (element.height !== undefined) {
+        sprite.height = element.height * scaleY;
+      } else {
+        sprite.height *= scaleY;
+      }
+      
+      // Now calculate anchor based on the correct dimensions
       if (element.anchorX !== undefined) {
         sprite.pivot.x = sprite.width * element.anchorX;
       }
@@ -98,16 +112,6 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       }
       if (element.y !== undefined) {
         sprite.y = element.y;
-      }
-      if (element.width !== undefined) {
-        sprite.width = element.width * scaleX;
-      } else {
-        sprite.width *= scaleX;
-      }
-      if (element.height !== undefined) {
-        sprite.height = element.height * scaleY;
-      } else {
-        sprite.height *= scaleY;
       }
       if (element.zIndex !== undefined) {
         sprite.zIndex = element.zIndex;

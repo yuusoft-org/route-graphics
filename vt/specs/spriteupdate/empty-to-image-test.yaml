@@ -7,10 +7,18 @@ specs:
 states:
   # State 1: Create sprite without URL
   - elements:
-    - id: 'empty-sprite'
+    - id: 'empty-sprite1'
       type: "sprite"
       x: 200
       y: 200
+      width: 100
+      height: 100
+    - id: 'empty-sprite2'
+      type: "sprite"
+      x: 200
+      y: 200
+      anchorX: 0.5
+      anchorY: 0.5
       width: 100
       height: 100
     - id: 'label'
@@ -24,16 +32,25 @@ states:
 
   # State 2: Add URL to the sprite
   - elements:
-    - id: 'empty-sprite'
+    - id: 'empty-sprite1'
       type: "sprite"
       url: "file:circle-red"
       x: 200
       y: 200
       width: 100
       height: 100
+    - id: 'empty-sprite2'
+      type: "sprite"
+      url: "file:circle-blue"
+      x: 200
+      y: 200
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 100
+      height: 100
     - id: 'label'
       type: "text"
-      text: "Should show red circle"
+      text: "Should show circle sprites"
       x: 200
       y: 320
       style:
