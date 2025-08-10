@@ -1,0 +1,59 @@
+---
+title: Sprite Position Move
+description: A sprite moving between positions without add/remove
+specs:
+  - "sprite should animate from one position to another"
+  - "sprite should remain visible throughout"
+  - "smooth transition between states"
+---
+states:
+  - elements:
+      - id: 'sprite1'
+        type: "sprite"
+        url: "file:circle-red"
+        x: 100
+        y: 100
+  - elements:
+      - id: 'sprite1'
+        type: "sprite"
+        url: "file:circle-red"
+        x: 400
+        y: 300
+    transitions:
+      - id: 'sprite-move-1'
+        elementId: 'sprite1'
+        type: keyframes
+        event: update
+        animationProperties:
+          x:
+            keyframes:
+              - duration: 1000
+                value: 400
+                easing: linear
+          y:
+            keyframes:
+              - duration: 1000
+                value: 300
+                easing: linear
+  - elements:
+      - id: 'sprite1'
+        type: "sprite"
+        url: "file:circle-red"
+        x: 200
+        y: 50
+    transitions:
+      - id: 'sprite-move-2'
+        elementId: 'sprite1'
+        type: keyframes
+        event: update
+        animationProperties:
+          x:
+            keyframes:
+              - duration: 1000
+                value: 200
+                easing: linear
+          y:
+            keyframes:
+              - duration: 1000
+                value: 50
+                easing: linear

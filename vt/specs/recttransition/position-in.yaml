@@ -1,0 +1,36 @@
+---
+title: Rect Position In
+description: A rect's position transition
+specs:
+  - "`y` should be correct"
+  - "`x` should be correct"
+  - "rect should move from initial position to target"
+---
+states:
+  - elements: []
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 500
+        y: 200
+        width: 200
+        height: 150
+        fill: "#ff0000"
+    transitions:
+      - id: 'rect-position-in'
+        elementId: 'rect1'
+        type: keyframes
+        event: add
+        animationProperties:
+          x:
+            initialValue: 0
+            keyframes:
+              - duration: 1000
+                value: 500
+                easing: linear
+          y:
+            initialValue: 0
+            keyframes:
+              - duration: 1000
+                value: 200
+                easing: linear

@@ -30,6 +30,7 @@
 export const TransitionEvent = {
   Add: "add",
   Remove: "remove",
+  Update: "update",
 };
 
 /**

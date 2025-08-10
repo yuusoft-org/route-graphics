@@ -1,0 +1,38 @@
+---
+title: Rect Position In Relative
+description: A rect's position transition with relative values
+specs:
+  - "rect should move relative to initial position"
+  - "`x` should be offset by relative value"
+  - "`y` should be offset by relative value"
+---
+states:
+  - elements: []
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 100
+        y: 100
+        width: 200
+        height: 150
+        fill: "#ff00ff"
+    transitions:
+      - id: 'rect-position-in-relative'
+        elementId: 'rect1'
+        type: keyframes
+        event: add
+        animationProperties:
+          x:
+            initialValue: 100
+            keyframes:
+              - duration: 1000
+                value: 200
+                easing: linear
+                relative: true
+          y:
+            initialValue: 100
+            keyframes:
+              - duration: 1000
+                value: 150
+                easing: linear
+                relative: true

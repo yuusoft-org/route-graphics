@@ -1,0 +1,65 @@
+---
+title: Rect Position Move
+description: A rect moving between positions without add/remove
+specs:
+  - "rect should animate from one position to another"
+  - "rect should remain visible throughout"
+  - "smooth transition between states"
+---
+states:
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 100
+        y: 100
+        width: 150
+        height: 150
+        fill: "#ff6600"
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 400
+        y: 300
+        width: 150
+        height: 150
+        fill: "#ff6600"
+    transitions:
+      - id: 'rect-move-1'
+        elementId: 'rect1'
+        type: keyframes
+        event: update
+        animationProperties:
+          x:
+            keyframes:
+              - duration: 1000
+                value: 400
+                easing: linear
+          y:
+            keyframes:
+              - duration: 1000
+                value: 300
+                easing: linear
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 200
+        y: 50
+        width: 150
+        height: 150
+        fill: "#ff6600"
+    transitions:
+      - id: 'rect-move-2'
+        elementId: 'rect1'
+        type: keyframes
+        event: update
+        animationProperties:
+          x:
+            keyframes:
+              - duration: 1000
+                value: 200
+                easing: linear
+          y:
+            keyframes:
+              - duration: 1000
+                value: 50
+                easing: linear
