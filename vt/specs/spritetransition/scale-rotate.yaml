@@ -14,22 +14,19 @@ states:
         url: "file:circle-red"
         x: 300
         y: 200
-        scaleX: 2
-        scaleY: 2
-        rotation: 180
     transitions:
       - id: 'sprite-scale-rotate'
         elementId: 'sprite1'
         type: keyframes
         event: add
         animationProperties:
-          scaleX:
+          scale.x:
             initialValue: 0.5
             keyframes:
               - duration: 1500
                 value: 2
                 easing: linear
-          scaleY:
+          scale.y:
             initialValue: 0.5
             keyframes:
               - duration: 1500
@@ -39,5 +36,5 @@ states:
             initialValue: 0
             keyframes:
               - duration: 1500
-                value: 180
+                value: 3.14159
                 easing: linear

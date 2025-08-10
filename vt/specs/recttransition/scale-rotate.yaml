@@ -16,22 +16,19 @@ states:
         width: 100
         height: 100
         fill: "#9900ff"
-        scaleX: 2
-        scaleY: 2
-        rotation: 180
     transitions:
       - id: 'rect-scale-rotate'
         elementId: 'rect1'
         type: keyframes
         event: add
         animationProperties:
-          scaleX:
+          scale.x:
             initialValue: 0.5
             keyframes:
               - duration: 1500
                 value: 2
                 easing: linear
-          scaleY:
+          scale.y:
             initialValue: 0.5
             keyframes:
               - duration: 1500
@@ -41,5 +38,5 @@ states:
             initialValue: 0
             keyframes:
               - duration: 1500
-                value: 180
+                value: 3.14159
                 easing: linear
