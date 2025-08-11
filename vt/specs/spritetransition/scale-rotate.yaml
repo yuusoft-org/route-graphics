@@ -1,0 +1,40 @@
+---
+title: Sprite Scale and Rotate
+description: A sprite's scale and rotation transition
+specs:
+  - "sprite should scale smoothly"
+  - "sprite should rotate smoothly"
+  - "combined transformations should work"
+---
+states:
+  - elements: []
+  - elements:
+      - id: 'sprite1'
+        type: "sprite"
+        url: "file:circle-red"
+        x: 300
+        y: 200
+    transitions:
+      - id: 'sprite-scale-rotate'
+        elementId: 'sprite1'
+        type: keyframes
+        event: add
+        animationProperties:
+          scale.x:
+            initialValue: 0.5
+            keyframes:
+              - duration: 1500
+                value: 2
+                easing: linear
+          scale.y:
+            initialValue: 0.5
+            keyframes:
+              - duration: 1500
+                value: 2
+                easing: linear
+          rotation:
+            initialValue: 0
+            keyframes:
+              - duration: 1500
+                value: 3.14159
+                easing: linear

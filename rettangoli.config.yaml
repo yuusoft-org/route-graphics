@@ -15,6 +15,9 @@ vt:
         - title: "Rect"
           files: "rect"
           description: "Rect primitive rendering tests"
+        - title: "Rect Transitions"
+          files: "recttransition"
+          description: "Rect transitions and animations tests"
     - title: "Sprite"
       type: "groupLabel"
       items:

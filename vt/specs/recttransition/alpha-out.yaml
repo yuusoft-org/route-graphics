@@ -1,0 +1,29 @@
+---
+title: Rect Alpha Out
+description: A rect's alpha fade out transition
+specs:
+  - "alpha should fade from 1 to 0"
+  - "rect should disappear gradually"
+---
+states:
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 200
+        y: 200
+        width: 300
+        height: 200
+        fill: "#ffff00"
+        alpha: 1
+  - elements: []
+    transitions:
+      - id: 'rect-alpha-out'
+        elementId: 'rect1'
+        type: keyframes
+        event: remove
+        animationProperties:
+          alpha:
+            keyframes:
+              - duration: 1500
+                value: 0
+                easing: linear

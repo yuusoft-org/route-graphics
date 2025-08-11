@@ -1,0 +1,30 @@
+---
+title: Rect Alpha In
+description: A rect's alpha fade in transition
+specs:
+  - "alpha should fade from 0 to 1"
+  - "rect should appear gradually"
+---
+states:
+  - elements: []
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 200
+        y: 200
+        width: 300
+        height: 200
+        fill: "#0000ff"
+        alpha: 1
+    transitions:
+      - id: 'rect-alpha-in'
+        elementId: 'rect1'
+        type: keyframes
+        event: add
+        animationProperties:
+          alpha:
+            initialValue: 0
+            keyframes:
+              - duration: 1500
+                value: 1
+                easing: linear

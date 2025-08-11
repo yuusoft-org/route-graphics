@@ -1,0 +1,36 @@
+---
+title: Rect Position Out Relative
+description: A rect's position out transition with relative values
+specs:
+  - "rect should move relative to current position"
+  - "`x` should be offset by relative value"
+  - "`y` should be offset by relative value"
+---
+states:
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 200
+        y: 200
+        width: 200
+        height: 150
+        fill: "#00ffff"
+  - elements: []
+    transitions:
+      - id: 'rect-position-out-relative'
+        elementId: 'rect1'
+        type: keyframes
+        event: remove
+        animationProperties:
+          x:
+            keyframes:
+              - duration: 1000
+                value: 300
+                easing: linear
+                relative: true
+          y:
+            keyframes:
+              - duration: 1000
+                value: -200
+                easing: linear
+                relative: true

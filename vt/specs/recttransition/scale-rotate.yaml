@@ -1,0 +1,42 @@
+---
+title: Rect Scale and Rotate
+description: A rect's scale and rotation transition
+specs:
+  - "rect should scale smoothly"
+  - "rect should rotate smoothly"
+  - "combined transformations should work"
+---
+states:
+  - elements: []
+  - elements:
+      - id: 'rect1'
+        type: "rect"
+        x: 300
+        y: 200
+        width: 100
+        height: 100
+        fill: "#9900ff"
+    transitions:
+      - id: 'rect-scale-rotate'
+        elementId: 'rect1'
+        type: keyframes
+        event: add
+        animationProperties:
+          scale.x:
+            initialValue: 0.5
+            keyframes:
+              - duration: 1500
+                value: 2
+                easing: linear
+          scale.y:
+            initialValue: 0.5
+            keyframes:
+              - duration: 1500
+                value: 2
+                easing: linear
+          rotation:
+            initialValue: 0
+            keyframes:
+              - duration: 1500
+                value: 3.14159
+                easing: linear
