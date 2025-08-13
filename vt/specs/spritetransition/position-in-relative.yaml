@@ -8,20 +8,24 @@ specs:
 ---
 states:
   - elements:
-      - id: 'a'
+      - id: "a"
         type: "sprite"
         url: "file:bg1"
-      - id: 'b'
+  - elements:
+      - id: "a"
+        type: "sprite"
+        url: "file:bg1"
+      - id: "b"
         type: "sprite"
         url: "file:circle-red"
         x: 200
         y: 200
     transitions:
-      - id: 'a'
-        elementId: 'b'
+      - id: "a"
+        elementId: "b"
         type: keyframes
         event: add
-        animationProperties:
+        properties:
           x:
             keyframes:
               - duration: 1000
@@ -34,4 +38,3 @@ states:
                 relative: true
                 value: 200
                 easing: linear
-              

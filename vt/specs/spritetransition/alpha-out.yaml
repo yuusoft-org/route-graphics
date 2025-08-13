@@ -21,7 +21,7 @@ states:
         elementId: 'b'
         type: keyframes
         event: remove
-        animationProperties:
+        properties:
           alpha:
             keyframes:
               - duration: 1000

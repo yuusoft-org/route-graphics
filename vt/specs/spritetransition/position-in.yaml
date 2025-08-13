@@ -23,7 +23,7 @@ states:
         elementId: 'b'
         type: keyframes
         event: add
-        animationProperties:
+        properties:
           x:
             initialValue: 0
             keyframes:

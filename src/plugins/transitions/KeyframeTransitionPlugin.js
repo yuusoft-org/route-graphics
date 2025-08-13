@@ -105,23 +105,21 @@ class KeyframeTransitionPlugin {
   transitionType = "keyframes";
 
   _transition = (app, sprite, transition) => {
-    console.log("keyframe transition setup");
     return new Observable((observer) => {
-      console.log("keyframe transition start");
-      const { animationProperties: animationPropertiesArrayOrObject } =
+      const { properties: propertiesArrayOrObject } =
         transition;
       // TODO: stop supporting arrays
 
       const animationProperties = Array.isArray(
-        animationPropertiesArrayOrObject,
+        propertiesArrayOrObject,
       )
-        ? animationPropertiesArrayOrObject
-        : Object.entries(animationPropertiesArrayOrObject).map(
-            ([property, value]) => ({
-              ...value,
-              property,
-            }),
-          );
+        ? propertiesArrayOrObject
+        : Object.entries(propertiesArrayOrObject).map(
+          ([property, value]) => ({
+            ...value,
+            property,
+          }),
+        );
 
       const accumulatedDurations = animationProperties.map(
         (animationProperty) => {

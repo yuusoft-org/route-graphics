@@ -25,7 +25,7 @@ states:
         elementId: 'b'
         type: keyframes
         event: remove
-        animationProperties:
+        properties:
           x:
             keyframes:
               - duration: 1000
