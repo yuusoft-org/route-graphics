@@ -19,7 +19,7 @@ states:
         elementId: 'sprite1'
         type: keyframes
         event: add
-        animationProperties:
+        properties:
           scale.x:
             initialValue: 0.5
             keyframes:

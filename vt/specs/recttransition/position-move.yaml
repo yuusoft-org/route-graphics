@@ -28,7 +28,7 @@ states:
         elementId: 'rect1'
         type: keyframes
         event: update
-        animationProperties:
+        properties:
           x:
             keyframes:
               - duration: 1000
@@ -52,7 +52,7 @@ states:
         elementId: 'rect1'
         type: keyframes
         event: update
-        animationProperties:
+        properties:
           x:
             keyframes:
               - duration: 1000

@@ -21,7 +21,7 @@ states:
         elementId: 'rect1'
         type: keyframes
         event: add
-        animationProperties:
+        properties:
           x:
             initialValue: 100
             keyframes:

@@ -21,7 +21,7 @@ states:
         elementId: 'rect1'
         type: keyframes
         event: remove
-        animationProperties:
+        properties:
           x:
             keyframes:
               - duration: 1000

@@ -21,7 +21,7 @@ states:
         elementId: 'b'
         type: keyframes
         event: add
-        animationProperties:
+        properties:
           alpha:
             initialValue: 0.2
             keyframes:

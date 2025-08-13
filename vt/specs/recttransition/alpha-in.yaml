@@ -21,7 +21,7 @@ states:
         elementId: 'rect1'
         type: keyframes
         event: add
-        animationProperties:
+        properties:
           alpha:
             initialValue: 0
             keyframes:
