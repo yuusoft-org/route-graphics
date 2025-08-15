@@ -584,16 +584,39 @@ export class ContainerRendererPlugin {
         );
       }
 
-      // sort children by element id from nextElement.children
-      container.children.sort((a, b) => {
-        const aIndex = nextElement.children?.findIndex(
-          (element) => element.id === a.label,
-        );
-        const bIndex = nextElement.children?.findIndex(
-          (element) => element.id === b.label,
-        );
-        return aIndex - bIndex;
-      });
+      // Sort children based on their order in nextElement.children
+      // This ensures proper layering when zIndex is not specified
+      if (nextElement.children && nextElement.children.length > 0) {
+        container.children.sort((a, b) => {
+          // Find the corresponding elements in nextElement.children
+          const aElement = nextElement.children.find(
+            (element) => element.id === a.label
+          );
+          const bElement = nextElement.children.find(
+            (element) => element.id === b.label
+          );
+          
+          // If both elements are found in children array
+          if (aElement && bElement) {
+            // First, sort by zIndex if specified
+            const aZIndex = aElement.zIndex ?? 0;
+            const bZIndex = bElement.zIndex ?? 0;
+            if (aZIndex !== bZIndex) {
+              return aZIndex - bZIndex;
+            }
+            
+            // If zIndex is the same or not specified, maintain order from nextElement.children
+            const aIndex = nextElement.children.indexOf(aElement);
+            const bIndex = nextElement.children.indexOf(bElement);
+            return aIndex - bIndex;
+          }
+          
+          // Keep elements that aren't in children array at the beginning
+          if (!aElement && !bElement) return 0;
+          if (!aElement) return -1;
+          if (!bElement) return 1;
+        });
+      }
 
       this._currentSubscription = from($updates)
         .pipe(
