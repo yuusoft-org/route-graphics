@@ -379,17 +379,6 @@ class RouteGraphics extends BaseRouteGraphics {
       );
     }
 
-    // sort children by element id from nextElement.children
-    app.stage.children.sort((a, b) => {
-      const aIndex = nextState.elements.findIndex(
-        (element) => element.id === a.label,
-      );
-      const bIndex = nextState.elements.findIndex(
-        (element) => element.id === b.label,
-      );
-      return aIndex - bIndex;
-    });
-
     if (this._currentSubscription) {
       if (!this._currentSubscription.closed) {
         this._currentSubscription.unsubscribe();
@@ -400,6 +389,39 @@ class RouteGraphics extends BaseRouteGraphics {
       .pipe(
         mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
         finalize(() => {
+          // Sort children AFTER all add/update operations complete
+          app.stage.children.sort((a, b) => {
+            const aElement = nextState.elements.find(
+              (element) => element.id === a.label
+            );
+            const bElement = nextState.elements.find(
+              (element) => element.id === b.label
+            );
+            
+            if (aElement && bElement) {
+              // First, sort by zIndex if specified
+              const aZIndex = aElement.zIndex ?? 0;
+              const bZIndex = bElement.zIndex ?? 0;
+              if (aZIndex !== bZIndex) {
+                return aZIndex - bZIndex;
+              }
+              
+              // If zIndex is the same or not specified, maintain order from nextState.elements
+              const aIndex = nextState.elements.findIndex(
+                (element) => element.id === a.label
+              );
+              const bIndex = nextState.elements.findIndex(
+                (element) => element.id === b.label
+              );
+              return aIndex - bIndex;
+            }
+            
+            // Keep elements that aren't in nextState.elements at their current position
+            if (!aElement && !bElement) return 0;
+            if (!aElement) return -1;
+            if (!bElement) return 1;
+          });
+          
           eventHandler &&
             eventHandler("completed", {
               id: nextState.id,

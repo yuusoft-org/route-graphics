@@ -1,0 +1,57 @@
+---
+title: Layout order
+description: Check layout order
+specs:
+  - container b should display above container a
+---
+states:
+  - elements:
+      - id: "d"
+        type: "container"
+        direction: "vertical"
+        x: 150
+        y: 200
+        children:
+          - id: "e"
+            type: "sprite"
+            url: "file:circle-red"
+            width: 200
+            height: 200
+          - id: "f"
+            type: "sprite"
+            url: "file:circle-blue"
+            width: 200
+            height: 200
+  - elements:
+      - id: "a"
+        type: "container"
+        direction: "horizontal"
+        x: 100
+        y: 100
+        children:
+          - id: "b"
+            type: "sprite"
+            url: "file:circle-red"
+            width: 200
+            height: 200
+          - id: "c"
+            type: "sprite"
+            url: "file:circle-blue"
+            width: 200
+            height: 200
+      - id: "d"
+        type: "container"
+        direction: "vertical"
+        x: 150
+        y: 200
+        children:
+          - id: "e"
+            type: "sprite"
+            url: "file:circle-red"
+            width: 200
+            height: 200
+          - id: "f"
+            type: "sprite"
+            url: "file:circle-blue"
+            width: 200
+            height: 200
