@@ -145,21 +145,8 @@ class KeyframeTransitionPlugin {
         );
       });
 
-      const effect = (time) => {
-        if (signal?.aborted) {
-          app.ticker.remove(effect);
-          reject(new DOMException('Operation aborted', 'AbortError'));
-          return;
-        }
-
-        currentTimDelta += time.deltaMS;
-
-        if (currentTimDelta >= maxDuration) {
-          app.ticker.remove(effect);
-          resolve();
-          return;
-        }
-
+      // Helper function to apply the animation state at a given time
+      const applyAnimationState = (timeDelta) => {
         const output = {};
 
         animationProperties.forEach((animationProperty) => {
@@ -178,7 +165,7 @@ class KeyframeTransitionPlugin {
           set(
             output,
             animationProperty.property,
-            processInput(input, currentTimDelta),
+            processInput(input, timeDelta),
           );
         });
 
@@ -190,7 +177,37 @@ class KeyframeTransitionPlugin {
         });
       };
 
+      const cleanup = () => {
+        app.ticker.remove(effect);
+        // Set to final state when torn down
+        applyAnimationState(maxDuration);
+      };
+
+      const effect = (time) => {
+        if (signal?.aborted) {
+          cleanup();
+          reject(new DOMException('Operation aborted', 'AbortError'));
+          return;
+        }
+
+        currentTimDelta += time.deltaMS;
+
+        if (currentTimDelta >= maxDuration) {
+          app.ticker.remove(effect);
+          resolve();
+          return;
+        }
+
+        applyAnimationState(currentTimDelta);
+      };
+
       app.ticker.add(effect);
+
+      // If already aborted, clean up immediately
+      if (signal?.aborted) {
+        cleanup();
+        reject(new DOMException('Operation aborted', 'AbortError'));
+      }
     });
   };
 
