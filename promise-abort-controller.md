@@ -72,17 +72,13 @@ add = async (app, options, signal) => {
     transitionClass.add(app, sprite, transition, signal)
   );
   
-  // Listen for abort
-  const abortHandler = () => {
-    // Cleanup logic
-  };
-  signal?.addEventListener('abort', abortHandler);
+  // Run all transitions
+  await Promise.all(transitionPromises);
   
-  try {
-    await Promise.all(transitionPromises);
-  } finally {
-    signal?.removeEventListener('abort', abortHandler);
-  }
+  // Return cleanup function if needed
+  return () => {
+    // Cleanup resources like sprite.destroy()
+  };
 };
 ```
 
@@ -104,6 +100,12 @@ add = async (app, options, signal) => {
 3. Performance testing
 
 ## Implementation Details
+
+### Key Simplification
+Unlike the event listener approach sometimes seen in examples, we don't need to use `signal.addEventListener('abort', ...)` for most cases. The AbortSignal is primarily used for:
+- Checking `signal.aborted` to exit early from operations
+- Passing to APIs that accept AbortSignal (like fetch)
+- The actual abort happens externally via `controller.abort()`
 
 ### 1. Managing Parallel Operations
 **Current (RxJS):**
@@ -128,7 +130,7 @@ this._currentAbortController?.abort();
 this._currentAbortController = new AbortController();
 ```
 
-### 3. Cleanup on Cancellation
+### 3. Cleanup Pattern
 **Current (RxJS):**
 ```javascript
 return () => {
@@ -137,28 +139,51 @@ return () => {
 };
 ```
 
-**New (AbortController):**
+**New (Promise-based):**
 ```javascript
-signal.addEventListener('abort', () => {
-  sprite.destroy();
-});
+// Main render method in RouteGraphics
+try {
+  await Promise.all(actions);
+} catch (error) {
+  if (error.name === 'AbortError') {
+    // Handle cleanup for aborted operations
+    cleanupResources();
+  }
+  throw error;
+}
 ```
+
+The key difference is that cleanup happens at the orchestration level when catching abort errors, rather than registering event listeners in each method.
 
 ### 4. Animation Frame Handling
 For `KeyframeTransitionPlugin`, we need special handling:
 ```javascript
-const effect = (time) => {
-  if (signal?.aborted) {
-    app.ticker.remove(effect);
-    return;
-  }
-  // Animation logic
-};
-app.ticker.add(effect);
+add = async (app, sprite, transition, signal) => {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Operation aborted', 'AbortError'));
+      return;
+    }
 
-signal?.addEventListener('abort', () => {
-  app.ticker.remove(effect);
-});
+    const effect = (time) => {
+      if (signal?.aborted) {
+        app.ticker.remove(effect);
+        reject(new DOMException('Operation aborted', 'AbortError'));
+        return;
+      }
+      
+      // Animation logic
+      currentTimeDelta += time.deltaMS;
+      
+      if (currentTimeDelta >= maxDuration) {
+        app.ticker.remove(effect);
+        resolve();
+      }
+    };
+    
+    app.ticker.add(effect);
+  });
+};
 ```
 
 ## Unknowns and Risks
