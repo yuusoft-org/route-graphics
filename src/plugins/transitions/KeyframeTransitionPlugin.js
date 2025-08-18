@@ -1,4 +1,4 @@
-import { Observable } from "rxjs";
+// No RxJS import needed
 
 const easings = {
   linear: (x) => x,
@@ -104,10 +104,14 @@ class KeyframeTransitionPlugin {
   rendererName = "pixi";
   transitionType = "keyframes";
 
-  _transition = (app, sprite, transition) => {
-    return new Observable((observer) => {
-      const { properties: propertiesArrayOrObject } =
-        transition;
+  _transition = async (app, sprite, transition, signal) => {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException('Operation aborted', 'AbortError'));
+        return;
+      }
+
+      const { properties: propertiesArrayOrObject } = transition;
       // TODO: stop supporting arrays
 
       const animationProperties = Array.isArray(
@@ -142,11 +146,17 @@ class KeyframeTransitionPlugin {
       });
 
       const effect = (time) => {
+        if (signal?.aborted) {
+          app.ticker.remove(effect);
+          reject(new DOMException('Operation aborted', 'AbortError'));
+          return;
+        }
+
         currentTimDelta += time.deltaMS;
 
         if (currentTimDelta >= maxDuration) {
           app.ticker.remove(effect);
-          observer.complete();
+          resolve();
           return;
         }
 
@@ -181,21 +191,15 @@ class KeyframeTransitionPlugin {
       };
 
       app.ticker.add(effect);
-
-      return () => {
-        app.ticker.remove(effect);
-        // Set to final state when torn down
-        effect({ deltaMS: maxDuration - currentTimDelta });
-      };
     });
   };
 
-  add = (app, sprite, transition) => {
-    return this._transition(app, sprite, transition);
+  add = async (app, sprite, transition, signal) => {
+    return this._transition(app, sprite, transition, signal);
   };
 
-  remove = (app, sprite, transition) => {
-    return this._transition(app, sprite, transition);
+  remove = async (app, sprite, transition, signal) => {
+    return this._transition(app, sprite, transition, signal);
   };
 }
 

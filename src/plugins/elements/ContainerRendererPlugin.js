@@ -1,7 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import { TransitionEvent, BaseRendererPlugin } from "../../types";
 import { diffElements } from "../../common";
-import { finalize, from, mergeMap, Observable } from "rxjs";
 
 /**
  * @typedef {import('../../types').ContainerElement} ContainerElement

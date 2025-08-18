@@ -1,6 +1,5 @@
 import { Text, TextStyle, Rectangle } from "pixi.js";
 import { TransitionEvent, BaseRendererPlugin } from "../../types";
-import { from, mergeMap, Observable } from "rxjs";
 
 /**
  * @typedef {import('../../types').ContainerElement} ContainerElement

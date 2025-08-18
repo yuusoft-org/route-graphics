@@ -1,6 +1,5 @@
 import { Sprite, Texture } from "pixi.js";
 import { TransitionEvent, BaseRendererPlugin } from "../../types";
-import { from, mergeMap, Observable } from "rxjs";
 
 /**
  * @typedef {import('../../types').ContainerElement} ContainerElement
@@ -50,10 +49,13 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
    * @param {SpriteElement} options.element
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
-   * @returns {Observable<any>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  add = (app, options) => {
-    return new Observable((observer) => {
+  add = async (app, options, signal) => {
+    if (signal?.aborted) {
+      throw new DOMException('Operation aborted', 'AbortError');
+    }
       const {
         parent,
         element,
@@ -168,7 +170,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       //   }
       // });
 
-      const transitionObservables = [];
+      const transitionPromises = [];
 
       for (const transition of transitions) {
         if (
@@ -181,29 +183,16 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
               `Transition class not found for type ${transition.type}`,
             );
           }
-          transitionObservables.push(
-            transitionClass.add(app, sprite, transition),
+          transitionPromises.push(
+            transitionClass.add(app, sprite, transition, signal),
           );
         }
       }
 
       parent.addChild(sprite);
 
-      const subscription = from(transitionObservables)
-        .pipe(
-          mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
-        )
-        .subscribe({
-          error: (err) => {
-            console.error("Error:", err);
-          },
-          complete: () => observer.complete(),
-        });
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    });
+      // Run all transitions in parallel
+      await Promise.all(transitionPromises);
   };
 
   /**
@@ -213,10 +202,13 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
    * @param {SpriteElement} options.element
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
-   * @returns {Observable<any>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  remove = (app, options) => {
-    return new Observable((observer) => {
+  remove = async (app, options, signal) => {
+    if (signal?.aborted) {
+      throw new DOMException('Operation aborted', 'AbortError');
+    }
       const {
         parent,
         element,
@@ -227,7 +219,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       if (!sprite) {
         throw new Error(`Sprite with id ${element.id} not found`);
       }
-      let transitionObservables = [];
+      let transitionPromises = [];
       for (const transition of transitions) {
         if (
           transition.elementId === element.id &&
@@ -239,37 +231,19 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
               `Transition class not found for type ${transition.type}`,
             );
           }
-          transitionObservables.push(
-            transitionClass.remove(app, sprite, transition),
+          transitionPromises.push(
+            transitionClass.remove(app, sprite, transition, signal),
           );
         }
       }
 
-      const subscription = from(transitionObservables)
-        .pipe(
-          mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
-        )
-        .subscribe({
-          error: (err) => {
-            console.error("Error:", err);
-          },
-          // next: val => console.log('Parallel result:', val),
-          complete: () => {
-            observer.complete();
-            if (sprite) {
-              sprite.destroy();
-            }
-          },
-        });
-
-      // subscription.unsubscribe();
-      return () => {
-        subscription.unsubscribe();
-        if (sprite) {
-          sprite.destroy();
-        }
-      };
-    });
+      // Run all transitions in parallel
+      await Promise.all(transitionPromises);
+      
+      // Destroy sprite after transitions complete
+      if (sprite) {
+        sprite.destroy();
+      }
   };
 
   /**
@@ -280,9 +254,10 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
    * @param {SpriteElement} options.nextElement
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
-   * @returns {Observable<undefined>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  update = (
+  update = async (
     app,
     {
       parent,
@@ -292,15 +267,18 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       getTransitionByType,
       eventHandler,
     },
+    signal
   ) => {
-    return new Observable((observer) => {
+    if (signal?.aborted) {
+      throw new DOMException('Operation aborted', 'AbortError');
+    }
       const sprite = parent.getChildByName(prevElement.id);
       if (!sprite) {
         throw new Error(`Sprite with id ${prevElement.id} not found`);
       }
 
       // Check for update transitions
-      let transitionObservables = [];
+      let transitionPromises = [];
       for (const transition of transitions) {
         if (
           transition.elementId === prevElement.id &&
@@ -313,38 +291,21 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
             );
           }
           // For update transitions, we pass the current sprite object
-          transitionObservables.push(
-            transitionClass.add(app, sprite, transition),
+          transitionPromises.push(
+            transitionClass.add(app, sprite, transition, signal),
           );
         }
       }
 
       // If there are transitions, apply them
-      if (transitionObservables.length > 0) {
-        const subscription = from(transitionObservables)
-          .pipe(
-            mergeMap((task$) => task$),
-          )
-          .subscribe({
-            error: (err) => {
-              console.error("Error:", err);
-            },
-            complete: () => {
-              // After transitions complete, update any properties not covered by transitions
-              // (texture changes, hover/click URLs, etc.)
-              handleTextureUpdates();
-              observer.complete();
-            },
-          });
-
-        return () => {
-          subscription.unsubscribe();
-        };
+      if (transitionPromises.length > 0) {
+        await Promise.all(transitionPromises);
+        // After transitions complete, update any properties not covered by transitions
+        // (texture changes, hover/click URLs, etc.)
+        handleTextureUpdates();
       } else {
         // No transitions, update properties directly
         handleDirectUpdates();
-        observer.complete();
-        return () => {};
       }
 
       // Helper function to handle texture updates
@@ -527,6 +488,5 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
           sprite.eventMode = "static";
         }
       }
-    });
   };
 }
