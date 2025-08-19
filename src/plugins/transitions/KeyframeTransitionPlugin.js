@@ -183,13 +183,15 @@ class KeyframeTransitionPlugin {
         applyAnimationState(maxDuration);
       };
 
-      const effect = (time) => {
-        if (signal?.aborted) {
+      // Register abort handler for immediate cleanup
+      if (signal) {
+        signal.addEventListener('abort', () => {
           cleanup();
           reject(new DOMException('Operation aborted', 'AbortError'));
-          return;
-        }
+        });
+      }
 
+      const effect = (time) => {
         currentTimDelta += time.deltaMS;
 
         if (currentTimDelta >= maxDuration) {
@@ -201,13 +203,14 @@ class KeyframeTransitionPlugin {
         applyAnimationState(currentTimDelta);
       };
 
-      app.ticker.add(effect);
-
-      // If already aborted, clean up immediately
+      // If already aborted, don't start
       if (signal?.aborted) {
         cleanup();
         reject(new DOMException('Operation aborted', 'AbortError'));
+        return;
       }
+
+      app.ticker.add(effect);
     });
   };
 
