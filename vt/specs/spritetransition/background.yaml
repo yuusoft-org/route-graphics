@@ -1,0 +1,27 @@
+---
+title: Background
+---
+states:
+  - elements:
+      - id: "b"
+        type: "sprite"
+        url: "file:circle-red"
+  - elements:
+      - id: "a"
+        type: "sprite"
+        url: "file:bg1"
+      - id: "b"
+        type: "sprite"
+        url: "file:circle-red"
+    transitions:
+      - id: "a"
+        elementId: "a"
+        type: keyframes
+        event: add
+        properties:
+          alpha:
+            initialValue: 0.2
+            keyframes:
+              - duration: 5000
+                value: 1
+                easing: linear

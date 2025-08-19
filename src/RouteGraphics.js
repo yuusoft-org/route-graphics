@@ -353,6 +353,7 @@ class RouteGraphics extends BaseRouteGraphics {
         elementRenderer.remove(app, {
           parent: parent,
           element: toDeleteElement,
+          elements: nextState.elements,
           transitions: nextState.transitions,
           getRendererByElement: this._getRendererByElement,
           getTransitionByType: this._getTransitionByType,
@@ -367,6 +368,7 @@ class RouteGraphics extends BaseRouteGraphics {
         elementRenderer.add(app, {
           parent: parent,
           element: toAddElement,
+          elements: nextState.elements,
           getRendererByElement: this._getRendererByElement,
           transitions: nextState.transitions,
           getTransitionByType: this._getTransitionByType,
@@ -382,6 +384,7 @@ class RouteGraphics extends BaseRouteGraphics {
           parent: parent,
           prevElement: toUpdateElement.prev,
           nextElement: toUpdateElement.next,
+          elements: nextState.elements,
           getRendererByElement: this._getRendererByElement,
           transitions: nextState.transitions,
           getTransitionByType: this._getTransitionByType,

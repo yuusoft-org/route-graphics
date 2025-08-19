@@ -49,6 +49,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
    * @param {SpriteElement} options.element
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
+   * @param {BaseElement[]} [options.elements=[]] - All elements in the state for ordering
    * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
    * @returns {Promise<void>}
    */
@@ -62,6 +63,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       transitions = [],
       getTransitionByType,
       eventHandler,
+      elements = [],
     } = options;
 
     // Handle empty sprites - use EMPTY texture if no URL provided
@@ -190,6 +192,33 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
     }
 
     parent.addChild(sprite);
+
+    // Sort children based on elements array order and zIndex
+    if (Array.isArray(elements) && elements.length > 0) {
+      parent.children.sort((a, b) => {
+        const aElement = elements.find(el => el.id === a.label);
+        const bElement = elements.find(el => el.id === b.label);
+        
+        if (aElement && bElement) {
+          // First, sort by zIndex if specified
+          const aZIndex = aElement.zIndex ?? 0;
+          const bZIndex = bElement.zIndex ?? 0;
+          if (aZIndex !== bZIndex) {
+            return aZIndex - bZIndex;
+          }
+          
+          // If zIndex is the same, maintain order from elements array
+          const aIndex = elements.findIndex(el => el.id === a.label);
+          const bIndex = elements.findIndex(el => el.id === b.label);
+          return aIndex - bIndex;
+        }
+        
+        // Keep elements that aren't in elements array at their current position
+        if (!aElement && !bElement) return 0;
+        if (!aElement) return -1;
+        if (!bElement) return 1;
+      });
+    }
 
     // Run all transitions in parallel
     await Promise.all(transitionPromises);
