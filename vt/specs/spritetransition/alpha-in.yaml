@@ -6,19 +6,19 @@ specs:
 ---
 states:
   - elements:
-      - id: 'a'
+      - id: "a"
         type: "sprite"
         url: "file:bg1"
   - elements:
-      - id: 'a'
+      - id: "a"
         type: "sprite"
         url: "file:bg1"
-      - id: 'b'
+      - id: "b"
         type: "sprite"
         url: "file:circle-red"
     transitions:
-      - id: 'a'
-        elementId: 'b'
+      - id: "a"
+        elementId: "b"
         type: keyframes
         event: add
         properties:
@@ -28,4 +28,10 @@ states:
               - duration: 5000
                 value: 1
                 easing: linear
-              
+  - elements:
+      - id: "a"
+        type: "sprite"
+        url: "file:bg1"
+      - id: "b"
+        type: "sprite"
+        url: "file:circle-red"

@@ -1,6 +1,5 @@
 import { Text, TextStyle, Rectangle } from "pixi.js";
 import { TransitionEvent, BaseRendererPlugin } from "../../types";
-import { from, mergeMap, Observable } from "rxjs";
 
 /**
  * @typedef {import('../../types').ContainerElement} ContainerElement
@@ -66,143 +65,133 @@ export class TextRendererPlugin {
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
    * @param {Function} [options.eventHandler]
-   * @returns {Observable<any>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  add = (app, options) => {
-    return new Observable((observer) => {
-      const {
-        parent,
-        element,
-        transitions = [],
-        getTransitionByType,
-        eventHandler,
-      } = options;
+  add = async (app, options, signal) => {
+    if (signal?.aborted) {
+      throw new DOMException('Operation aborted', 'AbortError');
+    }
 
-      const textStyle = createTextStyle(element.style);
-      const newText = new Text({ text: element.text, style: textStyle });
+    const {
+      parent,
+      element,
+      transitions = [],
+      getTransitionByType,
+      eventHandler,
+    } = options;
 
-      let hoverTextStyle;
-      if (element.hoverStyle) {
-        hoverTextStyle = createTextStyle(element.hoverStyle);
-      }
+    const textStyle = createTextStyle(element.style);
+    const newText = new Text({ text: element.text, style: textStyle });
 
-      let clickedTextStyle;
-      if (element.clickedStyle) {
-        clickedTextStyle = createTextStyle(element.clickedStyle);
-      }
+    let hoverTextStyle;
+    if (element.hoverStyle) {
+      hoverTextStyle = createTextStyle(element.hoverStyle);
+    }
 
-      if (element.eventName || element.clickedStyle || element.hoverStyle) {
-        newText.cursor = "pointer";
-        newText.eventMode = "static";
-      }
-      newText.label = element.id;
-      if (element.x !== undefined) {
-        newText.x = element.x;
-      }
-      if (element.y !== undefined) {
-        newText.y = element.y;
-      }
-      if (element.anchorX !== undefined) {
-        newText.anchor.x = element.anchorX;
-      }
-      if (element.anchorY !== undefined) {
-        newText.anchor.y = element.anchorY;
-      }
-      if (element.anchorX !== undefined || element.anchorY !== undefined) {
-        const bounds = newText.getLocalBounds();
-        newText.hitArea = new Rectangle(
-          -bounds.width * newText.anchor.x,
-          -bounds.height * newText.anchor.y,
-          bounds.width,
-          bounds.height,
-        );
-      }
+    let clickedTextStyle;
+    if (element.clickedStyle) {
+      clickedTextStyle = createTextStyle(element.clickedStyle);
+    }
 
-      newText
-        .on("pointerupoutside", () => {
-          newText.style = textStyle;
-        })
-        .on("pointerup", () => {
-          newText.style = textStyle;
-        })
-        .on("pointerleave", () => {
-          newText.style = textStyle;
-        });
+    if (element.eventName || element.clickedStyle || element.hoverStyle) {
+      newText.cursor = "pointer";
+      newText.eventMode = "static";
+    }
+    newText.label = element.id;
+    if (element.x !== undefined) {
+      newText.x = element.x;
+    }
+    if (element.y !== undefined) {
+      newText.y = element.y;
+    }
+    if (element.anchorX !== undefined) {
+      newText.anchor.x = element.anchorX;
+    }
+    if (element.anchorY !== undefined) {
+      newText.anchor.y = element.anchorY;
+    }
+    if (element.anchorX !== undefined || element.anchorY !== undefined) {
+      const bounds = newText.getLocalBounds();
+      newText.hitArea = new Rectangle(
+        -bounds.width * newText.anchor.x,
+        -bounds.height * newText.anchor.y,
+        bounds.width,
+        bounds.height,
+      );
+    }
 
-      newText.on("pointerup", (e) => {
-        if (element.clickSoundUrl && app.soundStage) {
-          app.soundStage.add({
-            id: `${element.id}-click-${Math.random()}`,
-            url: element.clickSoundUrl,
-            loop: false,
-            volume: element.clickSoundVolume ?? 50 / 100,
-          });
-        }
-        e.stopPropagation();
-        eventHandler && eventHandler(element.eventName, element.eventPayload);
+    newText
+      .on("pointerupoutside", () => {
+        newText.style = textStyle;
+      })
+      .on("pointerup", () => {
+        newText.style = textStyle;
+      })
+      .on("pointerleave", () => {
+        newText.style = textStyle;
       });
 
-      if (clickedTextStyle) {
-        newText.on("pointerdown", () => {
-          newText.style = clickedTextStyle;
+    newText.on("pointerup", (e) => {
+      if (element.clickSoundUrl && app.soundStage) {
+        app.soundStage.add({
+          id: `${element.id}-click-${Math.random()}`,
+          url: element.clickSoundUrl,
+          loop: false,
+          volume: element.clickSoundVolume ?? 50 / 100,
         });
       }
-      if (hoverTextStyle) {
-        newText.on("pointerenter", () => {
-          newText.style = hoverTextStyle;
+      e.stopPropagation();
+      eventHandler && eventHandler(element.eventName, element.eventPayload);
+    });
 
-          if (
-            element.hoverSoundUrl &&
-            app.soundStage &&
-            element.hoverSoundVolume !== undefined
-          ) {
-            app.soundStage.add({
-              id: `${element.id}-hover-${Math.random()}`,
-              url: element.hoverSoundUrl,
-              loop: false,
-              volume: element.hoverSoundVolume / 100,
-            });
-          }
-        });
-      }
+    if (clickedTextStyle) {
+      newText.on("pointerdown", () => {
+        newText.style = clickedTextStyle;
+      });
+    }
+    if (hoverTextStyle) {
+      newText.on("pointerenter", () => {
+        newText.style = hoverTextStyle;
 
-      const transitionObservables = [];
-
-      for (const transition of transitions) {
         if (
-          transition.elementId === element.id &&
-          transition.event === TransitionEvent.Add
+          element.hoverSoundUrl &&
+          app.soundStage &&
+          element.hoverSoundVolume !== undefined
         ) {
-          const transitionClass = getTransitionByType(transition.type);
-          if (!transitionClass) {
-            throw new Error(
-              `Transition class not found for type ${transition.type}`,
-            );
-          }
-          transitionObservables.push(
-            transitionClass.add(app, newText, transition),
+          app.soundStage.add({
+            id: `${element.id}-hover-${Math.random()}`,
+            url: element.hoverSoundUrl,
+            loop: false,
+            volume: element.hoverSoundVolume / 100,
+          });
+        }
+      });
+    }
+
+    const transitionPromises = [];
+
+    for (const transition of transitions) {
+      if (
+        transition.elementId === element.id &&
+        transition.event === TransitionEvent.Add
+      ) {
+        const transitionClass = getTransitionByType(transition.type);
+        if (!transitionClass) {
+          throw new Error(
+            `Transition class not found for type ${transition.type}`,
           );
         }
+        transitionPromises.push(
+          transitionClass.add(app, newText, transition, signal),
+        );
       }
+    }
 
-      parent.addChild(newText);
+    parent.addChild(newText);
 
-      const subscription = from(transitionObservables)
-        .pipe(
-          mergeMap((task$) => task$), // Runs all in parallel
-        )
-        .subscribe({
-          error: (err) => {
-            console.error("Error:", err);
-            observer.error(err);
-          },
-          complete: () => observer.complete(),
-        });
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    });
+    // Run all transitions in parallel
+    await Promise.all(transitionPromises);
   };
 
   /**
@@ -212,63 +201,51 @@ export class TextRendererPlugin {
    * @param {TextElement} options.element
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
-   * @returns {Observable<any>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  remove = (app, options) => {
-    return new Observable((observer) => {
-      const {
-        parent,
-        element,
-        transitions = [],
-        getTransitionByType,
-      } = options;
-      const text = parent.getChildByName(element.id);
-      if (!text) {
-        console.warn(`Text with id ${element.id} not found`);
-        observer.complete();
-        return;
-      }
+  remove = async (app, options, signal) => {
+    if (signal?.aborted) {
+      throw new DOMException('Operation aborted', 'AbortError');
+    }
 
-      let transitionObservables = [];
-      for (const transition of transitions) {
-        if (
-          transition.elementId === element.id &&
-          transition.event === TransitionEvent.Remove
-        ) {
-          const transitionClass = getTransitionByType(transition.type);
-          if (!transitionClass) {
-            throw new Error(
-              `Transition class not found for type ${transition.type}`,
-            );
-          }
-          transitionObservables.push(
-            transitionClass.remove(app, text, transition),
+    const {
+      parent,
+      element,
+      transitions = [],
+      getTransitionByType,
+    } = options;
+    const text = parent.getChildByName(element.id);
+    if (!text) {
+      console.warn(`Text with id ${element.id} not found`);
+      return;
+    }
+
+    let transitionPromises = [];
+    for (const transition of transitions) {
+      if (
+        transition.elementId === element.id &&
+        transition.event === TransitionEvent.Remove
+      ) {
+        const transitionClass = getTransitionByType(transition.type);
+        if (!transitionClass) {
+          throw new Error(
+            `Transition class not found for type ${transition.type}`,
           );
         }
+        transitionPromises.push(
+          transitionClass.remove(app, text, transition, signal),
+        );
       }
+    }
 
-      const subscription = from(transitionObservables)
-        .pipe(
-          mergeMap((task$) => task$), // Runs all in parallel
-        )
-        .subscribe({
-          error: (err) => {
-            console.error("Error:", err);
-            observer.error(err);
-          },
-          complete: () => {
-            text.destroy();
-            observer.complete();
-          },
-        });
-
-      return () => {
-        subscription.unsubscribe();
-        if (text) {
-          text.destroy();
-        }
-      };
-    });
+    // Run all transitions in parallel
+    await Promise.all(transitionPromises);
+    
+    // Destroy text after transitions complete
+    if (text) {
+      text.destroy();
+    }
   };
 
   /**
@@ -280,86 +257,70 @@ export class TextRendererPlugin {
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
    * @param {Function} [options.eventHandler]
-   * @returns {Observable<undefined>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  update = (app, options) => {
-    return new Observable((observer) => {
-      const {
-        parent,
-        prevElement,
-        nextElement,
-        transitions,
-        getTransitionByType,
-        eventHandler,
-      } = options;
-      const text = /** @type {Text | null} */ (
-        parent.getChildByName(prevElement.id)
-      );
-      if (!text) {
-        console.warn(`Text with id ${prevElement.id} not found`);
-        observer.complete();
-        return;
+  update = async (app, options, signal) => {
+    if (signal?.aborted) {
+      throw new DOMException('Operation aborted', 'AbortError');
+    }
+
+    const {
+      parent,
+      prevElement,
+      nextElement,
+      transitions,
+      getTransitionByType,
+      eventHandler,
+    } = options;
+    const text = /** @type {Text | null} */ (
+      parent.getChildByName(prevElement.id)
+    );
+    if (!text) {
+      console.warn(`Text with id ${prevElement.id} not found`);
+      return;
+    }
+
+    // If significant changes, remove old and add new
+    if (JSON.stringify(prevElement) !== JSON.stringify(nextElement)) {
+      const tasks = [
+        this.add(app, {
+          parent,
+          element: nextElement,
+          transitions,
+          getTransitionByType,
+          eventHandler,
+        }, signal),
+        this.remove(app, {
+          parent,
+          element: prevElement,
+          transitions,
+          getTransitionByType,
+        }, signal),
+      ];
+
+      // Run both operations in parallel
+      await Promise.all(tasks);
+    } else {
+      // Simple updates
+      if (prevElement.text !== nextElement.text) {
+        text.text = nextElement.text;
       }
 
-      // If significant changes, remove old and add new
-      if (JSON.stringify(prevElement) !== JSON.stringify(nextElement)) {
-        const tasks = [
-          this.add(app, {
-            parent,
-            element: nextElement,
-            transitions,
-            getTransitionByType,
-            eventHandler,
-          }),
-          this.remove(app, {
-            parent,
-            element: prevElement,
-            transitions,
-            getTransitionByType,
-          }),
-        ];
-
-        const subscription = from(tasks)
-          .pipe(
-            mergeMap((task$) => task$), // Runs all in parallel
-          )
-          .subscribe({
-            error: (err) => {
-              console.error("Error:", err);
-              observer.error(err);
-            },
-            complete: () => observer.complete(),
-          });
-
-        return () => {
-          subscription.unsubscribe();
-        };
-      } else {
-        // Simple updates
-        if (prevElement.text !== nextElement.text) {
-          text.text = nextElement.text;
-        } else {
-        }
-
-        if (
-          JSON.stringify(prevElement.style) !==
-          JSON.stringify(nextElement.style)
-        ) {
-          text.style = createTextStyle(nextElement?.style);
-        }
-
-        if (nextElement.x !== undefined) {
-          text.x = nextElement.x;
-        }
-
-        if (nextElement.y !== undefined) {
-          text.y = nextElement.y;
-        }
-
-        observer.complete();
+      if (
+        JSON.stringify(prevElement.style) !==
+        JSON.stringify(nextElement.style)
+      ) {
+        text.style = createTextStyle(nextElement?.style);
       }
 
-      return () => {};
-    });
+      if (nextElement.x !== undefined) {
+        text.x = nextElement.x;
+      }
+
+      if (nextElement.y !== undefined) {
+        text.y = nextElement.y;
+      }
+    }
   };
 }

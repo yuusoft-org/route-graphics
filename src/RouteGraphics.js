@@ -10,7 +10,6 @@ import {
 import { BaseRouteGraphics } from "./types";
 import { diffElements } from "./common.js";
 import { AudioStage, AudioAsset } from "./AudioStage.js";
-import { finalize, from, mergeMap, tap } from "rxjs";
 
 /**
  * @typedef {import('./types.js').RouteGraphicsInitOptions} RouteGraphicsInitOptions
@@ -114,7 +113,10 @@ class RouteGraphics extends BaseRouteGraphics {
    */
   _plugins;
 
-  _currentSubscription;
+  /**
+   * @type {AbortController}
+   */
+  _currentAbortController;
 
   /**
    * @type {AdvancedBufferLoader}
@@ -334,11 +336,20 @@ class RouteGraphics extends BaseRouteGraphics {
       nextState.elements,
     );
 
+    // Cancel any previous render operations
+    if (this._currentAbortController) {
+      this._currentAbortController.abort();
+    }
+
+    // Create new AbortController for this render
+    this._currentAbortController = new AbortController();
+    const signal = this._currentAbortController.signal;
+
     const actions = [];
 
     for (const toDeleteElement of toDeleteElements) {
       const elementRenderer = this._getRendererByElement(toDeleteElement);
-      actions.push(
+      actions.push(() => 
         elementRenderer.remove(app, {
           parent: parent,
           element: toDeleteElement,
@@ -346,13 +357,13 @@ class RouteGraphics extends BaseRouteGraphics {
           getRendererByElement: this._getRendererByElement,
           getTransitionByType: this._getTransitionByType,
           eventHandler,
-        }),
+        }, signal)
       );
     }
 
     for (const toAddElement of toAddElements) {
       const elementRenderer = this._getRendererByElement(toAddElement);
-      actions.push(
+      actions.push(() => 
         elementRenderer.add(app, {
           parent: parent,
           element: toAddElement,
@@ -360,13 +371,13 @@ class RouteGraphics extends BaseRouteGraphics {
           transitions: nextState.transitions,
           getTransitionByType: this._getTransitionByType,
           eventHandler,
-        }),
+        }, signal)
       );
     }
 
     for (const toUpdateElement of toUpdateElements) {
       const elementRenderer = this._getRendererByElement(toUpdateElement.next);
-      actions.push(
+      actions.push(() => 
         elementRenderer.update(app, {
           parent: parent,
           prevElement: toUpdateElement.prev,
@@ -375,66 +386,62 @@ class RouteGraphics extends BaseRouteGraphics {
           transitions: nextState.transitions,
           getTransitionByType: this._getTransitionByType,
           eventHandler,
-        }),
+        }, signal)
       );
     }
 
-    if (this._currentSubscription) {
-      if (!this._currentSubscription.closed) {
-        this._currentSubscription.unsubscribe();
-      }
-    }
+    try {
+      // Run all actions in parallel
+      await Promise.all(actions.map(action => action()));
 
-    this._currentSubscription = from(actions)
-      .pipe(
-        mergeMap((task$) => task$), // Runs all in parallel (or use mergeMap(task$, concurrency))
-        finalize(() => {
-          // Sort children AFTER all add/update operations complete
-          app.stage.children.sort((a, b) => {
-            const aElement = nextState.elements.find(
-              (element) => element.id === a.label
-            );
-            const bElement = nextState.elements.find(
-              (element) => element.id === b.label
-            );
-            
-            if (aElement && bElement) {
-              // First, sort by zIndex if specified
-              const aZIndex = aElement.zIndex ?? 0;
-              const bZIndex = bElement.zIndex ?? 0;
-              if (aZIndex !== bZIndex) {
-                return aZIndex - bZIndex;
-              }
-              
-              // If zIndex is the same or not specified, maintain order from nextState.elements
-              const aIndex = nextState.elements.findIndex(
-                (element) => element.id === a.label
-              );
-              const bIndex = nextState.elements.findIndex(
-                (element) => element.id === b.label
-              );
-              return aIndex - bIndex;
-            }
-            
-            // Keep elements that aren't in nextState.elements at their current position
-            if (!aElement && !bElement) return 0;
-            if (!aElement) return -1;
-            if (!bElement) return 1;
-          });
+      // Sort children AFTER all add/update operations complete
+      app.stage.children.sort((a, b) => {
+        const aElement = nextState.elements.find(
+          (element) => element.id === a.label
+        );
+        const bElement = nextState.elements.find(
+          (element) => element.id === b.label
+        );
+        
+        if (aElement && bElement) {
+          // First, sort by zIndex if specified
+          const aZIndex = aElement.zIndex ?? 0;
+          const bZIndex = bElement.zIndex ?? 0;
+          if (aZIndex !== bZIndex) {
+            return aZIndex - bZIndex;
+          }
           
-          eventHandler &&
-            eventHandler("completed", {
-              id: nextState.id,
-              diffTime: Date.now() - time,
-            });
-          this._currentSubscription = undefined;
-        }),
-      )
-      .subscribe({
-        error: (err) => {
-          console.error("Error:", err);
-        },
+          // If zIndex is the same or not specified, maintain order from nextState.elements
+          const aIndex = nextState.elements.findIndex(
+            (element) => element.id === a.label
+          );
+          const bIndex = nextState.elements.findIndex(
+            (element) => element.id === b.label
+          );
+          return aIndex - bIndex;
+        }
+        
+        // Keep elements that aren't in nextState.elements at their current position
+        if (!aElement && !bElement) return 0;
+        if (!aElement) return -1;
+        if (!bElement) return 1;
       });
+      
+      eventHandler &&
+        eventHandler("completed", {
+          id: nextState.id,
+          diffTime: Date.now() - time,
+        });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        // Operation was cancelled, this is expected
+        return;
+      }
+      console.error("Error:", error);
+      throw error;
+    } finally {
+      this._currentAbortController = undefined;
+    }
   };
 }
 

@@ -1,4 +1,4 @@
-import { Observable } from "rxjs";
+// No RxJS import needed
 
 const easings = {
   linear: (x) => x,
@@ -104,10 +104,14 @@ class KeyframeTransitionPlugin {
   rendererName = "pixi";
   transitionType = "keyframes";
 
-  _transition = (app, sprite, transition) => {
-    return new Observable((observer) => {
-      const { properties: propertiesArrayOrObject } =
-        transition;
+  _transition = async (app, sprite, transition, signal) => {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException('Operation aborted', 'AbortError'));
+        return;
+      }
+
+      const { properties: propertiesArrayOrObject } = transition;
       // TODO: stop supporting arrays
 
       const animationProperties = Array.isArray(
@@ -141,15 +145,8 @@ class KeyframeTransitionPlugin {
         );
       });
 
-      const effect = (time) => {
-        currentTimDelta += time.deltaMS;
-
-        if (currentTimDelta >= maxDuration) {
-          app.ticker.remove(effect);
-          observer.complete();
-          return;
-        }
-
+      // Helper function to apply the animation state at a given time
+      const applyAnimationState = (timeDelta) => {
         const output = {};
 
         animationProperties.forEach((animationProperty) => {
@@ -168,7 +165,7 @@ class KeyframeTransitionPlugin {
           set(
             output,
             animationProperty.property,
-            processInput(input, currentTimDelta),
+            processInput(input, timeDelta),
           );
         });
 
@@ -180,22 +177,49 @@ class KeyframeTransitionPlugin {
         });
       };
 
-      app.ticker.add(effect);
-
-      return () => {
+      const cleanup = () => {
         app.ticker.remove(effect);
         // Set to final state when torn down
-        effect({ deltaMS: maxDuration - currentTimDelta });
+        applyAnimationState(maxDuration);
       };
+
+      // Register abort handler for immediate cleanup
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          cleanup();
+          reject(new DOMException('Operation aborted', 'AbortError'));
+        });
+      }
+
+      const effect = (time) => {
+        currentTimDelta += time.deltaMS;
+
+        if (currentTimDelta >= maxDuration) {
+          app.ticker.remove(effect);
+          resolve();
+          return;
+        }
+
+        applyAnimationState(currentTimDelta);
+      };
+
+      // If already aborted, don't start
+      if (signal?.aborted) {
+        cleanup();
+        reject(new DOMException('Operation aborted', 'AbortError'));
+        return;
+      }
+
+      app.ticker.add(effect);
     });
   };
 
-  add = (app, sprite, transition) => {
-    return this._transition(app, sprite, transition);
+  add = async (app, sprite, transition, signal) => {
+    return this._transition(app, sprite, transition, signal);
   };
 
-  remove = (app, sprite, transition) => {
-    return this._transition(app, sprite, transition);
+  remove = async (app, sprite, transition, signal) => {
+    return this._transition(app, sprite, transition, signal);
   };
 }
 
