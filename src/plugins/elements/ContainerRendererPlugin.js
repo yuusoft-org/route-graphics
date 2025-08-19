@@ -27,6 +27,7 @@ export class ContainerRendererPlugin {
    * @param {Object} options
    * @param {Container} options.parent
    * @param {ContainerContainerElement} options.element
+   * @param {BaseElement[]} [options.elements=[]] - All elements in the state for ordering
    * @param {BaseTransition[]} [options.transitions=[]]
    * @param {Function} options.getTransitionByType
    * @param {Function} options.getRendererByElement
@@ -43,6 +44,7 @@ export class ContainerRendererPlugin {
     const {
       parent,
       element: originalElement,
+      elements = [],
       transitions = [],
       getTransitionByType,
       getRendererByElement,
@@ -219,6 +221,7 @@ export class ContainerRendererPlugin {
         renderer.add(app, {
           parent: container,
           element: adjustedChild,
+          elements: element.children || [],
           transitions,
           getTransitionByType,
           getRendererByElement,
@@ -306,6 +309,7 @@ export class ContainerRendererPlugin {
       parent,
       prevElement: originalPrevElement,
       nextElement: originalNextElement,
+      elements = [],
       getRendererByElement,
       transitions = [],
       getTransitionByType,
@@ -443,6 +447,7 @@ export class ContainerRendererPlugin {
         renderer.remove(app, {
           parent: container,
           element,
+          elements: nextElement.children || [],
           transitions,
           getTransitionByType,
           getRendererByElement,
@@ -470,6 +475,7 @@ export class ContainerRendererPlugin {
         renderer.add(app, {
           parent: container,
           element: adjustedElement,
+          elements: nextElement.children || [],
           transitions,
           getTransitionByType,
           getRendererByElement,
@@ -513,6 +519,7 @@ export class ContainerRendererPlugin {
           parent: container,
           prevElement: adjustedPrevElement,
           nextElement: adjustedNextElement,
+          elements: nextElement.children || [],
           transitions,
           getTransitionByType,
           getRendererByElement,
