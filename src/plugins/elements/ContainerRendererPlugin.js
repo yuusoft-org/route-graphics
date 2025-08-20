@@ -383,10 +383,12 @@ export class ContainerRendererPlugin {
         // throw new Error(`Container with id ${prevElement.id} not found`);
       }
 
-      if (nextElement.x !== undefined && nextElement.x !== prevElement.x) {
+      // For elements with adjusted coordinates (from parent's layoutChildren),
+      // always update position regardless of prevElement values
+      if (nextElement.x !== undefined) {
         container.x = nextElement.x;
       }
-      if (nextElement.y !== undefined && nextElement.y !== prevElement.y) {
+      if (nextElement.y !== undefined) {
         container.y = nextElement.y;
       }
       if (
@@ -494,6 +496,34 @@ export class ContainerRendererPlugin {
 
       const { toAddElements, toUpdateElements, toDeleteElements } =
         diffElements(prevElement.children, nextElement.children);
+      
+      // If container has direction and children have been re-laid out,
+      // we need to update positions of all existing children
+      if (nextElement.direction && nextElement.children) {
+        // Create a map of updated positions from layoutChildren
+        const updatedPositions = new Map();
+        nextElement.children.forEach(child => {
+          updatedPositions.set(child.id, { x: child.x, y: child.y });
+        });
+        
+        // Apply updated positions to toUpdateElements
+        toUpdateElements.forEach(element => {
+          const newPos = updatedPositions.get(element.next.id);
+          if (newPos) {
+            element.next.x = newPos.x;
+            element.next.y = newPos.y;
+          }
+        });
+        
+        // Apply updated positions to toAddElements
+        toAddElements.forEach(element => {
+          const newPos = updatedPositions.get(element.id);
+          if (newPos) {
+            element.x = newPos.x;
+            element.y = newPos.y;
+          }
+        });
+      }
 
       for (const element of toDeleteElements) {
         const renderer = getRendererByElement(element);
@@ -737,8 +767,11 @@ export class ContainerRendererPlugin {
         // Start alignment
         let layoutPos = 0;
         (element.children || []).forEach((childElement, index) => {
-          childElement[mainAxis] = layoutPos;
-          layoutPos += childElement[mainSize];
+          // Consider child's own anchor when positioning
+          const childMainSize = childElement[mainSize] || 0;
+          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
+          layoutPos += childMainSize;
           if (index < element.children.length - 1) {
             layoutPos += gap;
           }
@@ -747,8 +780,11 @@ export class ContainerRendererPlugin {
         // End alignment
         let layoutPos = -mainTotal;
         (element.children || []).forEach((childElement, index) => {
-          childElement[mainAxis] = layoutPos;
-          layoutPos += childElement[mainSize];
+          // Consider child's own anchor when positioning
+          const childMainSize = childElement[mainSize] || 0;
+          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
+          layoutPos += childMainSize;
           if (index < element.children.length - 1) {
             layoutPos += gap;
           }
@@ -772,7 +808,9 @@ export class ContainerRendererPlugin {
       if (crossAnchor === 0) {
         // Start alignment
         (element.children || []).forEach((childElement) => {
-          childElement[crossAxis] = 0;
+          const childCrossSize = childElement[crossSize] || 0;
+          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
+          childElement[crossAxis] = childCrossSize * childAnchor;
         });
       } else if (crossAnchor === 0.5) {
         // Center alignment - center each child individually
@@ -786,7 +824,9 @@ export class ContainerRendererPlugin {
         // End alignment - align each child to the end
         (element.children || []).forEach((childElement) => {
           const childCrossSize = childElement[crossSize] || 0;
-          childElement[crossAxis] = -childCrossSize;
+          // Consider child's own anchor when positioning
+          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
+          childElement[crossAxis] = -childCrossSize + childCrossSize * childAnchor;
         });
       }
     }
