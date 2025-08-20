@@ -136,7 +136,8 @@ export class ContainerRendererPlugin {
       let totalHeight;
 
       if (element.direction === "horizontal") {
-        totalWidth = element.children.reduce((p, c) => p + c.width + gap, 0);
+        totalWidth = element.children.reduce((p, c, i) => 
+          p + c.width + (i > 0 ? gap : 0), 0);
         totalHeight = element.children.reduce(
           (p, c) => Math.max(p, c.height || 0),
           0,
@@ -146,10 +147,8 @@ export class ContainerRendererPlugin {
           (p, c) => Math.max(p, c.width || 0),
           0,
         );
-        totalHeight = element.children.reduce(
-          (p, c) => p + c.height + gap,
-          0,
-        );
+        totalHeight = element.children.reduce((p, c, i) => 
+          p + c.height + (i > 0 ? gap : 0), 0);
       }
 
       const anchor = { x: anchorX, y: anchorY };
@@ -325,10 +324,12 @@ export class ContainerRendererPlugin {
       return;
     }
 
-    if (nextElement.x !== undefined && nextElement.x !== prevElement.x) {
+    // For elements with adjusted coordinates (from parent's layoutChildren),
+    // always update position regardless of prevElement values
+    if (nextElement.x !== undefined) {
       container.x = nextElement.x;
     }
-    if (nextElement.y !== undefined && nextElement.y !== prevElement.y) {
+    if (nextElement.y !== undefined) {
       container.y = nextElement.y;
     }
     if (
@@ -361,10 +362,8 @@ export class ContainerRendererPlugin {
       let totalHeight;
 
       if (nextElement.direction === "horizontal") {
-        totalWidth = nextElement.children.reduce(
-          (p, c) => p + c.width + gap,
-          0,
-        );
+        totalWidth = nextElement.children.reduce((p, c, i) =>
+          p + c.width + (i > 0 ? gap : 0), 0);
         totalHeight = nextElement.children.reduce(
           (p, c) => Math.max(p, c.height || 0),
           0,
@@ -374,10 +373,8 @@ export class ContainerRendererPlugin {
           (p, c) => Math.max(p, c.width || 0),
           0,
         );
-        totalHeight = nextElement.children.reduce(
-          (p, c) => p + c.height + gap,
-          0,
-        );
+        totalHeight = nextElement.children.reduce((p, c, i) =>
+          p + c.height + (i > 0 ? gap : 0), 0);
       }
 
       const anchor = { x: anchorX, y: anchorY };
@@ -440,6 +437,34 @@ export class ContainerRendererPlugin {
 
     const { toAddElements, toUpdateElements, toDeleteElements } =
       diffElements(prevElement.children, nextElement.children);
+    
+    // If container has direction and children have been re-laid out,
+    // we need to update positions of all existing children
+    if (nextElement.direction && nextElement.children) {
+      // Create a map of updated positions from layoutChildren
+      const updatedPositions = new Map();
+      nextElement.children.forEach(child => {
+        updatedPositions.set(child.id, { x: child.x, y: child.y });
+      });
+      
+      // Apply updated positions to toUpdateElements
+      toUpdateElements.forEach(element => {
+        const newPos = updatedPositions.get(element.next.id);
+        if (newPos) {
+          element.next.x = newPos.x;
+          element.next.y = newPos.y;
+        }
+      });
+      
+      // Apply updated positions to toAddElements
+      toAddElements.forEach(element => {
+        const newPos = updatedPositions.get(element.id);
+        if (newPos) {
+          element.x = newPos.x;
+          element.y = newPos.y;
+        }
+      });
+    }
 
     for (const element of toDeleteElements) {
       const renderer = getRendererByElement(element);
@@ -645,7 +670,10 @@ export class ContainerRendererPlugin {
         childElement[crossAxis] = currentCrossPos;
 
         // Update tracking variables
-        currentMainPos += childElement[mainSize] + gap;
+        currentMainPos += childElement[mainSize];
+        if (index < element.children.length - 1) {
+          currentMainPos += gap;
+        }
         currentRowHeight = Math.max(
           currentRowHeight,
           childElement[crossSize] || 0,
@@ -667,23 +695,41 @@ export class ContainerRendererPlugin {
       if (mainAnchor === 0) {
         // Start alignment
         let layoutPos = 0;
-        (element.children || []).forEach((childElement) => {
-          childElement[mainAxis] = layoutPos;
-          layoutPos += childElement[mainSize] + gap;
+        (element.children || []).forEach((childElement, index) => {
+          // Consider child's own anchor when positioning
+          const childMainSize = childElement[mainSize] || 0;
+          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
+          layoutPos += childMainSize;
+          if (index < element.children.length - 1) {
+            layoutPos += gap;
+          }
         });
       } else if (mainAnchor === 1) {
         // End alignment
         let layoutPos = -mainTotal;
-        (element.children || []).forEach((childElement) => {
-          childElement[mainAxis] = layoutPos;
-          layoutPos += childElement[mainSize] + gap;
+        (element.children || []).forEach((childElement, index) => {
+          // Consider child's own anchor when positioning
+          const childMainSize = childElement[mainSize] || 0;
+          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
+          layoutPos += childMainSize;
+          if (index < element.children.length - 1) {
+            layoutPos += gap;
+          }
         });
       } else if (mainAnchor === 0.5) {
-        // Center alignment
+        // Center alignment - children should be centered around 0
         let layoutPos = -mainTotal / 2;
-        (element.children || []).forEach((childElement) => {
-          childElement[mainAxis] = layoutPos;
-          layoutPos += childElement[mainSize] + gap;
+        (element.children || []).forEach((childElement, index) => {
+          // Consider child's own anchor when positioning
+          const childMainSize = childElement[mainSize] || 0;
+          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
+          layoutPos += childMainSize;
+          if (index < element.children.length - 1) {
+            layoutPos += gap;
+          }
         });
       }
 
@@ -691,17 +737,25 @@ export class ContainerRendererPlugin {
       if (crossAnchor === 0) {
         // Start alignment
         (element.children || []).forEach((childElement) => {
-          childElement[crossAxis] = 0;
+          const childCrossSize = childElement[crossSize] || 0;
+          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
+          childElement[crossAxis] = childCrossSize * childAnchor;
         });
       } else if (crossAnchor === 0.5) {
-        // Center alignment
+        // Center alignment - center each child individually
         (element.children || []).forEach((childElement) => {
-          childElement[crossAxis] = -crossTotal / 2;
+          const childCrossSize = childElement[crossSize] || 0;
+          // Consider child's own anchor when positioning
+          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
+          childElement[crossAxis] = -childCrossSize / 2 + childCrossSize * childAnchor;
         });
       } else if (crossAnchor === 1) {
-        // End alignment
+        // End alignment - align each child to the end
         (element.children || []).forEach((childElement) => {
-          childElement[crossAxis] = -crossTotal;
+          const childCrossSize = childElement[crossSize] || 0;
+          // Consider child's own anchor when positioning
+          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
+          childElement[crossAxis] = -childCrossSize + childCrossSize * childAnchor;
         });
       }
     }

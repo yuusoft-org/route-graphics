@@ -1,0 +1,636 @@
+---
+title: Container direction - Multiple Children
+description: A container's direction with multiple children
+---
+states:
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+        - id: 'child4'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 255, 0, 0.3)"
+        - id: 'child5'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 255, 0.3)"
+        - id: 'child6'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 255, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+        - id: 'child4'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 255, 0, 0.3)"
+        - id: 'child5'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 255, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+        - id: 'child4'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 255, 0, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+        - id: 'child4'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 255, 0, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+        - id: 'child4'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 255, 0, 0.3)"
+        - id: 'child5'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 255, 0.3)"
+  - elements:
+    - id: 'center'
+      type: "rect"
+      x: 960
+      y: 540
+      anchorX: 0.5
+      anchorY: 0.5
+      width: 30
+      height: 30
+      fill: red
+    - id: 'container'
+      type: "container"
+      x: 960
+      y: 540
+      width: 1920
+      height: 1080
+      anchorX: 0.5
+      anchorY: 0.5
+      direction: "vertical"
+      children:
+        - id: 'child1'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 0, 0.3)"
+        - id: 'child2'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 0, 0.3)"
+        - id: 'child3'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 0, 255, 0.3)"
+        - id: 'child4'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 255, 0, 0.3)"
+        - id: 'child5'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(255, 0, 255, 0.3)"
+        - id: 'child6'
+          type: "container"
+          x: 0
+          y: 0
+          width: 100
+          height: 120
+          anchorX: 0.5
+          anchorY: 0.5
+          fill:
+            color: "rgba(0, 255, 255, 0.3)"
+
