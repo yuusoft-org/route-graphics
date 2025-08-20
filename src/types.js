@@ -122,9 +122,10 @@ export class BaseRendererPlugin {
    * @param {T[]} [options.transitions=[]] - Array of transitions
    * @param {Function} options.getTransitionByType - Function to get a transition by type
    * @param {Function} options.getRendererByElement
-   * @returns {Promise<undefined>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  add = (app, options) => {
+  add = async (app, options, signal) => {
     throw new Error("Method not implemented.");
   };
 
@@ -137,9 +138,10 @@ export class BaseRendererPlugin {
    * @param {E} options.element - The element to remove
    * @param {T[]} [options.transitions=[]] - Array of transitions
    * @param {Function} options.getTransitionByType - Function to get a transition by type
-   * @returns {Promise<undefined>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  remove = (app, options) => {
+  remove = async (app, options, signal) => {
     throw new Error("Method not implemented.");
   };
 
@@ -153,9 +155,10 @@ export class BaseRendererPlugin {
    * @param {T[]} [options.transitions=[]] - Array of transitions
    * @param {Function} options.getRendererByElement
    * @param {Function} options.getTransitionByType - Function to get a transition by type
-   * @returns {Promise<undefined>}
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  update = (app, options) => {
+  update = async (app, options, signal) => {
     throw new Error("Method not implemented.");
   };
 }
@@ -169,8 +172,10 @@ export class AbstractTransitionPlugin {
    * @param {Application} app
    * @param {Container} container
    * @param {Object} transition
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  add = (app, container, transition) => {
+  add = async (app, container, transition, signal) => {
     throw new Error("Method not implemented.");
   };
 
@@ -179,8 +184,10 @@ export class AbstractTransitionPlugin {
    * @param {Application} app
    * @param {Container} container
    * @param {Object} transition
+   * @param {AbortSignal} [signal] - Optional AbortSignal for cancellation
+   * @returns {Promise<void>}
    */
-  remove = (app, container, transition) => {
+  remove = async (app, container, transition, signal) => {
     throw new Error("Method not implemented.");
   };
 }
