@@ -1,0 +1,30 @@
+---
+title: Border
+description: A rect's border properties
+specs:
+  - "`border` should be drawn"
+---
+states:
+  - elements:
+      - id: "rect-width-height"
+        type: "rect"
+        x: 10
+        y: 10
+        width: 200
+        height: 100
+        fill: blue
+        border:
+          width: 12
+          color: red
+          alpha: 0.5
+      - id: "rect-2"
+        type: "rect"
+        x: 300
+        y: 10
+        width: 200
+        height: 100
+        fill: blue
+        border:
+          width: 12
+          color: red
+          alignment: 0.5
