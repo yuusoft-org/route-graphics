@@ -75,6 +75,15 @@ export class RectRendererPlugin {
     graphics.rect(0, 0, width, height);
     graphics.fill(element.fill);
 
+    if (element.border) {
+      graphics.stroke({
+        width: element.border.width,
+        color: element.border.color,
+        alpha: element.border.alpha ?? 1,
+        alignment: element.border.alignment ?? 1
+      });
+    }
+
     if (element.anchorX !== undefined) {
       graphics.pivot.x = width * element.anchorX;
     }
@@ -155,7 +164,7 @@ export class RectRendererPlugin {
     if (!graphics) {
       throw new Error(`Rect with id ${element.id} not found`);
     }
-    
+
     let transitionPromises = [];
     for (const transition of transitions) {
       if (
@@ -176,7 +185,7 @@ export class RectRendererPlugin {
 
     // Run all transitions in parallel
     await Promise.all(transitionPromises);
-    
+
     // Destroy graphics after transitions complete
     if (graphics) {
       graphics.destroy();
@@ -271,10 +280,20 @@ export class RectRendererPlugin {
         graphics.rotation = (nextElement.rotation * Math.PI) / 180;
       }
 
-      if (prevElement.width !== nextElement.width || prevElement.height !== nextElement.height || prevElement.fill !== nextElement.fill) {
+      const borderHasChanged = JSON.stringify(prevElement.border) !== JSON.stringify(nextElement.border);
+
+      if (prevElement.width !== nextElement.width || prevElement.height !== nextElement.height || prevElement.fill !== nextElement.fill || borderHasChanged) {
         graphics.clear();
         graphics.rect(0, 0, nextElement.width, nextElement.height);
         graphics.fill(nextElement.fill);
+        if (nextElement.border) {
+          graphics.stroke({
+            width: element.border.width,
+            color: element.border.color,
+            alpha: element.border.alpha,
+            alignment: element.border.alignment ?? 1
+          });
+        }
       }
 
       if (prevElement.anchorX !== undefined && nextElement.anchorX !== prevElement.anchorX) {
