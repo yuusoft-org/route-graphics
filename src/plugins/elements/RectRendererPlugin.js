@@ -73,7 +73,9 @@ export class RectRendererPlugin {
     const width = element.width;
     const height = element.height;
     graphics.rect(0, 0, width, height);
-    graphics.fill(element.fill);
+    if (element.fill) {
+      graphics.fill(element.fill);
+    }
 
     if (element.border) {
       graphics.stroke({
@@ -285,13 +287,15 @@ export class RectRendererPlugin {
       if (prevElement.width !== nextElement.width || prevElement.height !== nextElement.height || prevElement.fill !== nextElement.fill || borderHasChanged) {
         graphics.clear();
         graphics.rect(0, 0, nextElement.width, nextElement.height);
-        graphics.fill(nextElement.fill);
+        if (nextElement.fill) {
+          graphics.fill(nextElement.fill);
+        }
         if (nextElement.border) {
           graphics.stroke({
-            width: element.border.width,
-            color: element.border.color,
-            alpha: element.border.alpha,
-            alignment: element.border.alignment ?? 1
+            width: nextElement.border.width,
+            color: nextElement.border.color,
+            alpha: nextElement.border.alpha ?? 1,
+            alignment: nextElement.border.alignment ?? 1
           });
         }
       }
