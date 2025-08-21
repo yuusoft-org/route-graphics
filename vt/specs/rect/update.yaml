@@ -1,5 +1,5 @@
 ---
-title: Border
+title: Border Update
 description: A rect's border properties
 specs:
   - "`border` should be drawn"
@@ -17,24 +17,26 @@ states:
           width: 12
           color: red
           alpha: 0.5
-      - id: "rect-2"
+  - elements:
+      - id: "rect-width-height"
         type: "rect"
         x: 300
         y: 10
-        width: 200
-        height: 100
-        fill: blue
+        width: 300
+        height: 150
+        fill: green
         border:
           width: 12
-          color: red
+          color: pink
           alignment: 0.5
-      - id: "rect-3"
+  - elements:
+      - id: "rect-width-height"
         type: "rect"
-        x: 600
+        x: 300
         y: 10
-        width: 200
-        height: 100
+        width: 300
+        height: 150
         border:
+          color: "pink"
           width: 12
-          color: red
           alignment: 0.5
