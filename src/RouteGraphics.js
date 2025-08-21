@@ -178,18 +178,18 @@ class RouteGraphics extends BaseRouteGraphics {
    */
   _classifyAsset = (mimeType) => {
     if (!mimeType) return 'texture';
-    
+
     if (mimeType.startsWith('audio/')) return 'audio';
-    
-    if (mimeType.startsWith('font/') || 
-        ['application/font-woff', 'application/font-woff2', 
-         'application/x-font-ttf', 'application/x-font-otf'].includes(mimeType)) {
+
+    if (mimeType.startsWith('font/') ||
+      ['application/font-woff', 'application/font-woff2',
+        'application/x-font-ttf', 'application/x-font-otf'].includes(mimeType)) {
       return 'font';
     }
-    
+
     // Future: video support can be added here
     // if (mimeType.startsWith('video/')) return 'video';
-    
+
     return 'texture';
   };
 
@@ -217,7 +217,7 @@ class RouteGraphics extends BaseRouteGraphics {
 
     // Load audio assets using AudioAsset.load in parallel
     await Promise.all(
-      Object.entries(assetsByType.audio).map(([key, asset]) => 
+      Object.entries(assetsByType.audio).map(([key, asset]) =>
         AudioAsset.load(key, asset.buffer)
       )
     );
@@ -280,6 +280,27 @@ class RouteGraphics extends BaseRouteGraphics {
   updatedBackgroundColor = (color) => {
     this._app.renderer.background.color = color;
   };
+
+  getStageElementBounds = () => {
+    const items = {};
+    const iterate = (children) => {
+      if (!children || children.length === 0) {
+        return;
+      }
+      for (const item of children) {
+        items[item.label] = {
+          x: item.groupTransform.tx,
+          y: item.groupTransform.ty,
+          width: item.width,
+          height: item.height
+        }
+
+        iterate(item.children)
+      }
+    }
+    iterate(this._app.stage.children)
+    return items;
+  }
 
   /**
    *
@@ -349,7 +370,7 @@ class RouteGraphics extends BaseRouteGraphics {
 
     for (const toDeleteElement of toDeleteElements) {
       const elementRenderer = this._getRendererByElement(toDeleteElement);
-      actions.push(() => 
+      actions.push(() =>
         elementRenderer.remove(app, {
           parent: parent,
           element: toDeleteElement,
@@ -364,7 +385,7 @@ class RouteGraphics extends BaseRouteGraphics {
 
     for (const toAddElement of toAddElements) {
       const elementRenderer = this._getRendererByElement(toAddElement);
-      actions.push(() => 
+      actions.push(() =>
         elementRenderer.add(app, {
           parent: parent,
           element: toAddElement,
@@ -379,7 +400,7 @@ class RouteGraphics extends BaseRouteGraphics {
 
     for (const toUpdateElement of toUpdateElements) {
       const elementRenderer = this._getRendererByElement(toUpdateElement.next);
-      actions.push(() => 
+      actions.push(() =>
         elementRenderer.update(app, {
           parent: parent,
           prevElement: toUpdateElement.prev,
@@ -405,7 +426,7 @@ class RouteGraphics extends BaseRouteGraphics {
         const bElement = nextState.elements.find(
           (element) => element.id === b.label
         );
-        
+
         if (aElement && bElement) {
           // First, sort by zIndex if specified
           const aZIndex = aElement.zIndex ?? 0;
@@ -413,7 +434,7 @@ class RouteGraphics extends BaseRouteGraphics {
           if (aZIndex !== bZIndex) {
             return aZIndex - bZIndex;
           }
-          
+
           // If zIndex is the same or not specified, maintain order from nextState.elements
           const aIndex = nextState.elements.findIndex(
             (element) => element.id === a.label
@@ -423,13 +444,13 @@ class RouteGraphics extends BaseRouteGraphics {
           );
           return aIndex - bIndex;
         }
-        
+
         // Keep elements that aren't in nextState.elements at their current position
         if (!aElement && !bElement) return 0;
         if (!aElement) return -1;
         if (!bElement) return 1;
       });
-      
+
       eventHandler &&
         eventHandler("completed", {
           id: nextState.id,
