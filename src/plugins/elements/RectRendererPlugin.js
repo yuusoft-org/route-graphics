@@ -72,7 +72,7 @@ export class RectRendererPlugin {
 
     const width = element.width;
     const height = element.height;
-    graphics.rect(0, 0, width, height);
+    graphics.roundRect(0, 0, width, height, element.radius ?? 0);
     if (element.fill) {
       graphics.fill(element.fill);
     }
@@ -284,9 +284,9 @@ export class RectRendererPlugin {
 
       const borderHasChanged = JSON.stringify(prevElement.border) !== JSON.stringify(nextElement.border);
 
-      if (prevElement.width !== nextElement.width || prevElement.height !== nextElement.height || prevElement.fill !== nextElement.fill || borderHasChanged) {
+      if (prevElement.width !== nextElement.width || prevElement.height !== nextElement.height || prevElement.radius !== nextElement.radius || prevElement.fill !== nextElement.fill || borderHasChanged) {
         graphics.clear();
-        graphics.rect(0, 0, nextElement.width, nextElement.height);
+        graphics.roundRect(0, 0, nextElement.width, nextElement.height, nextElement.radius ?? 0);
         if (nextElement.fill) {
           graphics.fill(nextElement.fill);
         }
