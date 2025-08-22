@@ -40,3 +40,26 @@ states:
           color: "pink"
           width: 12
           alignment: 0.5
+  - elements:
+      - id: "rect-width-height"
+        type: "rect"
+        x: 300
+        y: 10
+        width: 300
+        height: 150
+        radius: 12
+        border:
+          color: "pink"
+          width: 12
+          alignment: 0.5
+  - elements:
+      - id: "rect-width-height"
+        type: "rect"
+        x: 300
+        y: 10
+        width: 300
+        height: 150
+        border:
+          color: "pink"
+          width: 12
+          alignment: 0.5
