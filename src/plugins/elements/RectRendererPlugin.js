@@ -70,6 +70,41 @@ export class RectRendererPlugin {
       graphics.rotation = (element.rotation * Math.PI) / 180;
     }
 
+    if (element.cursor) {
+      graphics.cursor = element.cursor;
+    }
+
+    if (element.pointerDown) {
+      graphics.on('pointerdown', (e) => {
+        eventHandler && eventHandler(element.pointerDown, {
+          x: e.global.x,
+          y: e.global.y
+        });
+      })
+    }
+
+    if (element.pointerUp) {
+      graphics.on('pointerup', (e) => {
+        eventHandler && eventHandler(element.pointerUp, {
+          x: e.global.x,
+          y: e.global.y
+        });
+      })
+    }
+
+    if (element.pointerMove) {
+      graphics.on('pointermove', (e) => {
+        eventHandler && eventHandler(element.pointerMove, {
+          x: e.global.x,
+          y: e.global.y
+        });
+      })
+    }
+
+    if (element.cursor || element.pointerDown || element.pointerUp || element.pointerMove) {
+      graphics.eventMode = 'static';
+    }
+
     const width = element.width;
     const height = element.height;
     graphics.roundRect(0, 0, width, height, element.radius ?? 0);

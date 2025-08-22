@@ -90,8 +90,8 @@ class App {
     await this._app.init({
       width: 1920,
       height: 1080,
-      eventHandler: (e, f) => {
-        // console.log('eventHandler', e, f)
+      eventHandler: (eventName, payload) => {
+        console.log('eventHandler', eventName, payload)
       },
       plugins: [
         new SpriteRendererPlugin(),
