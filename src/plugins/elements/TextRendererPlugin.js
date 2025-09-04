@@ -70,7 +70,7 @@ export class TextRendererPlugin {
    */
   add = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
     const {
@@ -206,15 +206,10 @@ export class TextRendererPlugin {
    */
   remove = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
-    const {
-      parent,
-      element,
-      transitions = [],
-      getTransitionByType,
-    } = options;
+    const { parent, element, transitions = [], getTransitionByType } = options;
     const text = parent.getChildByName(element.id);
     if (!text) {
       console.warn(`Text with id ${element.id} not found`);
@@ -241,7 +236,7 @@ export class TextRendererPlugin {
 
     // Run all transitions in parallel
     await Promise.all(transitionPromises);
-    
+
     // Destroy text after transitions complete
     if (text) {
       text.destroy();
@@ -262,7 +257,7 @@ export class TextRendererPlugin {
    */
   update = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
     const {
@@ -284,19 +279,27 @@ export class TextRendererPlugin {
     // If significant changes, remove old and add new
     if (JSON.stringify(prevElement) !== JSON.stringify(nextElement)) {
       const tasks = [
-        this.add(app, {
-          parent,
-          element: nextElement,
-          transitions,
-          getTransitionByType,
-          eventHandler,
-        }, signal),
-        this.remove(app, {
-          parent,
-          element: prevElement,
-          transitions,
-          getTransitionByType,
-        }, signal),
+        this.add(
+          app,
+          {
+            parent,
+            element: nextElement,
+            transitions,
+            getTransitionByType,
+            eventHandler,
+          },
+          signal,
+        ),
+        this.remove(
+          app,
+          {
+            parent,
+            element: prevElement,
+            transitions,
+            getTransitionByType,
+          },
+          signal,
+        ),
       ];
 
       // Run both operations in parallel
@@ -308,8 +311,7 @@ export class TextRendererPlugin {
       }
 
       if (
-        JSON.stringify(prevElement.style) !==
-        JSON.stringify(nextElement.style)
+        JSON.stringify(prevElement.style) !== JSON.stringify(nextElement.style)
       ) {
         text.style = createTextStyle(nextElement?.style);
       }

@@ -177,20 +177,26 @@ class RouteGraphics extends BaseRouteGraphics {
    * @returns {string} Asset category
    */
   _classifyAsset = (mimeType) => {
-    if (!mimeType) return 'texture';
+    if (!mimeType) return "texture";
 
-    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith("audio/")) return "audio";
 
-    if (mimeType.startsWith('font/') ||
-      ['application/font-woff', 'application/font-woff2',
-        'application/x-font-ttf', 'application/x-font-otf'].includes(mimeType)) {
-      return 'font';
+    if (
+      mimeType.startsWith("font/") ||
+      [
+        "application/font-woff",
+        "application/font-woff2",
+        "application/x-font-ttf",
+        "application/x-font-otf",
+      ].includes(mimeType)
+    ) {
+      return "font";
     }
 
     // Future: video support can be added here
     // if (mimeType.startsWith('video/')) return 'video';
 
-    return 'texture';
+    return "texture";
   };
 
   /**
@@ -207,7 +213,7 @@ class RouteGraphics extends BaseRouteGraphics {
     const assetsByType = {
       audio: {},
       font: {},
-      texture: {} // includes images and other PIXI-compatible assets
+      texture: {}, // includes images and other PIXI-compatible assets
     };
 
     for (const [key, asset] of Object.entries(assetBufferMap)) {
@@ -218,8 +224,8 @@ class RouteGraphics extends BaseRouteGraphics {
     // Load audio assets using AudioAsset.load in parallel
     await Promise.all(
       Object.entries(assetsByType.audio).map(([key, asset]) =>
-        AudioAsset.load(key, asset.buffer)
-      )
+        AudioAsset.load(key, asset.buffer),
+      ),
     );
 
     // Load font assets
@@ -238,7 +244,7 @@ class RouteGraphics extends BaseRouteGraphics {
         } finally {
           URL.revokeObjectURL(url);
         }
-      })
+      }),
     );
 
     if (!this._advancedLoader) {
@@ -266,11 +272,13 @@ class RouteGraphics extends BaseRouteGraphics {
   };
 
   loadAudioAssets = async (urls) => {
-    return Promise.all(urls.map(async (url) => {
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      return AudioAsset.load(url, arrayBuffer);
-    }));
+    return Promise.all(
+      urls.map(async (url) => {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        return AudioAsset.load(url, arrayBuffer);
+      }),
+    );
   };
 
   /**
@@ -292,15 +300,15 @@ class RouteGraphics extends BaseRouteGraphics {
           x: item.groupTransform.tx,
           y: item.groupTransform.ty,
           width: item.width,
-          height: item.height
-        }
+          height: item.height,
+        };
 
-        iterate(item.children)
+        iterate(item.children);
       }
-    }
-    iterate(this._app.stage.children)
+    };
+    iterate(this._app.stage.children);
     return items;
-  }
+  };
 
   /**
    *
@@ -371,60 +379,72 @@ class RouteGraphics extends BaseRouteGraphics {
     for (const toDeleteElement of toDeleteElements) {
       const elementRenderer = this._getRendererByElement(toDeleteElement);
       actions.push(() =>
-        elementRenderer.remove(app, {
-          parent: parent,
-          element: toDeleteElement,
-          elements: nextState.elements,
-          transitions: nextState.transitions,
-          getRendererByElement: this._getRendererByElement,
-          getTransitionByType: this._getTransitionByType,
-          eventHandler,
-        }, signal)
+        elementRenderer.remove(
+          app,
+          {
+            parent: parent,
+            element: toDeleteElement,
+            elements: nextState.elements,
+            transitions: nextState.transitions,
+            getRendererByElement: this._getRendererByElement,
+            getTransitionByType: this._getTransitionByType,
+            eventHandler,
+          },
+          signal,
+        ),
       );
     }
 
     for (const toAddElement of toAddElements) {
       const elementRenderer = this._getRendererByElement(toAddElement);
       actions.push(() =>
-        elementRenderer.add(app, {
-          parent: parent,
-          element: toAddElement,
-          elements: nextState.elements,
-          getRendererByElement: this._getRendererByElement,
-          transitions: nextState.transitions,
-          getTransitionByType: this._getTransitionByType,
-          eventHandler,
-        }, signal)
+        elementRenderer.add(
+          app,
+          {
+            parent: parent,
+            element: toAddElement,
+            elements: nextState.elements,
+            getRendererByElement: this._getRendererByElement,
+            transitions: nextState.transitions,
+            getTransitionByType: this._getTransitionByType,
+            eventHandler,
+          },
+          signal,
+        ),
       );
     }
 
     for (const toUpdateElement of toUpdateElements) {
       const elementRenderer = this._getRendererByElement(toUpdateElement.next);
       actions.push(() =>
-        elementRenderer.update(app, {
-          parent: parent,
-          prevElement: toUpdateElement.prev,
-          nextElement: toUpdateElement.next,
-          elements: nextState.elements,
-          getRendererByElement: this._getRendererByElement,
-          transitions: nextState.transitions,
-          getTransitionByType: this._getTransitionByType,
-          eventHandler,
-        }, signal)
+        elementRenderer.update(
+          app,
+          {
+            parent: parent,
+            prevElement: toUpdateElement.prev,
+            nextElement: toUpdateElement.next,
+            elements: nextState.elements,
+            getRendererByElement: this._getRendererByElement,
+            transitions: nextState.transitions,
+            getTransitionByType: this._getTransitionByType,
+            eventHandler,
+          },
+          signal,
+        ),
       );
     }
 
     try {
       // Run all actions in parallel
-      await Promise.all(actions.map(action => action()));
+      await Promise.all(actions.map((action) => action()));
 
       // Sort children AFTER all add/update operations complete
       app.stage.children.sort((a, b) => {
         const aElement = nextState.elements.find(
-          (element) => element.id === a.label
+          (element) => element.id === a.label,
         );
         const bElement = nextState.elements.find(
-          (element) => element.id === b.label
+          (element) => element.id === b.label,
         );
 
         if (aElement && bElement) {
@@ -437,10 +457,10 @@ class RouteGraphics extends BaseRouteGraphics {
 
           // If zIndex is the same or not specified, maintain order from nextState.elements
           const aIndex = nextState.elements.findIndex(
-            (element) => element.id === a.label
+            (element) => element.id === a.label,
           );
           const bIndex = nextState.elements.findIndex(
-            (element) => element.id === b.label
+            (element) => element.id === b.label,
           );
           return aIndex - bIndex;
         }
@@ -457,7 +477,7 @@ class RouteGraphics extends BaseRouteGraphics {
           diffTime: Date.now() - time,
         });
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error.name === "AbortError") {
         // Operation was cancelled, this is expected
         return;
       }
