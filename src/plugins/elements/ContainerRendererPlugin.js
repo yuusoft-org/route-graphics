@@ -38,7 +38,7 @@ export class ContainerRendererPlugin {
    */
   add = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
     const {
@@ -136,8 +136,10 @@ export class ContainerRendererPlugin {
       let totalHeight;
 
       if (element.direction === "horizontal") {
-        totalWidth = element.children.reduce((p, c, i) => 
-          p + c.width + (i > 0 ? gap : 0), 0);
+        totalWidth = element.children.reduce(
+          (p, c, i) => p + c.width + (i > 0 ? gap : 0),
+          0,
+        );
         totalHeight = element.children.reduce(
           (p, c) => Math.max(p, c.height || 0),
           0,
@@ -147,8 +149,10 @@ export class ContainerRendererPlugin {
           (p, c) => Math.max(p, c.width || 0),
           0,
         );
-        totalHeight = element.children.reduce((p, c, i) => 
-          p + c.height + (i > 0 ? gap : 0), 0);
+        totalHeight = element.children.reduce(
+          (p, c, i) => p + c.height + (i > 0 ? gap : 0),
+          0,
+        );
       }
 
       const anchor = { x: anchorX, y: anchorY };
@@ -201,31 +205,35 @@ export class ContainerRendererPlugin {
 
     (element.children || []).forEach((childElement) => {
       const renderer = getRendererByElement(childElement);
-      
+
       // Adjust child coordinates based on container's anchor
       // The child coordinates should be relative to the container's anchor point
       const containerWidth = element.width || 0;
       const containerHeight = element.height || 0;
       const anchorOffsetX = anchorX * containerWidth;
       const anchorOffsetY = anchorY * containerHeight;
-      
+
       const adjustedChild = {
         zIndex: element.zIndex,
         ...childElement,
         x: (childElement.x || 0) + anchorOffsetX,
         y: (childElement.y || 0) + anchorOffsetY,
       };
-      
+
       renderPromises.push(
-        renderer.add(app, {
-          parent: container,
-          element: adjustedChild,
-          elements: element.children || [],
-          transitions,
-          getTransitionByType,
-          getRendererByElement,
-          eventHandler,
-        }, signal),
+        renderer.add(
+          app,
+          {
+            parent: container,
+            element: adjustedChild,
+            elements: element.children || [],
+            transitions,
+            getTransitionByType,
+            getRendererByElement,
+            eventHandler,
+          },
+          signal,
+        ),
       );
     });
 
@@ -273,7 +281,7 @@ export class ContainerRendererPlugin {
    */
   remove = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
     console.log("remove container 11111111111");
@@ -301,7 +309,7 @@ export class ContainerRendererPlugin {
    */
   update = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
     const {
@@ -362,8 +370,10 @@ export class ContainerRendererPlugin {
       let totalHeight;
 
       if (nextElement.direction === "horizontal") {
-        totalWidth = nextElement.children.reduce((p, c, i) =>
-          p + c.width + (i > 0 ? gap : 0), 0);
+        totalWidth = nextElement.children.reduce(
+          (p, c, i) => p + c.width + (i > 0 ? gap : 0),
+          0,
+        );
         totalHeight = nextElement.children.reduce(
           (p, c) => Math.max(p, c.height || 0),
           0,
@@ -373,8 +383,10 @@ export class ContainerRendererPlugin {
           (p, c) => Math.max(p, c.width || 0),
           0,
         );
-        totalHeight = nextElement.children.reduce((p, c, i) =>
-          p + c.height + (i > 0 ? gap : 0), 0);
+        totalHeight = nextElement.children.reduce(
+          (p, c, i) => p + c.height + (i > 0 ? gap : 0),
+          0,
+        );
       }
 
       const anchor = { x: anchorX, y: anchorY };
@@ -435,29 +447,31 @@ export class ContainerRendererPlugin {
 
     const updatePromises = [];
 
-    const { toAddElements, toUpdateElements, toDeleteElements } =
-      diffElements(prevElement.children, nextElement.children);
-    
+    const { toAddElements, toUpdateElements, toDeleteElements } = diffElements(
+      prevElement.children,
+      nextElement.children,
+    );
+
     // If container has direction and children have been re-laid out,
     // we need to update positions of all existing children
     if (nextElement.direction && nextElement.children) {
       // Create a map of updated positions from layoutChildren
       const updatedPositions = new Map();
-      nextElement.children.forEach(child => {
+      nextElement.children.forEach((child) => {
         updatedPositions.set(child.id, { x: child.x, y: child.y });
       });
-      
+
       // Apply updated positions to toUpdateElements
-      toUpdateElements.forEach(element => {
+      toUpdateElements.forEach((element) => {
         const newPos = updatedPositions.get(element.next.id);
         if (newPos) {
           element.next.x = newPos.x;
           element.next.y = newPos.y;
         }
       });
-      
+
       // Apply updated positions to toAddElements
-      toAddElements.forEach(element => {
+      toAddElements.forEach((element) => {
         const newPos = updatedPositions.get(element.id);
         if (newPos) {
           element.x = newPos.x;
@@ -469,55 +483,63 @@ export class ContainerRendererPlugin {
     for (const element of toDeleteElements) {
       const renderer = getRendererByElement(element);
       updatePromises.push(
-        renderer.remove(app, {
-          parent: container,
-          element,
-          elements: nextElement.children || [],
-          transitions,
-          getTransitionByType,
-          getRendererByElement,
-          eventHandler,
-        }, signal),
+        renderer.remove(
+          app,
+          {
+            parent: container,
+            element,
+            elements: nextElement.children || [],
+            transitions,
+            getTransitionByType,
+            getRendererByElement,
+            eventHandler,
+          },
+          signal,
+        ),
       );
     }
 
     for (const element of toAddElements) {
       const renderer = getRendererByElement(element);
-      
+
       // Adjust child coordinates based on container's anchor
       const containerWidth = nextElement.width || 0;
       const containerHeight = nextElement.height || 0;
       const anchorOffsetX = anchorX * containerWidth;
       const anchorOffsetY = anchorY * containerHeight;
-      
+
       const adjustedElement = {
         ...element,
         x: (element.x || 0) + anchorOffsetX,
         y: (element.y || 0) + anchorOffsetY,
       };
-      
+
       updatePromises.push(
-        renderer.add(app, {
-          parent: container,
-          element: adjustedElement,
-          elements: nextElement.children || [],
-          transitions,
-          getTransitionByType,
-          getRendererByElement,
-          eventHandler,
-        }, signal),
+        renderer.add(
+          app,
+          {
+            parent: container,
+            element: adjustedElement,
+            elements: nextElement.children || [],
+            transitions,
+            getTransitionByType,
+            getRendererByElement,
+            eventHandler,
+          },
+          signal,
+        ),
       );
     }
 
     for (const element of toUpdateElements) {
       const renderer = getRendererByElement(element.next);
-      
+
       // Apply anchor offset to updated elements, similar to how we handle added elements
       const containerWidth = nextElement.width || 0;
       const containerHeight = nextElement.height || 0;
       const anchorOffsetX = anchorX * containerWidth;
       const anchorOffsetY = anchorY * containerHeight;
-      
+
       // Calculate previous anchor offset for comparison
       const prevAnchorX = prevElement.anchorX ?? 0;
       const prevAnchorY = prevElement.anchorY ?? 0;
@@ -525,31 +547,35 @@ export class ContainerRendererPlugin {
       const prevContainerHeight = prevElement.height || 0;
       const prevAnchorOffsetX = prevAnchorX * prevContainerWidth;
       const prevAnchorOffsetY = prevAnchorY * prevContainerHeight;
-      
+
       // Adjust coordinates if anchor or container size changed
       const adjustedPrevElement = {
         ...element.prev,
         x: (element.prev.x || 0) + prevAnchorOffsetX,
         y: (element.prev.y || 0) + prevAnchorOffsetY,
       };
-      
+
       const adjustedNextElement = {
         ...element.next,
         x: (element.next.x || 0) + anchorOffsetX,
         y: (element.next.y || 0) + anchorOffsetY,
       };
-      
+
       updatePromises.push(
-        renderer.update(app, {
-          parent: container,
-          prevElement: adjustedPrevElement,
-          nextElement: adjustedNextElement,
-          elements: nextElement.children || [],
-          transitions,
-          getTransitionByType,
-          getRendererByElement,
-          eventHandler,
-        }, signal),
+        renderer.update(
+          app,
+          {
+            parent: container,
+            prevElement: adjustedPrevElement,
+            nextElement: adjustedNextElement,
+            elements: nextElement.children || [],
+            transitions,
+            getTransitionByType,
+            getRendererByElement,
+            eventHandler,
+          },
+          signal,
+        ),
       );
     }
 
@@ -559,12 +585,12 @@ export class ContainerRendererPlugin {
       container.children.sort((a, b) => {
         // Find the corresponding elements in nextElement.children
         const aElement = nextElement.children.find(
-          (element) => element.id === a.label
+          (element) => element.id === a.label,
         );
         const bElement = nextElement.children.find(
-          (element) => element.id === b.label
+          (element) => element.id === b.label,
         );
-        
+
         // If both elements are found in children array
         if (aElement && bElement) {
           // First, sort by zIndex if specified
@@ -573,13 +599,13 @@ export class ContainerRendererPlugin {
           if (aZIndex !== bZIndex) {
             return aZIndex - bZIndex;
           }
-          
+
           // If zIndex is the same or not specified, maintain order from nextElement.children
           const aIndex = nextElement.children.indexOf(aElement);
           const bIndex = nextElement.children.indexOf(bElement);
           return aIndex - bIndex;
         }
-        
+
         // Keep elements that aren't in children array at the beginning
         if (!aElement && !bElement) return 0;
         if (!aElement) return -1;
@@ -698,7 +724,9 @@ export class ContainerRendererPlugin {
         (element.children || []).forEach((childElement, index) => {
           // Consider child's own anchor when positioning
           const childMainSize = childElement[mainSize] || 0;
-          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          const childAnchor = isHorizontal
+            ? childElement.anchorX || 0
+            : childElement.anchorY || 0;
           childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
           layoutPos += childMainSize;
           if (index < element.children.length - 1) {
@@ -711,7 +739,9 @@ export class ContainerRendererPlugin {
         (element.children || []).forEach((childElement, index) => {
           // Consider child's own anchor when positioning
           const childMainSize = childElement[mainSize] || 0;
-          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          const childAnchor = isHorizontal
+            ? childElement.anchorX || 0
+            : childElement.anchorY || 0;
           childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
           layoutPos += childMainSize;
           if (index < element.children.length - 1) {
@@ -724,7 +754,9 @@ export class ContainerRendererPlugin {
         (element.children || []).forEach((childElement, index) => {
           // Consider child's own anchor when positioning
           const childMainSize = childElement[mainSize] || 0;
-          const childAnchor = isHorizontal ? (childElement.anchorX || 0) : (childElement.anchorY || 0);
+          const childAnchor = isHorizontal
+            ? childElement.anchorX || 0
+            : childElement.anchorY || 0;
           childElement[mainAxis] = layoutPos + childMainSize * childAnchor;
           layoutPos += childMainSize;
           if (index < element.children.length - 1) {
@@ -738,7 +770,9 @@ export class ContainerRendererPlugin {
         // Start alignment
         (element.children || []).forEach((childElement) => {
           const childCrossSize = childElement[crossSize] || 0;
-          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
+          const childAnchor = isHorizontal
+            ? childElement.anchorY || 0
+            : childElement.anchorX || 0;
           childElement[crossAxis] = childCrossSize * childAnchor;
         });
       } else if (crossAnchor === 0.5) {
@@ -746,16 +780,22 @@ export class ContainerRendererPlugin {
         (element.children || []).forEach((childElement) => {
           const childCrossSize = childElement[crossSize] || 0;
           // Consider child's own anchor when positioning
-          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
-          childElement[crossAxis] = -childCrossSize / 2 + childCrossSize * childAnchor;
+          const childAnchor = isHorizontal
+            ? childElement.anchorY || 0
+            : childElement.anchorX || 0;
+          childElement[crossAxis] =
+            -childCrossSize / 2 + childCrossSize * childAnchor;
         });
       } else if (crossAnchor === 1) {
         // End alignment - align each child to the end
         (element.children || []).forEach((childElement) => {
           const childCrossSize = childElement[crossSize] || 0;
           // Consider child's own anchor when positioning
-          const childAnchor = isHorizontal ? (childElement.anchorY || 0) : (childElement.anchorX || 0);
-          childElement[crossAxis] = -childCrossSize + childCrossSize * childAnchor;
+          const childAnchor = isHorizontal
+            ? childElement.anchorY || 0
+            : childElement.anchorX || 0;
+          childElement[crossAxis] =
+            -childCrossSize + childCrossSize * childAnchor;
         });
       }
     }

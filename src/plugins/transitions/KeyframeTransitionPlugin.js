@@ -107,23 +107,19 @@ class KeyframeTransitionPlugin {
   _transition = async (app, sprite, transition, signal) => {
     return new Promise((resolve, reject) => {
       if (signal?.aborted) {
-        reject(new DOMException('Operation aborted', 'AbortError'));
+        reject(new DOMException("Operation aborted", "AbortError"));
         return;
       }
 
       const { properties: propertiesArrayOrObject } = transition;
       // TODO: stop supporting arrays
 
-      const animationProperties = Array.isArray(
-        propertiesArrayOrObject,
-      )
+      const animationProperties = Array.isArray(propertiesArrayOrObject)
         ? propertiesArrayOrObject
-        : Object.entries(propertiesArrayOrObject).map(
-          ([property, value]) => ({
+        : Object.entries(propertiesArrayOrObject).map(([property, value]) => ({
             ...value,
             property,
-          }),
-        );
+          }));
 
       const accumulatedDurations = animationProperties.map(
         (animationProperty) => {
@@ -185,9 +181,9 @@ class KeyframeTransitionPlugin {
 
       // Register abort handler for immediate cleanup
       if (signal) {
-        signal.addEventListener('abort', () => {
+        signal.addEventListener("abort", () => {
           cleanup();
-          reject(new DOMException('Operation aborted', 'AbortError'));
+          reject(new DOMException("Operation aborted", "AbortError"));
         });
       }
 
@@ -206,7 +202,7 @@ class KeyframeTransitionPlugin {
       // If already aborted, don't start
       if (signal?.aborted) {
         cleanup();
-        reject(new DOMException('Operation aborted', 'AbortError'));
+        reject(new DOMException("Operation aborted", "AbortError"));
         return;
       }
 

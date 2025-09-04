@@ -55,7 +55,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
    */
   add = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
     const {
       parent,
@@ -67,7 +67,9 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
     } = options;
 
     // Handle empty sprites - use EMPTY texture if no URL provided
-    const textureButton = element.url ? Texture.from(element.url) : Texture.EMPTY;
+    const textureButton = element.url
+      ? Texture.from(element.url)
+      : Texture.EMPTY;
     // TODO fix texture is undefined in test environment
     let textureButtonHover;
     let textureButtonClicked;
@@ -83,6 +85,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
 
     const sprite = new Sprite(textureButton);
     sprite.label = element.id;
+    sprite.interactiveChildren = false;
 
     if (element.eventName || element.hoverUrl || element.clickUrl) {
       sprite.cursor = "pointer";
@@ -196,9 +199,9 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
     // Sort children based on elements array order and zIndex
     if (Array.isArray(elements) && elements.length > 0) {
       parent.children.sort((a, b) => {
-        const aElement = elements.find(el => el.id === a.label);
-        const bElement = elements.find(el => el.id === b.label);
-        
+        const aElement = elements.find((el) => el.id === a.label);
+        const bElement = elements.find((el) => el.id === b.label);
+
         if (aElement && bElement) {
           // First, sort by zIndex if specified
           const aZIndex = aElement.zIndex ?? 0;
@@ -206,13 +209,13 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
           if (aZIndex !== bZIndex) {
             return aZIndex - bZIndex;
           }
-          
+
           // If zIndex is the same, maintain order from elements array
-          const aIndex = elements.findIndex(el => el.id === a.label);
-          const bIndex = elements.findIndex(el => el.id === b.label);
+          const aIndex = elements.findIndex((el) => el.id === a.label);
+          const bIndex = elements.findIndex((el) => el.id === b.label);
           return aIndex - bIndex;
         }
-        
+
         // Keep elements that aren't in elements array at their current position
         if (!aElement && !bElement) return 0;
         if (!aElement) return -1;
@@ -236,14 +239,9 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
    */
   remove = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
-    const {
-      parent,
-      element,
-      transitions = [],
-      getTransitionByType,
-    } = options;
+    const { parent, element, transitions = [], getTransitionByType } = options;
     const sprite = parent.getChildByName(element.id);
     if (!sprite) {
       throw new Error(`Sprite with id ${element.id} not found`);
@@ -296,10 +294,10 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       getTransitionByType,
       eventHandler,
     },
-    signal
+    signal,
   ) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
     const sprite = parent.getChildByName(prevElement.id);
     if (!sprite) {
@@ -339,7 +337,8 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
 
     // Helper function to handle texture updates
     function handleTextureUpdates() {
-      const urlChanged = prevElement.url !== nextElement.url ||
+      const urlChanged =
+        prevElement.url !== nextElement.url ||
         prevElement.hoverUrl !== nextElement.hoverUrl ||
         prevElement.clickUrl !== nextElement.clickUrl;
 
@@ -352,21 +351,27 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
             if (textureButton.baseTexture.valid) {
               const scaleX = nextElement.scaleX ?? 1;
               const scaleY = nextElement.scaleY ?? 1;
-              sprite.width = (nextElement.width ?? textureButton.width) * scaleX;
-              sprite.height = (nextElement.height ?? textureButton.height) * scaleY;
+              sprite.width =
+                (nextElement.width ?? textureButton.width) * scaleX;
+              sprite.height =
+                (nextElement.height ?? textureButton.height) * scaleY;
             } else {
-              textureButton.baseTexture.once('loaded', () => {
+              textureButton.baseTexture.once("loaded", () => {
                 const scaleX = nextElement.scaleX ?? 1;
                 const scaleY = nextElement.scaleY ?? 1;
-                sprite.width = (nextElement.width ?? textureButton.width) * scaleX;
-                sprite.height = (nextElement.height ?? textureButton.height) * scaleY;
+                sprite.width =
+                  (nextElement.width ?? textureButton.width) * scaleX;
+                sprite.height =
+                  (nextElement.height ?? textureButton.height) * scaleY;
               });
             }
           }
         }
 
-        const hadInteractiveTextures = prevElement.hoverUrl || prevElement.clickUrl;
-        const hasInteractiveTextures = nextElement.hoverUrl || nextElement.clickUrl;
+        const hadInteractiveTextures =
+          prevElement.hoverUrl || prevElement.clickUrl;
+        const hasInteractiveTextures =
+          nextElement.hoverUrl || nextElement.clickUrl;
 
         if (!hadInteractiveTextures && hasInteractiveTextures) {
           const mainTexture = sprite.texture;
@@ -384,22 +389,26 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
 
         if (nextElement.hoverUrl) {
           const textureButtonHover = Texture.from(nextElement.hoverUrl);
-          sprite.off('pointerenter');
-          sprite.on('pointerenter', () => {
+          sprite.off("pointerenter");
+          sprite.on("pointerenter", () => {
             sprite.texture = textureButtonHover;
           });
         }
 
         if (nextElement.clickUrl) {
           const textureButtonClicked = Texture.from(nextElement.clickUrl);
-          sprite.off('pointerdown');
-          sprite.on('pointerdown', () => {
+          sprite.off("pointerdown");
+          sprite.on("pointerdown", () => {
             sprite.texture = textureButtonClicked;
           });
         }
       }
 
-      if (nextElement.eventName || nextElement.hoverUrl || nextElement.clickUrl) {
+      if (
+        nextElement.eventName ||
+        nextElement.hoverUrl ||
+        nextElement.clickUrl
+      ) {
         sprite.cursor = "pointer";
         sprite.eventMode = "static";
       }
@@ -408,7 +417,8 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
     // Helper function to handle direct updates (no transitions)
     function handleDirectUpdates() {
       // Check if URL changed (image update)
-      const urlChanged = prevElement.url !== nextElement.url ||
+      const urlChanged =
+        prevElement.url !== nextElement.url ||
         prevElement.hoverUrl !== nextElement.hoverUrl ||
         prevElement.clickUrl !== nextElement.clickUrl;
 
@@ -425,22 +435,28 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
             if (textureButton.baseTexture.valid) {
               const scaleX = nextElement.scaleX ?? 1;
               const scaleY = nextElement.scaleY ?? 1;
-              sprite.width = (nextElement.width ?? textureButton.width) * scaleX;
-              sprite.height = (nextElement.height ?? textureButton.height) * scaleY;
+              sprite.width =
+                (nextElement.width ?? textureButton.width) * scaleX;
+              sprite.height =
+                (nextElement.height ?? textureButton.height) * scaleY;
             } else {
-              textureButton.baseTexture.once('loaded', () => {
+              textureButton.baseTexture.once("loaded", () => {
                 const scaleX = nextElement.scaleX ?? 1;
                 const scaleY = nextElement.scaleY ?? 1;
-                sprite.width = (nextElement.width ?? textureButton.width) * scaleX;
-                sprite.height = (nextElement.height ?? textureButton.height) * scaleY;
+                sprite.width =
+                  (nextElement.width ?? textureButton.width) * scaleX;
+                sprite.height =
+                  (nextElement.height ?? textureButton.height) * scaleY;
               });
             }
           }
         }
 
         // Check if we need to add reset listeners (when first adding hover or click)
-        const hadInteractiveTextures = prevElement.hoverUrl || prevElement.clickUrl;
-        const hasInteractiveTextures = nextElement.hoverUrl || nextElement.clickUrl;
+        const hadInteractiveTextures =
+          prevElement.hoverUrl || prevElement.clickUrl;
+        const hasInteractiveTextures =
+          nextElement.hoverUrl || nextElement.clickUrl;
 
         if (!hadInteractiveTextures && hasInteractiveTextures) {
           // Get the current main texture
@@ -460,16 +476,16 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         // Update hover and click textures if needed
         if (nextElement.hoverUrl) {
           const textureButtonHover = Texture.from(nextElement.hoverUrl);
-          sprite.off('pointerenter'); // Remove old listener
-          sprite.on('pointerenter', () => {
+          sprite.off("pointerenter"); // Remove old listener
+          sprite.on("pointerenter", () => {
             sprite.texture = textureButtonHover;
           });
         }
 
         if (nextElement.clickUrl) {
           const textureButtonClicked = Texture.from(nextElement.clickUrl);
-          sprite.off('pointerdown'); // Remove old listener
-          sprite.on('pointerdown', () => {
+          sprite.off("pointerdown"); // Remove old listener
+          sprite.on("pointerdown", () => {
             sprite.texture = textureButtonClicked;
           });
         }
@@ -482,37 +498,64 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       if (nextElement.y !== undefined && nextElement.y !== prevElement.y) {
         sprite.y = nextElement.y;
       }
-      if (nextElement.rotation !== undefined && nextElement.rotation !== prevElement.rotation) {
+      if (
+        nextElement.rotation !== undefined &&
+        nextElement.rotation !== prevElement.rotation
+      ) {
         sprite.rotation = (nextElement.rotation * Math.PI) / 180;
       }
 
       const scaleX = nextElement.scaleX ?? 1;
       const scaleY = nextElement.scaleY ?? 1;
 
-      if (nextElement.width !== undefined && (nextElement.width !== prevElement.width || scaleX !== (prevElement.scaleX ?? 1))) {
+      if (
+        nextElement.width !== undefined &&
+        (nextElement.width !== prevElement.width ||
+          scaleX !== (prevElement.scaleX ?? 1))
+      ) {
         sprite.width = nextElement.width * scaleX;
       }
-      if (nextElement.height !== undefined && (nextElement.height !== prevElement.height || scaleY !== (prevElement.scaleY ?? 1))) {
+      if (
+        nextElement.height !== undefined &&
+        (nextElement.height !== prevElement.height ||
+          scaleY !== (prevElement.scaleY ?? 1))
+      ) {
         sprite.height = nextElement.height * scaleY;
       }
 
-      if (nextElement.anchorX !== undefined && nextElement.anchorX !== prevElement.anchorX) {
-        sprite.pivot.x = sprite.width * nextElement.anchorX / scaleX;
+      if (
+        nextElement.anchorX !== undefined &&
+        nextElement.anchorX !== prevElement.anchorX
+      ) {
+        sprite.pivot.x = (sprite.width * nextElement.anchorX) / scaleX;
       }
-      if (nextElement.anchorY !== undefined && nextElement.anchorY !== prevElement.anchorY) {
-        sprite.pivot.y = sprite.height * nextElement.anchorY / scaleY;
+      if (
+        nextElement.anchorY !== undefined &&
+        nextElement.anchorY !== prevElement.anchorY
+      ) {
+        sprite.pivot.y = (sprite.height * nextElement.anchorY) / scaleY;
       }
 
-      if (nextElement.zIndex !== undefined && nextElement.zIndex !== prevElement.zIndex) {
+      if (
+        nextElement.zIndex !== undefined &&
+        nextElement.zIndex !== prevElement.zIndex
+      ) {
         sprite.zIndex = nextElement.zIndex;
       }
 
-      if (nextElement.alpha !== undefined && nextElement.alpha !== prevElement.alpha) {
+      if (
+        nextElement.alpha !== undefined &&
+        nextElement.alpha !== prevElement.alpha
+      ) {
         sprite.alpha = nextElement.alpha;
       }
 
       // Update interactivity
-      if (nextElement.eventName || nextElement.hoverUrl || nextElement.clickUrl) {
+      if (
+        nextElement.eventName ||
+        nextElement.hoverUrl ||
+        nextElement.clickUrl
+      ) {
         sprite.cursor = "pointer";
         sprite.eventMode = "static";
       }

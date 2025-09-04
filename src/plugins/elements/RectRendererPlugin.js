@@ -14,6 +14,8 @@ import { TransitionEvent, BaseRendererPlugin } from "../../types";
  * @property {number} width
  * @property {number} height
  * @property {string} fill
+ * @property {any} [clickEventPayload] - Payload for click events
+ * @property {any} [rightClickEventPayload] - Payload for right-click events
  * @typedef {ContainerElement & RectElementOptions} RectContainerElement
  */
 
@@ -37,7 +39,7 @@ export class RectRendererPlugin {
    */
   add = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
     const {
@@ -50,6 +52,8 @@ export class RectRendererPlugin {
 
     const graphics = new Graphics();
     graphics.label = element.id;
+    graphics.interactiveChildren = false;
+    graphics.eventMode = "none";
 
     if (element.x !== undefined) {
       graphics.x = element.x;
@@ -75,34 +79,45 @@ export class RectRendererPlugin {
     }
 
     if (element.pointerDown) {
-      graphics.on('pointerdown', (e) => {
-        eventHandler && eventHandler(element.pointerDown, {
-          x: e.global.x,
-          y: e.global.y
-        });
-      })
+      graphics.on("pointerdown", (e) => {
+        e.stopPropagation();
+        eventHandler &&
+          eventHandler(element.pointerDown, {
+            x: e.global.x,
+            y: e.global.y,
+          });
+      });
     }
 
     if (element.pointerUp) {
-      graphics.on('pointerup', (e) => {
-        eventHandler && eventHandler(element.pointerUp, {
-          x: e.global.x,
-          y: e.global.y
-        });
-      })
+      graphics.on("pointerup", (e) => {
+        e.stopPropagation();
+        eventHandler &&
+          eventHandler(element.pointerUp, {
+            x: e.global.x,
+            y: e.global.y,
+          });
+      });
     }
 
     if (element.pointerMove) {
-      graphics.on('pointermove', (e) => {
-        eventHandler && eventHandler(element.pointerMove, {
-          x: e.global.x,
-          y: e.global.y
-        });
-      })
+      graphics.on("pointermove", (e) => {
+        e.stopPropagation();
+        eventHandler &&
+          eventHandler(element.pointerMove, {
+            x: e.global.x,
+            y: e.global.y,
+          });
+      });
     }
 
-    if (element.cursor || element.pointerDown || element.pointerUp || element.pointerMove) {
-      graphics.eventMode = 'static';
+    if (
+      element.cursor ||
+      element.pointerDown ||
+      element.pointerUp ||
+      element.pointerMove
+    ) {
+      graphics.eventMode = "static";
     }
 
     const width = element.width;
@@ -117,7 +132,7 @@ export class RectRendererPlugin {
         width: element.border.width,
         color: element.border.color,
         alpha: element.border.alpha ?? 1,
-        alignment: element.border.alignment ?? 1
+        alignment: element.border.alignment ?? 1,
       });
     }
 
@@ -134,10 +149,14 @@ export class RectRendererPlugin {
     ) {
       graphics.eventMode = "static";
       graphics.on("pointerup", (e) => {
+        e.stopPropagation();
         if (e.button === 0) {
-          eventHandler(element.clickEventName);
+          eventHandler(element.clickEventName, element.clickEventPayload);
         } else if (e.button === 2) {
-          eventHandler(element.rightClickEventName);
+          eventHandler(
+            element.rightClickEventName,
+            element.rightClickEventPayload,
+          );
         }
       });
     }
@@ -145,6 +164,7 @@ export class RectRendererPlugin {
     if (element.wheelEventName && eventHandler) {
       graphics.eventMode = "static";
       graphics.on("wheel", (e) => {
+        e.stopPropagation();
         eventHandler(element.wheelEventName, {
           deltaY: e.deltaY,
         });
@@ -188,15 +208,10 @@ export class RectRendererPlugin {
    */
   remove = async (app, options, signal) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
-    const {
-      parent,
-      element,
-      transitions = [],
-      getTransitionByType,
-    } = options;
+    const { parent, element, transitions = [], getTransitionByType } = options;
     const graphics = parent.getChildByName(element.id);
     if (!graphics) {
       throw new Error(`Rect with id ${element.id} not found`);
@@ -250,10 +265,10 @@ export class RectRendererPlugin {
       getTransitionByType,
       eventHandler,
     },
-    signal
+    signal,
   ) => {
     if (signal?.aborted) {
-      throw new DOMException('Operation aborted', 'AbortError');
+      throw new DOMException("Operation aborted", "AbortError");
     }
 
     const graphics = parent.getChildByName(prevElement.id);
@@ -285,15 +300,25 @@ export class RectRendererPlugin {
     if (transitionPromises.length > 0) {
       await Promise.all(transitionPromises);
       // After transitions complete, update any properties not covered by transitions
-      if (prevElement.width !== nextElement.width || prevElement.height !== nextElement.height || prevElement.fill !== nextElement.fill) {
+      if (
+        prevElement.width !== nextElement.width ||
+        prevElement.height !== nextElement.height ||
+        prevElement.fill !== nextElement.fill
+      ) {
         graphics.clear();
         graphics.rect(0, 0, nextElement.width, nextElement.height);
         graphics.fill(nextElement.fill);
       }
-      if (prevElement.anchorX !== undefined && nextElement.anchorX !== prevElement.anchorX) {
+      if (
+        prevElement.anchorX !== undefined &&
+        nextElement.anchorX !== prevElement.anchorX
+      ) {
         graphics.pivot.x = nextElement.width * nextElement.anchorX;
       }
-      if (prevElement.anchorY !== undefined && nextElement.anchorY !== prevElement.anchorY) {
+      if (
+        prevElement.anchorY !== undefined &&
+        nextElement.anchorY !== prevElement.anchorY
+      ) {
         graphics.pivot.y = nextElement.height * nextElement.anchorY;
       }
     } else {
@@ -304,24 +329,50 @@ export class RectRendererPlugin {
       if (prevElement.y !== undefined && nextElement.y !== prevElement.y) {
         graphics.y = nextElement.y;
       }
-      if (prevElement.alpha !== undefined && nextElement.alpha !== prevElement.alpha) {
+      if (
+        prevElement.alpha !== undefined &&
+        nextElement.alpha !== prevElement.alpha
+      ) {
         graphics.alpha = nextElement.alpha;
       }
-      if (prevElement.scaleX !== undefined && nextElement.scaleX !== prevElement.scaleX) {
+      if (
+        prevElement.scaleX !== undefined &&
+        nextElement.scaleX !== prevElement.scaleX
+      ) {
         graphics.scale.x = nextElement.scaleX;
       }
-      if (prevElement.scaleY !== undefined && nextElement.scaleY !== prevElement.scaleY) {
+      if (
+        prevElement.scaleY !== undefined &&
+        nextElement.scaleY !== prevElement.scaleY
+      ) {
         graphics.scale.y = nextElement.scaleY;
       }
-      if (prevElement.rotation !== undefined && nextElement.rotation !== prevElement.rotation) {
+      if (
+        prevElement.rotation !== undefined &&
+        nextElement.rotation !== prevElement.rotation
+      ) {
         graphics.rotation = (nextElement.rotation * Math.PI) / 180;
       }
 
-      const borderHasChanged = JSON.stringify(prevElement.border) !== JSON.stringify(nextElement.border);
+      const borderHasChanged =
+        JSON.stringify(prevElement.border) !==
+        JSON.stringify(nextElement.border);
 
-      if (prevElement.width !== nextElement.width || prevElement.height !== nextElement.height || prevElement.radius !== nextElement.radius || prevElement.fill !== nextElement.fill || borderHasChanged) {
+      if (
+        prevElement.width !== nextElement.width ||
+        prevElement.height !== nextElement.height ||
+        prevElement.radius !== nextElement.radius ||
+        prevElement.fill !== nextElement.fill ||
+        borderHasChanged
+      ) {
         graphics.clear();
-        graphics.roundRect(0, 0, nextElement.width, nextElement.height, nextElement.radius ?? 0);
+        graphics.roundRect(
+          0,
+          0,
+          nextElement.width,
+          nextElement.height,
+          nextElement.radius ?? 0,
+        );
         if (nextElement.fill) {
           graphics.fill(nextElement.fill);
         }
@@ -330,15 +381,21 @@ export class RectRendererPlugin {
             width: nextElement.border.width,
             color: nextElement.border.color,
             alpha: nextElement.border.alpha ?? 1,
-            alignment: nextElement.border.alignment ?? 1
+            alignment: nextElement.border.alignment ?? 1,
           });
         }
       }
 
-      if (prevElement.anchorX !== undefined && nextElement.anchorX !== prevElement.anchorX) {
+      if (
+        prevElement.anchorX !== undefined &&
+        nextElement.anchorX !== prevElement.anchorX
+      ) {
         graphics.pivot.x = nextElement.width * nextElement.anchorX;
       }
-      if (prevElement.anchorY !== undefined && nextElement.anchorY !== prevElement.anchorY) {
+      if (
+        prevElement.anchorY !== undefined &&
+        nextElement.anchorY !== prevElement.anchorY
+      ) {
         graphics.pivot.y = nextElement.height * nextElement.anchorY;
       }
     }
