@@ -77,6 +77,10 @@ class App {
         url: "/public/bgm-1.mp3",
         type: "audio/mpeg",
       },
+      "file:bgm-2": {
+        url: "/public/bgm-2.mp3",
+        type: "audio/mpeg",
+      },
       "Inkfree": {
         url: "/public/Inkfree.ttf",
         type: "application/x-font-ttf",

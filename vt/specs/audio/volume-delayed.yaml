@@ -1,0 +1,19 @@
+---
+title: Audio with Delay and Volume
+description: "Test audio with delay and different volume levels"
+---
+states:
+  - elements:
+      - id: "sfx"
+        type: "audio"
+        url: "file:bgm-1"
+        volume: 0.7
+        delay: 1000
+
+  - elements:
+      - id: "sfx"
+        type: "audio"
+        url: "file:bgm-2"
+        volume: 0.4
+        delay: 2000
+
