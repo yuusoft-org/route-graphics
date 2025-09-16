@@ -7,3 +7,4 @@ states:
       - id: "a"
         type: "audio"
         url: "file:bgm-1"
+        volume: 1.0

@@ -1,0 +1,46 @@
+---
+title: Audio Volume Control
+description: "Test audio volume control functionality"
+---
+states:
+  - elements:
+      - id: "audio-full"
+        type: "audio"
+        url: "file:bgm-1"
+        volume: 1.0
+        loop: true
+
+  - elements:
+      - id: "audio-full"
+        type: "audio"
+        url: "file:bgm-1"
+        volume: 0.5
+        loop: true
+
+  - elements:
+      - id: "audio-full"
+        type: "audio"
+        url: "file:bgm-1"
+        volume: 0.2
+        loop: true
+
+  - elements:
+      - id: "audio-full"
+        type: "audio"
+        url: "file:bgm-1"
+        volume: 0
+        loop: true
+
+  - elements:
+      - id: "audio-full"
+        type: "audio"
+        url: "file:bgm-1"
+        volume: 0.8
+        loop: true
+
+  - elements:
+      - id: "audio-full"
+        type: "audio"
+        url: "file:bgm-1"
+        volume: 2
+        loop: true
