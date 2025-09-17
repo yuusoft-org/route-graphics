@@ -123,8 +123,6 @@ export class TextRendererPlugin {
 
     newText
       .on('pointerout', () => {
-        console.log('OOOOOOOOOOOOOOOOO out')
-        // newText.cursor = 'default';
         newText.isOver = false;
       })
       .on("pointerupoutside", () => {

@@ -66,6 +66,8 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       elements = [],
     } = options;
 
+    console.log('element', element)
+
     // Handle empty sprites - use EMPTY texture if no URL provided
     const textureButton = element.url
       ? Texture.from(element.url)
@@ -83,6 +85,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
       textureButtonClicked = Texture.from(element.clickUrl);
     }
 
+    console.log('textureButton', textureButton)
     const sprite = new Sprite(textureButton);
     sprite.label = element.id;
     sprite.interactiveChildren = false;

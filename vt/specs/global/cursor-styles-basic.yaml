@@ -16,14 +16,21 @@ states:
         text: "Hover & Click Styles Test"
         x: 400
         y: 50
-        anchorX: 0.5
-        anchorY: 0
         style:
           fontSize: 32
           fill: "white"
         hoverStyle:
           fontSize: 32
           fill: "yellow"
+      - id: "sprite-test"
+        type: "sprite"
+        url: "file:button"
+        hoverUrl: "file:button_over"
+        clickUrl: "file:button_down"
+        x: 200
+        y: 150
+        width: 100
+        height: 100
   - global:
       cursorStyles:
         default: "url('/public/circle-green-32.png'),auto"
@@ -34,11 +41,18 @@ states:
         text: "Hover & Click Styles Test"
         x: 400
         y: 50
-        anchorX: 0.5
-        anchorY: 0
         style:
           fontSize: 32
           fill: "white"
         hoverStyle:
           fontSize: 32
           fill: "yellow"
+      - id: "sprite-test"
+        type: "sprite"
+        url: "file:button"
+        hoverUrl: "file:button_over"
+        clickUrl: "file:button_down"
+        x: 200
+        y: 150
+        width: 100
+        height: 100

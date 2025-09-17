@@ -155,8 +155,6 @@ class RouteGraphics extends BaseRouteGraphics {
     const graphics = new Graphics();
     graphics.rect(0, 0, width, height);
     graphics.fill(backgroundColor || 0x000000);
-    // graphics.cursor = "default";
-    // this._app.stage.cursor = "default";
     this._app.stage.addChild(graphics);
     this._app.stage.width = width;
     this._app.stage.height = height;
