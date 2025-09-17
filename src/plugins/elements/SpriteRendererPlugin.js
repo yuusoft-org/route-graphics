@@ -91,7 +91,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
     sprite.interactiveChildren = false;
 
     if (element.eventName || element.hoverUrl || element.clickUrl) {
-      sprite.cursor = "pointer";
+      sprite.cursor = "hover";
       sprite.eventMode = "static";
     }
 
@@ -412,7 +412,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         nextElement.hoverUrl ||
         nextElement.clickUrl
       ) {
-        sprite.cursor = "pointer";
+        sprite.cursor = "hover";
         sprite.eventMode = "static";
       }
     }
@@ -559,7 +559,7 @@ export class SpriteRendererPlugin extends BaseRendererPlugin {
         nextElement.hoverUrl ||
         nextElement.clickUrl
       ) {
-        sprite.cursor = "pointer";
+        sprite.cursor = "hover";
         sprite.eventMode = "static";
       }
     }

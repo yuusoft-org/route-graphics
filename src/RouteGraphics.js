@@ -30,6 +30,10 @@ class AdvancedBufferLoader {
     this.bufferMap = bufferMap;
   }
 
+  test(url) {
+    return true;
+  }
+
   async load(_url) {
     // For file: URLs, use the full URL as key, otherwise use just the filename
     let url = _url.startsWith("file:") ? _url : getPathName(_url);
@@ -354,6 +358,17 @@ class RouteGraphics extends BaseRouteGraphics {
    * @param {GlobalConfiguration} [nextGlobal] - Next global configuration
    */
   _applyGlobalCursorStyles = (app, prevGlobal, nextGlobal) => {
+    // Initialize default cursor styles if they don't exist
+    if (!app.renderer.events.cursorStyles) {
+      app.renderer.events.cursorStyles = {};
+    }
+    if (!app.renderer.events.cursorStyles.default) {
+      app.renderer.events.cursorStyles.default = "default";
+    }
+    if (!app.renderer.events.cursorStyles.hover) {
+      app.renderer.events.cursorStyles.hover = "pointer";
+    }
+
     const prevCursorStyles = prevGlobal?.cursorStyles;
     const nextCursorStyles = nextGlobal?.cursorStyles;
 
