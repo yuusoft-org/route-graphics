@@ -1,0 +1,69 @@
+---
+title: Text 2
+description: A text-revealing's text
+specs:
+  - "`text` should be correct"
+---
+states:
+  - elements:
+      - id: "a"
+        type: "text-revealing"
+        displaySpeed: 5
+        content:
+          - text: Hello there
+            style:
+              fontSize: 48
+            furigana:
+              text: Hello
+              style:
+                fontSize: 16
+                fill: yellow
+          - text: " align top"
+            align: top
+            furigana:
+              text: furi1
+              style:
+                fontSize: 12
+                fill: white
+          - text: " align center"
+            align: center
+            furigana:
+              text: furi2
+              style:
+                fontSize: 12
+                fill: white
+          - text: " align bottom "
+            furigana:
+              align: bottom
+              text: furi3
+              style:
+                fontSize: 12
+                fill: white
+          - text: "block 1 this is a very long text that should wrap to the next line automatically when it exceeds the word wrap width "
+            furigana:
+              text: furi5
+              style:
+                fontSize: 12
+                fill: white
+          - text: "block 2 another long block of text that will also wrap "
+            style:
+              fontSize: 32
+              fill: "red"
+          - text: "block 3 and the final block with more text content"
+            align: "center"
+        x: 120
+        y: 120
+        align: "bottom"
+        indicator:
+          revealing:
+            url: file:circle-red
+            width: 12
+            height: 12
+          complete:
+            url: file:circle-green
+            width: 12
+            height: 12
+        style:
+          fontSize: 24
+          fill: "white"
+          wordWrapWidth: 600
