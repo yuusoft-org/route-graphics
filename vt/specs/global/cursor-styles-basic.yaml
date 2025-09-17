@@ -8,13 +8,37 @@ specs:
 states:
   - global:
       cursorStyles:
-        default: "crosshair"
-        hover: "help"
+        default: "url('/public/circle-red-32.png'),auto"
+        hover: "url('/public/circle-blue-32.png'),auto"
     elements:
-      - id: "rect-1"
-        type: "rect"
-        x: 50
+      - id: "title"
+        type: "text"
+        text: "Hover & Click Styles Test"
+        x: 400
         y: 50
-        width: 100
-        height: 100
-        fill: blue
+        anchorX: 0.5
+        anchorY: 0
+        style:
+          fontSize: 32
+          fill: "white"
+        hoverStyle:
+          fontSize: 32
+          fill: "yellow"
+  - global:
+      cursorStyles:
+        default: "url('/public/circle-green-32.png'),auto"
+        hover: "url('/public/circle-grey-32.png'),auto"
+    elements:
+      - id: "title"
+        type: "text"
+        text: "Hover & Click Styles Test"
+        x: 400
+        y: 50
+        anchorX: 0.5
+        anchorY: 0
+        style:
+          fontSize: 32
+          fill: "white"
+        hoverStyle:
+          fontSize: 32
+          fill: "yellow"

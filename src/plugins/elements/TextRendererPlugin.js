@@ -42,9 +42,9 @@ const createTextStyle = (style) => {
     fontFamily: style.fontFamily || "Roboto",
     stroke: style.strokeColor
       ? {
-          color: style.strokeColor,
-          width: style.strokeWidth,
-        }
+        color: style.strokeColor,
+        width: style.strokeWidth,
+      }
       : undefined,
   });
 };
@@ -95,7 +95,7 @@ export class TextRendererPlugin {
     }
 
     if (element.eventName || element.clickedStyle || element.hoverStyle) {
-      newText.cursor = "pointer";
+      newText.cursor = "hover";
       newText.eventMode = "static";
     }
     newText.label = element.id;
@@ -122,6 +122,11 @@ export class TextRendererPlugin {
     }
 
     newText
+      .on('pointerout', () => {
+        console.log('OOOOOOOOOOOOOOOOO out')
+        // newText.cursor = 'default';
+        newText.isOver = false;
+      })
       .on("pointerupoutside", () => {
         newText.style = textStyle;
       })

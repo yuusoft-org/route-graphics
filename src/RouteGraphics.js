@@ -155,6 +155,8 @@ class RouteGraphics extends BaseRouteGraphics {
     const graphics = new Graphics();
     graphics.rect(0, 0, width, height);
     graphics.fill(backgroundColor || 0x000000);
+    // graphics.cursor = "default";
+    // this._app.stage.cursor = "default";
     this._app.stage.addChild(graphics);
     this._app.stage.width = width;
     this._app.stage.height = height;
@@ -363,22 +365,16 @@ class RouteGraphics extends BaseRouteGraphics {
         // Apply new cursor styles
         if (nextCursorStyles.default) {
           app.renderer.events.cursorStyles.default = nextCursorStyles.default;
+          // Also set canvas cursor directly
+          app.canvas.style.cursor = nextCursorStyles.default;
         }
         if (nextCursorStyles.hover) {
           app.renderer.events.cursorStyles.hover = nextCursorStyles.hover;
-        }
-        if (nextCursorStyles.disabled) {
-          app.renderer.events.cursorStyles.disabled = nextCursorStyles.disabled;
-        }
-        if (nextCursorStyles.loading) {
-          app.renderer.events.cursorStyles.loading = nextCursorStyles.loading;
         }
       } else if (prevCursorStyles) {
         // Reset to default cursor styles if global config was removed
         app.renderer.events.cursorStyles.default = "default";
         app.renderer.events.cursorStyles.hover = "pointer";
-        delete app.renderer.events.cursorStyles.disabled;
-        delete app.renderer.events.cursorStyles.loading;
       }
     }
   };
