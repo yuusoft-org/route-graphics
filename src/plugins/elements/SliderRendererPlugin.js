@@ -116,10 +116,10 @@ export class SliderRendererPlugin extends BaseRendererPlugin {
     handle.y = slider.height / 2;
     handle.x = slider.width / 2;
     handle.eventMode = "static";
-    handle.cursor = "pointer";
+    handle.cursor = "hover";
 
     slider.eventMode = "static";
-    slider.cursor = "pointer";
+    slider.cursor = "hover";
 
     handle
       .on("pointerdown", onDragStart)

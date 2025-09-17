@@ -45,3 +45,9 @@ vt:
         - title: "Audio Basic"
           files: "audio"
           description: "Audio sound playback tests"
+    - title: "Global"
+      type: "groupLabel"
+      items:
+        - title: "Global Configuration"
+          files: "global"
+          description: "Global configuration tests including cursor styles"
