@@ -30,10 +30,6 @@ class AdvancedBufferLoader {
     this.bufferMap = bufferMap;
   }
 
-  test(url) {
-    return true;
-  }
-
   async load(_url) {
     // For file: URLs, use the full URL as key, otherwise use just the filename
     let url = _url.startsWith("file:") ? _url : getPathName(_url);
@@ -101,6 +97,7 @@ class RouteGraphics extends BaseRouteGraphics {
    */
   _state = {
     elements: [],
+    transitions: [],
   };
 
   /**
@@ -351,6 +348,42 @@ class RouteGraphics extends BaseRouteGraphics {
   };
 
   /**
+   * Apply global cursor styles to the PixiJS application
+   * @param {Application} app - The PixiJS application instance
+   * @param {GlobalConfiguration} [prevGlobal] - Previous global configuration
+   * @param {GlobalConfiguration} [nextGlobal] - Next global configuration
+   */
+  _applyGlobalCursorStyles = (app, prevGlobal, nextGlobal) => {
+    const prevCursorStyles = prevGlobal?.cursorStyles;
+    const nextCursorStyles = nextGlobal?.cursorStyles;
+
+    // Only update if cursor styles have changed
+    if (JSON.stringify(prevCursorStyles) !== JSON.stringify(nextCursorStyles)) {
+      if (nextCursorStyles) {
+        // Apply new cursor styles
+        if (nextCursorStyles.default) {
+          app.renderer.events.cursorStyles.default = nextCursorStyles.default;
+        }
+        if (nextCursorStyles.hover) {
+          app.renderer.events.cursorStyles.hover = nextCursorStyles.hover;
+        }
+        if (nextCursorStyles.disabled) {
+          app.renderer.events.cursorStyles.disabled = nextCursorStyles.disabled;
+        }
+        if (nextCursorStyles.loading) {
+          app.renderer.events.cursorStyles.loading = nextCursorStyles.loading;
+        }
+      } else if (prevCursorStyles) {
+        // Reset to default cursor styles if global config was removed
+        app.renderer.events.cursorStyles.default = "default";
+        app.renderer.events.cursorStyles.hover = "pointer";
+        delete app.renderer.events.cursorStyles.disabled;
+        delete app.renderer.events.cursorStyles.loading;
+      }
+    }
+  };
+
+  /**
    *
    * @param {Application} app
    * @param {RouteGraphicsState} prevState
@@ -359,6 +392,9 @@ class RouteGraphics extends BaseRouteGraphics {
    */
   _render = async (app, parent, prevState, nextState, eventHandler) => {
     const time = Date.now();
+
+    // Apply global cursor styles if they exist and have changed
+    this._applyGlobalCursorStyles(app, prevState.global, nextState.global);
 
     const { toAddElements, toUpdateElements, toDeleteElements } = diffElements(
       prevState.elements,

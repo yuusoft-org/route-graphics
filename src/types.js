@@ -41,12 +41,22 @@ export const TransitionEvent = {
  */
 
 /**
+ * @typedef {Object} GlobalConfiguration
+ * @property {Object} [cursorStyles] - Global cursor styles configuration
+ * @property {string} [cursorStyles.default] - Default cursor style
+ * @property {string} [cursorStyles.hover] - Hover cursor style
+ * @property {string} [cursorStyles.disabled] - Disabled cursor style
+ * @property {string} [cursorStyles.loading] - Loading cursor style
+ */
+
+/**
  * @template {BaseElement} E
  * @template {BaseTransition} T
  * @typedef {Object} RouteGraphicsState
  * @property {string} id - ID
  * @property {E[]} elements - Array of elements
  * @property {T[]} transitions - Array of transitions
+ * @property {GlobalConfiguration} [global] - Global configuration options
  */
 
 /**

@@ -119,9 +119,9 @@ class App {
   };
 
   _renderCanvas = () => {
-    const { elements = [], transitions = [] } =
+    const { elements = [], transitions = [], global } =
       this._jsonContent.states[this._frameIndex];
-    this._app.render({ elements, transitions });
+    this._app.render({ elements, transitions, global });
   };
 
   _nextFrame = () => {
