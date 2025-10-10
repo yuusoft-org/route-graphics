@@ -7,6 +7,7 @@ import {
   ExtensionType,
   Texture,
 } from "pixi.js";
+import '@pixi/unsafe-eval';
 import { BaseRouteGraphics } from "./types";
 import { diffElements } from "./common.js";
 import { AudioStage, AudioAsset } from "./AudioStage.js";
