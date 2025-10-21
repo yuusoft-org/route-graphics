@@ -1,0 +1,18 @@
+file: '../../src/parser/common.js'
+group: common
+suites: [calculatePositionAfterAnchor]
+---
+suite: calculatePositionAfterAnchor
+exportName: calculatePositionAfterAnchor
+---
+case: Test calculating text position after anchor
+in:
+  - positionX: 400
+    positionY: 260
+    width: 200
+    height: 100
+    anchorX: 0.5
+    anchorY: 0.5
+out:
+  x: 300
+  y: 210
