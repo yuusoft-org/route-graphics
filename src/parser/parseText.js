@@ -2,9 +2,13 @@ import { CanvasTextMetrics, TextStyle } from 'pixi.js';
 import { calculatePositionAfterAnchor } from './common.js';
 
 /**
+ * @import { BaseElement, ASTNode } from '../types.js' 
+ */
+
+/**
  * Parse text object and calculate final position after anchor adjustment
- * @param {import('../types.js').BaseElement} state
- * @returns {import('../types.js').ASTNode}
+ * @param {BaseElement} state
+ * @returns {ASTNode}
  */
 export function parseText(state) {
   // Calculate text dimensions
