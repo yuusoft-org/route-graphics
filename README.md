@@ -105,4 +105,10 @@ bun run vt:generate
 
 # Lint
 bun run lint
+
+# to test it
+bun run test
+
 ```
+
+
