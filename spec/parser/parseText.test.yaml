@@ -22,6 +22,8 @@ out:
   id: "tl"
   type: "text"
   text: "This text is aligned to the top left corner"
+  width: 483.94921875
+  height: 29
   x: 418.025390625
   y: 225.5
   zIndex: 0

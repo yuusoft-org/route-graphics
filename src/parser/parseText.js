@@ -33,6 +33,8 @@ export function parseText(state) {
       fontFamily: state.style.fontFamily,
       fill: state.style.fill
     },
+    width: textWidth,
+    height: textHeight,
     x: adjustedPosition.x,
     y: adjustedPosition.y,
     zIndex: state.zIndex || 0
