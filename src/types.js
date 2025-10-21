@@ -21,6 +21,19 @@
  */
 
 /**
+ * @typedef {Object} PositionAfterAnchorOptions
+ * @property {{x: number, y: number}} position - Object with x/y coordinates
+ * @property {{width: number, height: number}} dimensions - Object with width/height
+ * @property {{anchorX: number, anchorY: number}} anchor - Object with anchorX/anchorY
+ */
+
+/**
+ * @typedef {Object} PositionAfterAnchor
+ * @property {number} x
+ * @property {number} y
+ */
+
+/**
  * @typedef {Object} ContainerElementOptions
  * @property {number} [x] - The x-coordinate
  * @property {number} [y] - The y-coordinate
