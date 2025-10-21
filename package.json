@@ -32,7 +32,8 @@
   },
   "dependencies": {
     "@pixi/unsafe-eval": "^7.4.3",
-    "pixi.js": "^8.7.1"
+    "pixi.js": "^8.7.1",
+    "puty": "^0.0.5-rc1"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^1.6.0",

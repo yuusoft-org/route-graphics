@@ -1,0 +1,33 @@
+file: '../../parser/parseText.js'
+group: parser
+suites: [parseText]
+---
+suite: parseText
+exportName: parseText
+---
+case: Test parsing simple text object
+in: 
+  - id: 'tl'
+    type: "text"
+    text: "This text is aligned to the top left corner"
+    x: 660
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    style: 
+      fontSize: 24
+      fontFamily: "Arial"
+      fill: "white"
+out:
+  id: "tl"
+  type: "text"
+  properties: 
+    text: "This text is aligned to the top left corner"
+    fontSize: 24
+    fontFamily: "Arial"
+    fill: "white"
+  # Change this when we have a proper text measurement
+  # x: 355.984375
+  x: 350.40000000000003
+  y: 228
+  zIndex: 0
