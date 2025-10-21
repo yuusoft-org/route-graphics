@@ -13,7 +13,6 @@ import { calculatePositionAfterAnchor } from './common.js';
 export function parseText(state) {
   // Calculate text dimensions
 
-  // Can't use this, it requires a canvas context
   const { width: textWidth, height: textHeight } = CanvasTextMetrics.measureText(state.text, new TextStyle({
     fontFamily: state.style.fontFamily,
     fontSize: state.style.fontSize
