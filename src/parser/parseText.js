@@ -20,10 +20,14 @@ export function parseText(state) {
   }));
 
   // Calculate position after anchor
-  const position = { x: state.x, y: state.y };
-  const dimensions = { width: textWidth, height: textHeight };
-  const anchor = { anchorX: state.anchorX, anchorY: state.anchorY };
-  const adjustedPosition = calculatePositionAfterAnchor({position, dimensions, anchor});
+  const adjustedPosition = calculatePositionAfterAnchor({
+    positionX: state.x,
+    positionY: state.y,
+    width: textWidth,
+    height: textHeight,
+    anchorX: state.anchorX,
+    anchorY: state.anchorY
+  });
 
   const astObj = {
     id: state.id,

@@ -8,9 +8,16 @@
  * @param {PositionAfterAnchorOptions} options
  * @returns {PositionAfterAnchor}
  */
-export function calculatePositionAfterAnchor({position, dimensions, anchor}){
-    const offSetX= position.x - (dimensions.width * anchor.anchorX);
-    const offSetY= position.y - (dimensions.height * anchor.anchorY);
+export function calculatePositionAfterAnchor({
+    positionX,
+    positionY,
+    width,
+    height,
+    anchorX,
+    anchorY
+}){
+    const offSetX= positionX - (width * anchorX);
+    const offSetY= positionY - (height * anchorY);
     return {
         x: offSetX,
         y: offSetY
