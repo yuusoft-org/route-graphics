@@ -1,4 +1,4 @@
-file: '../../parser/parseText.js'
+file: '../../src/parser/parseText.js'
 group: parser
 suites: [parseText]
 ---
@@ -21,13 +21,11 @@ in:
 out:
   id: "tl"
   type: "text"
-  properties: 
-    text: "This text is aligned to the top left corner"
+  text: "This text is aligned to the top left corner"
+  x: 418.025390625
+  y: 225.5
+  zIndex: 0
+  style: 
     fontSize: 24
     fontFamily: "Arial"
     fill: "white"
-  # Change this when we have a proper text measurement
-  # x: 355.984375
-  x: 350.40000000000003
-  y: 228
-  zIndex: 0

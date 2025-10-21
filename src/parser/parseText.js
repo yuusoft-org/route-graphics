@@ -1,25 +1,19 @@
-// import { CanvasTextMetrics, TextStyle } from 'pixi.js';
+import { CanvasTextMetrics, TextStyle } from 'pixi.js';
 import { calculatePositionAfterAnchor } from './common.js';
-import { BaseElement, ASTNode } from "../types.js"
 
 /**
  * Parse text object and calculate final position after anchor adjustment
- * @param {BaseElement} state
- * @returns {ASTNode}
+ * @param {import('../types.js').BaseElement} state
+ * @returns {import('../types.js').ASTNode}
  */
 export function parseText(state) {
   // Calculate text dimensions
 
   // Can't use this, it requires a canvas context
-  // const { width: textWidth, height: textHeight } = CanvasTextMetrics.measureText(state.text, new TextStyle({
-  //   fontFamily: state.fontFamily,
-  //   fontSize: state.fontSize
-  // }));
-
-  // Temporary replacement for text measurement
-  const fontSize = state.style.fontSize || 16;
-  const textWidth = state.text.length * (fontSize * 0.6);
-  const textHeight = fontSize;
+  const { width: textWidth, height: textHeight } = CanvasTextMetrics.measureText(state.text, new TextStyle({
+    fontFamily: state.style.fontFamily,
+    fontSize: state.style.fontSize
+  }));
 
   // Calculate position after anchor
   const position = { x: state.x, y: state.y };
@@ -30,8 +24,8 @@ export function parseText(state) {
   const astObj = {
     id: state.id,
     type: "text",
-    properties: {
-      text: state.text,
+    text: state.text,
+    style: {
       fontSize: state.style.fontSize,
       fontFamily: state.style.fontFamily,
       fill: state.style.fill
