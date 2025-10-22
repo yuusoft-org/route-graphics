@@ -56,7 +56,10 @@
  * @typedef {Object} SpriteMixin
  * @property {'sprite'} type
  * @property {number} alpha
+<<<<<<< HEAD
  * @property {string} url
+=======
+>>>>>>> origin/main
  * 
  * @typedef {ASTNode & SpriteMixin } SpriteASTNode
  */
