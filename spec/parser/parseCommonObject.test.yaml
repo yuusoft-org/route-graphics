@@ -1,0 +1,41 @@
+file: '../../src/parser/parseCommonObject.js'
+group: parser
+suites: [parseCommonObject]
+---
+suite: parseCommonObject
+exportName: parseCommonObject
+---
+case: Test parsing simple common object
+in: 
+  - id: 'tl'
+    type: "text"
+    text: "This text is aligned to the top left corner"
+    x: 660
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    scaleX: 1.5
+    scaleY: 1.5
+    width: 483.94921875
+    height: 29
+out:
+  id: "tl"
+  type: "text"
+  width: 725.923828125
+  height: 43.5
+  x: 297.0380859375
+  y: 218.25
+  zIndex: 0
+  originX: 362.9619140625
+  originY: 21.75
+---
+case: Parsing object with no width or height
+in: 
+  - id: 'tl'
+    type: "text"
+    text: "This text is aligned to the top left corner"
+    x: 660
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+throws: "Input Error: Width or height is missing"

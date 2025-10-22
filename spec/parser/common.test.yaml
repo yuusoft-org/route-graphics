@@ -16,3 +16,5 @@ in:
 out:
   x: 300
   y: 210
+  originX: 100
+  originY: 50

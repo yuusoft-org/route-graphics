@@ -42,9 +42,9 @@ const createTextStyle = (style) => {
     fontFamily: style.fontFamily || "Roboto",
     stroke: style.strokeColor
       ? {
-        color: style.strokeColor,
-        width: style.strokeWidth,
-      }
+          color: style.strokeColor,
+          width: style.strokeWidth,
+        }
       : undefined,
   });
 };
@@ -122,7 +122,7 @@ export class TextRendererPlugin {
     }
 
     newText
-      .on('pointerout', () => {
+      .on("pointerout", () => {
         newText.isOver = false;
       })
       .on("pointerupoutside", () => {

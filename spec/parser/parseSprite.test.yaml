@@ -1,0 +1,38 @@
+file: '../../src/parser/parseSprite.js'
+group: parser
+suites: [parseSprite]
+---
+suite: parseSprite
+exportName: parseSprite
+---
+case: Test parsing sprite
+in: 
+  - id: 'circle-red'
+    type: "sprite"
+    url: "file:circle-red"
+    alpha: 0.8
+    width: 80
+    height: 100
+    cursor: pointer
+    hoverUrl: "file:circle-red-hover"
+    clickUrl: "file:circle-red-clicked"
+    scaleX: 1.2
+    scaleY: 0.8
+    x: 240
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+out:
+  id: "circle-red"
+  type: "sprite"
+  width: 96
+  height: 80
+  x: 192
+  y: 200
+  originX: 48
+  originY: 40
+  alpha: 0.8
+  zIndex: 0
+  cursor: pointer
+  hoverUrl: "file:circle-red-hover"
+  clickUrl: "file:circle-red-clicked"

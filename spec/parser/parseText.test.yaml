@@ -27,6 +27,8 @@ out:
   x: 418.025390625
   y: 225.5
   zIndex: 0
+  originX: 241.974609375
+  originY: 14.5
   style: 
     fontSize: 24
     fontFamily: "Arial"

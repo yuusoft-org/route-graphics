@@ -46,7 +46,7 @@ const createTextStyle = (style, breakWords = false) => {
     lineHeight: style.lineHeight,
     wordWrapWidth: style.wordWrapWidth,
     fontFamily: style.fontFamily || "Roboto",
-    whiteSpace: 'pre',
+    whiteSpace: "pre",
     trim: false,
     stroke: style.strokeColor
       ? {
@@ -97,16 +97,21 @@ export class TextRevealingRendererPlugin {
 
     const wordWrapWidth = element.style.wordWrapWidth || 500;
 
-    const segments = element.content && element.content.length > 0
-      ? element.content.map(item => ({
-          // HACK: Replace trailing spaces with non-breaking spaces to prevent PixiJS from trimming them
-          // PixiJS internally trims trailing spaces in TextMetrics.trimRight(), so we use \u00A0 instead
-          text: item.text.replace(/ +$/, (match) => '\u00A0'.repeat(match.length)),
-          style: item.style ? { ...element.style, ...item.style } : element.style,
-          align: item.align || element.align || 'top',
-          furigana: item.furigana,
-        }))
-      : element.segments;
+    const segments =
+      element.content && element.content.length > 0
+        ? element.content.map((item) => ({
+            // HACK: Replace trailing spaces with non-breaking spaces to prevent PixiJS from trimming them
+            // PixiJS internally trims trailing spaces in TextMetrics.trimRight(), so we use \u00A0 instead
+            text: item.text.replace(/ +$/, (match) =>
+              "\u00A0".repeat(match.length),
+            ),
+            style: item.style
+              ? { ...element.style, ...item.style }
+              : element.style,
+            align: item.align || element.align || "top",
+            furigana: item.furigana,
+          }))
+        : element.segments;
     // const segments = [
     //   {
     //     text: "Mallo Sallo",
@@ -163,9 +168,9 @@ export class TextRevealingRendererPlugin {
       let x = 0;
       let y = 0;
       let lineMaxHeight = 0;
-      
+
       const segmentsCopy = [...segments];
-      
+
       while (true) {
         const segment = segmentsCopy[0];
         if (!segment) {
@@ -221,12 +226,22 @@ export class TextRevealingRendererPlugin {
         let text = measurements.lines[0];
 
         // Preserve trailing spaces that might get trimmed by measureText
-        if (measurements.lines.length === 1 && segment.text.endsWith(" ") && !text.endsWith(" ")) {
+        if (
+          measurements.lines.length === 1 &&
+          segment.text.endsWith(" ") &&
+          !text.endsWith(" ")
+        ) {
           text += " ";
         }
         const remainingText = measurements.lines.slice(1).join(" ");
 
-        const newText = { text, style: styleWithWordWrapWidth, x, y: 0, align: segment.align };
+        const newText = {
+          text,
+          style: styleWithWordWrapWidth,
+          x,
+          y: 0,
+          align: segment.align,
+        };
 
         lineParts.push(newText);
 
@@ -261,10 +276,10 @@ export class TextRevealingRendererPlugin {
       let x = 0;
       let y = 0;
       let lineMaxHeight = 0;
-      
+
       const segmentsCopy = [...segments];
       const segmentFuriganaAdded = new WeakSet(); // Track which segments already have furigana added
-      
+
       while (true) {
         const segment = segmentsCopy[0];
         if (!segment) {
@@ -320,12 +335,22 @@ export class TextRevealingRendererPlugin {
         let text = measurements.lines[0];
 
         // Preserve trailing spaces that might get trimmed by measureText
-        if (measurements.lines.length === 1 && segment.text.endsWith(" ") && !text.endsWith(" ")) {
+        if (
+          measurements.lines.length === 1 &&
+          segment.text.endsWith(" ") &&
+          !text.endsWith(" ")
+        ) {
           text += " ";
         }
         const remainingText = measurements.lines.slice(1).join(" ");
 
-        const newText = { text, style: styleWithWordWrapWidth, x, y: 0, align: segment.align };
+        const newText = {
+          text,
+          style: styleWithWordWrapWidth,
+          x,
+          y: 0,
+          align: segment.align,
+        };
 
         lineParts.push(newText);
 
@@ -366,7 +391,7 @@ export class TextRevealingRendererPlugin {
       const lineContainer = new Container();
       lineContainer.y = chunk.y;
       lineContainer.alpha = 0;
-      
+
       // Calculate the maximum height in this line for alignment
       let maxHeight = 0;
       chunk.lineParts.forEach((part) => {
@@ -378,7 +403,7 @@ export class TextRevealingRendererPlugin {
           maxHeight = measurements.height;
         }
       });
-      
+
       // First pass: render non-furigana text and calculate their positions
       const textPositions = new Map();
       chunk.lineParts.forEach((part) => {
@@ -387,16 +412,16 @@ export class TextRevealingRendererPlugin {
             part.text,
             createTextStyle(part.style),
           );
-          
+
           // Calculate y offset based on alignment
           let yOffset = part.y;
-          const align = part.align || 'top';
-          if (align === 'center') {
+          const align = part.align || "top";
+          if (align === "center") {
             yOffset += (maxHeight - measurements.height) / 2;
-          } else if (align === 'bottom') {
+          } else if (align === "bottom") {
             yOffset += maxHeight - measurements.height;
           }
-          
+
           const text = new Text({
             text: part.text,
             style: createTextStyle(part.style),
@@ -404,12 +429,12 @@ export class TextRevealingRendererPlugin {
             y: yOffset,
           });
           lineContainer.addChild(text);
-          
+
           // Store position info for furigana calculation
           textPositions.set(part.x, { yOffset, height: measurements.height });
         }
       });
-      
+
       // Second pass: render furigana based on parent positions
       chunk.lineParts.forEach((part) => {
         if (part.isFurigana) {
@@ -417,16 +442,16 @@ export class TextRevealingRendererPlugin {
             part.text,
             createTextStyle(part.style),
           );
-          
+
           // Get parent's position info
           const parentPos = textPositions.get(part.parentX);
           let yOffset = -measurements.height - 5;
-          
+
           if (parentPos) {
             // Position furigana above the parent text
             yOffset = parentPos.yOffset - measurements.height + 2;
           }
-          
+
           const text = new Text({
             text: part.text,
             style: createTextStyle(part.style),
@@ -467,7 +492,7 @@ export class TextRevealingRendererPlugin {
       revealingIndicator = new Sprite(revealingTexture);
       revealingIndicator.anchor.set(0, 0.5);
       revealingIndicator.visible = false;
-      
+
       // Set dimensions if specified
       if (element.indicator.revealing.width !== undefined) {
         revealingIndicator.width = element.indicator.revealing.width;
@@ -475,7 +500,7 @@ export class TextRevealingRendererPlugin {
       if (element.indicator.revealing.height !== undefined) {
         revealingIndicator.height = element.indicator.revealing.height;
       }
-      
+
       container.addChild(revealingIndicator);
     }
 
@@ -484,7 +509,7 @@ export class TextRevealingRendererPlugin {
       completeIndicator = new Sprite(completeTexture);
       completeIndicator.anchor.set(0, 0.5);
       completeIndicator.visible = false;
-      
+
       // Set dimensions if specified
       if (element.indicator.complete.width !== undefined) {
         completeIndicator.width = element.indicator.complete.width;
@@ -492,7 +517,7 @@ export class TextRevealingRendererPlugin {
       if (element.indicator.complete.height !== undefined) {
         completeIndicator.height = element.indicator.complete.height;
       }
-      
+
       container.addChild(completeIndicator);
     }
 
@@ -509,7 +534,7 @@ export class TextRevealingRendererPlugin {
         child.mask = null;
         child.alpha = 1;
       });
-      
+
       // Show complete indicator immediately for fast display mode
       if (completeIndicator) {
         completeIndicator.visible = true;
@@ -518,22 +543,25 @@ export class TextRevealingRendererPlugin {
           const lastChunk = chunks[chunks.length - 1];
           let maxX = 0;
           let maxY = lastChunk.y;
-          
-          lastChunk.lineParts.forEach(part => {
+
+          lastChunk.lineParts.forEach((part) => {
             if (!part.isFurigana) {
-              const measurements = CanvasTextMetrics.measureText(part.text, createTextStyle(part.style));
+              const measurements = CanvasTextMetrics.measureText(
+                part.text,
+                createTextStyle(part.style),
+              );
               const endX = part.x + measurements.width;
               if (endX > maxX) {
                 maxX = endX;
               }
             }
           });
-          
+
           completeIndicator.x = maxX + 10;
           completeIndicator.y = maxY + 20;
         }
       }
-      
+
       return;
     }
 
@@ -551,17 +579,20 @@ export class TextRevealingRendererPlugin {
               const lastChunk = chunks[chunks.length - 1];
               let maxX = 0;
               let maxY = lastChunk.y;
-              
-              lastChunk.lineParts.forEach(part => {
+
+              lastChunk.lineParts.forEach((part) => {
                 if (!part.isFurigana) {
-                  const measurements = CanvasTextMetrics.measureText(part.text, createTextStyle(part.style));
+                  const measurements = CanvasTextMetrics.measureText(
+                    part.text,
+                    createTextStyle(part.style),
+                  );
                   const endX = part.x + measurements.width;
                   if (endX > maxX) {
                     maxX = endX;
                   }
                 }
               });
-              
+
               completeIndicator.x = maxX + 10;
               completeIndicator.y = maxY + 20;
             }
@@ -584,34 +615,48 @@ export class TextRevealingRendererPlugin {
         // Update revealing indicator position using the same mask logic
         if (revealingIndicator && lineIndex <= chunks.length) {
           const currentChunk = chunks[lineIndex - 1];
-          if (currentChunk && (container.getChildAt(lineIndex).mask === mask || lineIndex === chunks.length)) {
+          if (
+            currentChunk &&
+            (container.getChildAt(lineIndex).mask === mask ||
+              lineIndex === chunks.length)
+          ) {
             revealingIndicator.visible = true;
-            
+
             // Position ahead of the mask by a fixed amount to ensure it's at the visible text edge
             // Add extra offset to compensate for the mask lag
             const forwardOffset = 150; // Fixed pixels ahead to ensure visibility
-            const maskVisibleBoundary = mask.x + xOffset + gradientWidth + forwardOffset;
-            
+            const maskVisibleBoundary =
+              mask.x + xOffset + gradientWidth + forwardOffset;
+
             // Find the rightmost revealed text position and check if line is complete
             let indicatorX = 0;
             let hasVisibleText = false;
             let lineComplete = true;
             let totalLineWidth = 0;
-            
+
             // Calculate total line width first
             for (const part of currentChunk.lineParts) {
               if (!part.isFurigana) {
-                const measurements = CanvasTextMetrics.measureText(part.text, createTextStyle(part.style));
-                totalLineWidth = Math.max(totalLineWidth, part.x + measurements.width);
+                const measurements = CanvasTextMetrics.measureText(
+                  part.text,
+                  createTextStyle(part.style),
+                );
+                totalLineWidth = Math.max(
+                  totalLineWidth,
+                  part.x + measurements.width,
+                );
               }
             }
-            
+
             for (const part of currentChunk.lineParts) {
               if (!part.isFurigana) {
-                const measurements = CanvasTextMetrics.measureText(part.text, createTextStyle(part.style));
+                const measurements = CanvasTextMetrics.measureText(
+                  part.text,
+                  createTextStyle(part.style),
+                );
                 const partStartX = part.x;
                 const partEndX = part.x + measurements.width;
-                
+
                 if (partEndX <= maskVisibleBoundary) {
                   // This text is fully revealed - position at its end
                   indicatorX = partEndX;
@@ -628,12 +673,12 @@ export class TextRevealingRendererPlugin {
                 }
               }
             }
-            
+
             // Check if the entire line is revealed
             if (maskVisibleBoundary >= totalLineWidth) {
               lineComplete = true;
             }
-            
+
             // Show revealing indicator throughout animation, including on last line
             if (hasVisibleText && indicatorX > 0) {
               // Show revealing indicator
@@ -646,7 +691,7 @@ export class TextRevealingRendererPlugin {
             } else {
               revealingIndicator.visible = false;
             }
-            
+
             // Keep complete indicator hidden during animation
             if (completeIndicator) {
               completeIndicator.visible = false;
@@ -674,22 +719,25 @@ export class TextRevealingRendererPlugin {
                 const lastChunk = chunks[chunks.length - 1];
                 let maxX = 0;
                 let maxY = lastChunk.y;
-                
-                lastChunk.lineParts.forEach(part => {
+
+                lastChunk.lineParts.forEach((part) => {
                   if (!part.isFurigana) {
-                    const measurements = CanvasTextMetrics.measureText(part.text, createTextStyle(part.style));
+                    const measurements = CanvasTextMetrics.measureText(
+                      part.text,
+                      createTextStyle(part.style),
+                    );
                     const endX = part.x + measurements.width;
                     if (endX > maxX) {
                       maxX = endX;
                     }
                   }
                 });
-                
+
                 completeIndicator.x = maxX + 10;
                 completeIndicator.y = maxY + 20;
               }
             }
-            
+
             app.ticker.remove(effect);
             resolve();
           }
