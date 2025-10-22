@@ -16,9 +16,9 @@ export function parseRect(state) {
     astObj = {
         ...astObj,
         border:{
-            alpha: state?.border?.alpha||1,
-            color: state?.border?.color||"black",
-            width: state?.border?.width||0
+            alpha: state?.border?.alpha ?? 1,
+            color: state?.border?.color ?? "black",
+            width: state?.border?.width ?? 0
         }
     }
   }

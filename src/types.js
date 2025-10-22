@@ -53,19 +53,16 @@
  */
 
 /**
- * @typedef {Object} SpriteMixin
+ * @typedef {Object} SpriteASTProps
  * @property {'sprite'} type
  * @property {number} alpha
-<<<<<<< HEAD
  * @property {string} url
-=======
->>>>>>> origin/main
  * 
- * @typedef {ASTNode & SpriteMixin } SpriteASTNode
+ * @typedef {ASTNode & SpriteASTProps } SpriteASTNode
  */
 
 /**
- * @typedef {Object} RectMixin
+ * @typedef {Object} RectASTProps
  * @property {'rect'} type
  * @property {string} fill - Fill color (e.g., "red")
  * @property {Object} border
@@ -78,15 +75,15 @@
  * @property {string} pointerMove - Event name for pointer move
  * @property {number} rotation - Rotation in degrees
  *
- * @typedef {(ASTNode & RectMixin)} RectASTNode
+ * @typedef {(ASTNode & RectASTProps)} RectASTNode
  */
 
 /**
- * @typedef {Object} TextMixin
+ * @typedef {Object} TextASTProps
  * @property {string} text
  * @property {Object} [style] - Textstyle
  * 
- * @typedef {ASTNode & TextMixin} TextASTNode
+ * @typedef {ASTNode & TextASTProps} TextASTNode
  */
 
 /**

@@ -12,10 +12,14 @@ import { parseCommonObject } from './parseCommonObject.js';
  * @returns {TextASTNode}
  */
 export function parseText(state) {
-  const textStyle = {
+  const defaultTextStyle = {
     fill: 'black',
     fontFamily: 'Arial',
     fontSize: 16,
+  }
+
+  const textStyle = {
+    ...defaultTextStyle,
     ...state.style,
   }
 
