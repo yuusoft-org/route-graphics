@@ -9,6 +9,30 @@
  * @property {string} type - Type of the element
  */
 
+/** 
+ * @typedef {Object} ASTNode
+ * @property {string} type - Type of the AST node
+ * @property {string} id - ID of the AST node
+ * @property {number} x - X position of the AST node
+ * @property {number} y - Y position of the AST node
+ * @property {number} width - Width of the AST node
+ * @property {number} height - Height of the AST node
+ * @property {Object} [properties] - Properties of the AST node
+ */
+
+/**
+ * @typedef {Object} PositionAfterAnchorOptions
+ * @property {{x: number, y: number}} position - Object with x/y coordinates
+ * @property {{width: number, height: number}} dimensions - Object with width/height
+ * @property {{anchorX: number, anchorY: number}} anchor - Object with anchorX/anchorY
+ */
+
+/**
+ * @typedef {Object} PositionAfterAnchor
+ * @property {number} x
+ * @property {number} y
+ */
+
 /**
  * @typedef {Object} ParseCommonObjectOption
  * @property {number} providedWidth

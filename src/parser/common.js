@@ -3,7 +3,6 @@
  * @typedef {import('../types').PositionAfterAnchor} PositionAfterAnchor
  */
 
-import { Sprite, Texture } from 'pixi.js';
 
 /**
  *
