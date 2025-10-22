@@ -3,6 +3,8 @@
  * @typedef {import('../types').PositionAfterAnchor} PositionAfterAnchor
  */
 
+import { Sprite, Texture } from 'pixi.js';
+
 /**
  *
  * @param {PositionAfterAnchorOptions} options
@@ -16,10 +18,17 @@ export function calculatePositionAfterAnchor({
     anchorX,
     anchorY
 }){
-    const offSetX= positionX - (width * anchorX);
-    const offSetY= positionY - (height * anchorY);
+    const origin = {
+        x: width * anchorX,
+        y: height * anchorY
+    }
+
+    const offSetX= positionX - origin.x;
+    const offSetY= positionY - origin.y;
     return {
         x: offSetX,
-        y: offSetY
+        y: offSetY,
+        originX: origin.x,
+        originY: origin.y 
     };
 }

@@ -9,6 +9,12 @@
  * @property {string} type - Type of the element
  */
 
+/**
+ * @typedef {Object} ParseCommonObjectOption
+ * @property {number} providedWidth
+ * @property {number} providedHeight
+ */
+
 /** 
  * @typedef {Object} ASTNode
  * @property {string} type - Type of the AST node
@@ -17,20 +23,47 @@
  * @property {number} y - Y position of the AST node
  * @property {number} width - Width of the AST node
  * @property {number} height - Height of the AST node
- * @property {Object} [properties] - Properties of the AST node
+ * @property {number} zIndex
+ * @property {number} originX
+ * @property {number} originY
+ */
+
+/**
+ * @typedef {Object} SpriteMixin
+ * @property {'sprite'} type
+ * @property {number} alpha
+ * 
+ * @typedef {ASTNode & SpriteMixin } SpriteASTNode
+ */
+
+/**
+ * @typedef {Object} TextMixin
+ * @property {string} text
+ * @property {Object} [style] - Textstyle
+ * 
+ * @typedef {ASTNode & TextMixin} TextASTNode
  */
 
 /**
  * @typedef {Object} PositionAfterAnchorOptions
- * @property {{x: number, y: number}} position - Object with x/y coordinates
- * @property {{width: number, height: number}} dimensions - Object with width/height
- * @property {{anchorX: number, anchorY: number}} anchor - Object with anchorX/anchorY
+ * @property {number} positionX
+ * @property {number} positionY
+ * @property {number} width
+ * @property {number} height
+ * @property {number} anchorX
+ * @property {number} anchorY
  */
 
 /**
  * @typedef {Object} PositionAfterAnchor
  * @property {number} x
  * @property {number} y
+ */
+
+/**
+ * @typedef {Object} SpriteDimension
+ * @property {number} width
+ * @property {number} height
  */
 
 /**
