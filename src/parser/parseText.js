@@ -12,10 +12,16 @@ import { parseCommonObject } from './parseCommonObject.js';
  * @returns {TextASTNode}
  */
 export function parseText(state) {
+  const textStyle = {
+    fill: 'black',
+    fontFamily: 'Arial',
+    fontSize: 16,
+    ...state.style,
+  }
 
   const { width, height } = CanvasTextMetrics.measureText(state.text, new TextStyle({
-    fontFamily: state.style.fontFamily,
-    fontSize: state.style.fontSize
+    fontFamily: textStyle.fontFamily,
+    fontSize: textStyle.fontSize
   }));
 
   const astObj = parseCommonObject({...state,width,height})
@@ -24,9 +30,7 @@ export function parseText(state) {
     ...astObj,
     text:state.text,
     style: {
-      fontSize: state.style.fontSize,
-      fontFamily: state.style.fontFamily,
-      fill: state.style.fill
+      ...textStyle
     },
   };
 }
