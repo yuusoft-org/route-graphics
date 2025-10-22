@@ -56,6 +56,7 @@
  * @typedef {Object} SpriteMixin
  * @property {'sprite'} type
  * @property {number} alpha
+ * @property {string} url
  * 
  * @typedef {ASTNode & SpriteMixin } SpriteASTNode
  */
