@@ -33,6 +33,7 @@ out:
   originY: 40
   alpha: 0.8
   zIndex: 0
+  url: "file:circle-red"
   cursor: pointer
   hoverUrl: "file:circle-red-hover"
   clickUrl: "file:circle-red-clicked"

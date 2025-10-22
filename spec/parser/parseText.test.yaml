@@ -33,3 +33,28 @@ out:
     fontSize: 24
     fontFamily: "Arial"
     fill: "white"
+---
+case: Test parsing simple text object with no style
+in: 
+  - id: 'tl'
+    type: "text"
+    text: "This text is aligned to the top left corner"
+    x: 660
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+out:
+  id: "tl"
+  type: "text"
+  text: "This text is aligned to the top left corner"
+  width: 322.6328125
+  height: 19
+  x: 498.68359375
+  y: 230.5
+  zIndex: 0
+  originX: 161.31640625
+  originY: 9.5
+  style: 
+    fontSize: 16
+    fontFamily: "Arial"
+    fill: "black"
