@@ -67,7 +67,6 @@ export function parseContainer(state) {
         child = parseContainer(child);
         break;
       default:
-        throw new Error(`Unsupported element type: ${child.type}`);
     }
 
     if(direction === 'horizontal'){
