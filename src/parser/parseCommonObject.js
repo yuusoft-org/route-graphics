@@ -13,12 +13,12 @@ import { calculatePositionAfterAnchor } from './common.js';
  * @returns  {ASTNode}
  */
 export function parseCommonObject(state){
-  if(!state.width || !state.height){
+  if(!(typeof state.width ==="number") || !(typeof state.height === "number")){
     throw new Error("Input Error: Width or height is missing")
   }
 
-  let widthAfterScale = state.scaleX? state.scaleX*state.width : state.width
-  let heightAfterScale = state.scaleY? state.scaleY*state.height : state.height
+  let widthAfterScale = state.scaleX? state.scaleX * state.width : state.width
+  let heightAfterScale = state.scaleY? state.scaleY * state.height : state.height
 
   const {
     x: adjustedPositionX,

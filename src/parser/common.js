@@ -10,12 +10,12 @@
  * @returns {PositionAfterAnchor}
  */
 export function calculatePositionAfterAnchor({
-    positionX,
-    positionY,
+    positionX = 0,
+    positionY = 0,
     width,
     height,
-    anchorX,
-    anchorY
+    anchorX = 0,
+    anchorY = 0
 }){
     const origin = {
         x: width * anchorX,
