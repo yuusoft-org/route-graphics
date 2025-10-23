@@ -11,7 +11,6 @@ import { parseSprite } from './parseSprite.js';
  */
 
 /**
- * Parse container and calculate positions of children based on flexbox-like layout
  * @param {BaseElement} state
  * @returns {ContainerASTNode}
  */
@@ -33,7 +32,6 @@ export function parseContainer(state) {
   let currentRowWidth = 0;
   let currentColHeight = 0;
 
-  // Calculate container dimensions and position children
   for (let i = 0; i < children.length; i++) {
     const gapValue = i < children.length - 1 ? gap : 0
     let child = children[i];
@@ -111,14 +109,12 @@ export function parseContainer(state) {
     parsedChildren.push(child);
   }
 
-  // Parse container as common object with calculated dimensions\
   const containerAST = parseCommonObject({
     ...state,
     width: state.width? state.width : containerWidth,
     height: state.height? state.height : containerHeight
   });
 
-  // Add container-specific properties
   return {
     ...containerAST,
     children: parsedChildren,
