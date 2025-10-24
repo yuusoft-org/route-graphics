@@ -1,10 +1,10 @@
+import { Text } from 'pixi.js'
 
 /**
  * @typedef {import('../types.js').Container} Container
  * @typedef {import('../types.js').TextASTNode} TextASTNode
  */
 
-import { Text, TextStyle } from 'pixi.js'
 
 /**
  * 

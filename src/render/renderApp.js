@@ -1,4 +1,5 @@
 
+import { renderRect } from './renderRect.js';
 import renderText from './renderText.js';
 /**
  * @typedef {import('../types.js').Application} Application
@@ -19,6 +20,7 @@ export function renderApp(app,parent,ASTTree){
         
         switch(element.type){
             case "rect":
+                renderRect(element,parent)
                 break;
             case "text":
                 renderText(element,parent)
