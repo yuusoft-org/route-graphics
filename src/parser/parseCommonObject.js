@@ -18,7 +18,7 @@ export function parseCommonObject(state){
     throw new Error("Input Error: Width or height is missing")
 
   if(!['rect', 'text', 'container', 'sprite'].includes(state.type))
-    throw new Error("Input Error: Type must be rect/text/container/sprite.") 
+    throw new Error("Input Error: Type must be one of rect, text, container, sprite") 
 
   if(!state.id)
     throw new Error("Input Error: Id is missing")

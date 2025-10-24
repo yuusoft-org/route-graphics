@@ -62,4 +62,4 @@ in:
       scaleY: 1.5
       width: 483.94921875
       height: 29
-throws: "Input Error: Type must be rect/text/container/sprite."
+throws: "Input Error: Type must be one of rect, text, container, sprite"
