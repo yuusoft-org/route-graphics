@@ -4,6 +4,7 @@ import { calculatePositionAfterAnchor } from './common.js';
  * @typedef {import('../types.js').BaseElement} BaseElement
  * @typedef {import('../types.js').ParseCommonObjectOption} ParseCommonObjectOption
  * @typedef {import('../types.js').ASTNode} ASTNode
+ * @typedef {import('../types.js').ASTNodeType} ASTNodeType
  */
 
 
@@ -13,9 +14,14 @@ import { calculatePositionAfterAnchor } from './common.js';
  * @returns  {ASTNode}
  */
 export function parseCommonObject(state){
-  if(!(typeof state.width ==="number") || !(typeof state.height === "number")){
+  if(!(typeof state.width ==="number") || !(typeof state.height === "number")) 
     throw new Error("Input Error: Width or height is missing")
-  }
+
+  if(!['rect', 'text', 'container', 'sprite'].includes(state.type))
+    throw new Error("Input Error: Type must be rect/text/container/sprite.") 
+
+  if(!state.id)
+    throw new Error("Input Error: Id is missing")
 
   let widthAfterScale = state.scaleX? state.scaleX * state.width : state.width
   let heightAfterScale = state.scaleY? state.scaleY * state.height : state.height

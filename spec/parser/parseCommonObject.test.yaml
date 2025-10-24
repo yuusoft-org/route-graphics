@@ -9,7 +9,6 @@ case: Test parsing simple common object
 in: 
   - id: 'tl'
     type: "text"
-    text: "This text is aligned to the top left corner"
     x: 660
     y: 240
     anchorX: 0.5
@@ -33,9 +32,34 @@ case: Parsing object with no width or height
 in: 
   - id: 'tl'
     type: "text"
-    text: "This text is aligned to the top left corner"
     x: 660
     y: 240
     anchorX: 0.5
     anchorY: 0.5
 throws: "Input Error: Width or height is missing"
+---
+case: Parsing object with no id
+in: 
+    - type: "text"
+      x: 660
+      y: 240
+      anchorX: 0.5
+      anchorY: 0.5
+      scaleX: 1.5
+      scaleY: 1.5
+      width: 483.94921875
+      height: 29
+throws: "Input Error: Id is missing"
+---
+case: Parsing object with incorrect type
+in: 
+    - type: "blob"
+      x: 660
+      y: 240
+      anchorX: 0.5
+      anchorY: 0.5
+      scaleX: 1.5
+      scaleY: 1.5
+      width: 483.94921875
+      height: 29
+throws: "Input Error: Type must be rect/text/container/sprite."

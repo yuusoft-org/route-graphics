@@ -123,3 +123,38 @@ out:
   pointerMove: "pointerMove-123"
   rotation: 90
   zIndex: 0
+---
+case: Test parsing rect default to see the default values for cursor, fill, rotation and interactive props
+in: 
+  - id: 'rect-1'
+    type: "rect"
+    width: 80
+    height: 100
+    scaleX: 1.2
+    scaleY: 0.8
+    x: 240
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    border:
+      alpha: 0.8
+out:
+  id: "rect-1"
+  type: "rect"
+  width: 96
+  height: 80
+  x: 192
+  y: 200
+  originX: 48
+  originY: 40
+  border:
+    alpha: 0.8
+    width: 0
+    color: black
+  fill: white
+  cursor: ""
+  pointerDown: ""
+  pointerUp: ""
+  pointerMove: ""
+  rotation: 0
+  zIndex: 0

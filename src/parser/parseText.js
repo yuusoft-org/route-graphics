@@ -32,7 +32,7 @@ export function parseText(state) {
 
   return {
     ...astObj,
-    text:state.text,
+    text:state.text ?? "",
     style: {
       ...textStyle
     },
