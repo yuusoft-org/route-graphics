@@ -20,6 +20,12 @@ export function parseCommonObject(state){
   let widthAfterScale = state.scaleX? state.scaleX * state.width : state.width
   let heightAfterScale = state.scaleY? state.scaleY * state.height : state.height
 
+  //We don't let scale affect container type for now
+  if(state.type === "container"){
+    widthAfterScale = state.width
+    heightAfterScale = state.height
+  }
+
   const {
     x: adjustedPositionX,
     y: adjustedPositionY,

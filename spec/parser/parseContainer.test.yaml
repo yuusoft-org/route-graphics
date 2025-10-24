@@ -74,11 +74,11 @@ out:
   direction: "horizontal"
   gap: 5
   width: 322
-  height: 76.80000000000001
+  height: 96
   x: 79
-  y: 201.6
+  y: 192
   originX: 161
-  originY: 38.400000000000006
+  originY: 48
   scroll: false
   rotation: 90
   zIndex: 0
@@ -210,11 +210,11 @@ out:
   direction: "vertical"
   gap: 5
   width: 120
-  height: 212.8
+  height: 266
   x: 180
-  y: 133.6
+  y: 107
   originX: 60
-  originY: 106.4
+  originY: 133
   scroll: false
   rotation: 90
   zIndex: 0
@@ -331,11 +331,11 @@ out:
   direction: "horizontal"
   gap: 5
   width: 200
-  height: 144.8
+  height: 181
   x: 140
-  y: 167.6
+  y: 149.5
   originX: 100
-  originY: 72.4
+  originY: 90.5
   scroll: false
   rotation: 90
   zIndex: 0
@@ -449,11 +449,11 @@ out:
   direction: "vertical"
   gap: 5
   width: 245
-  height: 160
+  height: 200
   x: 117.5
-  y: 160
+  y: 140
   originX: 122.5
-  originY: 80
+  originY: 100
   scroll: false
   rotation: 90
   zIndex: 0

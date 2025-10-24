@@ -13,6 +13,12 @@ import { parseSprite } from './parseSprite.js';
 /**
  * @param {BaseElement} state
  * @returns {ContainerASTNode}
+ * 
+ * This will parse the container element.
+ * 
+ * If it doesn't have width/height it will expand the width/height based on the position x/y and the dimensions of the children
+ * If the direction has horizontal/vertical, it will reposition the children to be horizontal/vertical
+ * If direction is set and the width/height is set than the container will wrap the element based on the setted width/height
  */
 export function parseContainer(state) {
   const direction = state.direction;
