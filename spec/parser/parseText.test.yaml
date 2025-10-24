@@ -58,3 +58,27 @@ out:
     fontSize: 16
     fontFamily: "Arial"
     fill: "black"
+---
+case: Test parsing simple text object with no text
+in: 
+  - id: 'tl'
+    type: "text"
+    x: 660
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+out:
+  id: "tl"
+  type: "text"
+  text: ""
+  width: 5.0859375
+  height: 19
+  x: 657.45703125
+  y: 230.5
+  zIndex: 0
+  originX: 2.54296875
+  originY: 9.5
+  style: 
+    fontSize: 16
+    fontFamily: "Arial"
+    fill: "black"

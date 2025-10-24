@@ -25,11 +25,11 @@ export function parseRect(state) {
 
   return {
     ...astObj,
-    cursor: state.cursor,
-    fill: state.fill,
-    pointerDown: state.pointerDown,
-    pointerMove: state.pointerMove,
-    pointerUp: state.pointerUp,
-    rotation: state.rotation
+    cursor: state.cursor ?? "",
+    fill: state.fill ?? "white",
+    pointerDown: state.pointerDown ?? "",
+    pointerMove: state.pointerMove ?? "",
+    pointerUp: state.pointerUp ?? "",
+    rotation: state.rotation ?? 0
   };
 }

@@ -1,0 +1,471 @@
+file: '../../src/parser/parseContainer.js'
+group: parser
+suites: [parseContainer]
+---
+suite: parseContainer
+exportName: parseContainer
+---
+case: Test parsing container with no width or height horizontally
+in:
+  - id: 'container-1'
+    type: "container"
+    direction: "horizontal"
+    gap: 5
+    x: 240
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    rotation: 90
+    zIndex: 0
+    children:
+      - id: 'rect-1'
+        type: "rect"
+        width: 80
+        height: 100
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: red
+        rotation: 90
+      - id: 'rect-2'
+        type: "rect"
+        width: 100
+        height: 120
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: blue
+        rotation: 90
+      - id: 'rect-3'
+        type: "rect"
+        width: 80
+        height: 100
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: red
+        rotation: 90
+out:
+  id: "container-1"
+  type: "container"
+  direction: "horizontal"
+  gap: 5
+  width: 322
+  height: 96
+  x: 79
+  y: 192
+  originX: 161
+  originY: 48
+  scroll: false
+  rotation: 90
+  zIndex: 0
+  children:
+    - id: 'rect-1'
+      type: "rect"
+      width: 96
+      height: 80
+      x: 0
+      y: 0
+      originX: 0
+      originY: 0
+      fill: red
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+    - id: 'rect-2'
+      type: "rect"
+      width: 120
+      height: 96
+      x: 101
+      y: 0
+      originX: 0
+      originY: 0
+      fill: blue
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+    - id: 'rect-3'
+      type: "rect"
+      width: 96
+      height: 80
+      x: 226
+      y: 0
+      originX: 0
+      originY: 0
+      fill: red
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+---
+case: Test parsing container with no width or height vertically
+in:
+  - id: 'container-1'
+    type: "container"
+    direction: "vertical"
+    gap: 5
+    x: 240
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    rotation: 90
+    zIndex: 0
+    children:
+      - id: 'rect-1'
+        type: "rect"
+        width: 80
+        height: 100
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: red
+        rotation: 90
+      - id: 'rect-2'
+        type: "rect"
+        width: 100
+        height: 120
+        x: 240
+        y: 240
+        border:
+          alpha: 0.8
+        fill: blue
+        rotation: 90
+      - id: 'rect-3'
+        type: "rect"
+        width: 80
+        height: 100
+        x: 240
+        y: 240
+        border:
+          alpha: 0.8
+        fill: red
+        rotation: 90
+out:
+  id: "container-1"
+  type: "container"
+  direction: "vertical"
+  gap: 5
+  width: 100
+  height: 310
+  x: 190
+  y: 85
+  originX: 50
+  originY: 155
+  scroll: false
+  rotation: 90
+  zIndex: 0
+  children:
+    - id: 'rect-1'
+      type: "rect"
+      width: 96
+      height: 80
+      x: 0
+      y: 0
+      originX: 0
+      originY: 0
+      fill: red
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+    - id: 'rect-2'
+      type: "rect"
+      width: 100
+      height: 120
+      x: 0
+      y: 85
+      originX: 0
+      originY: 0
+      fill: blue
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+    - id: 'rect-3'
+      type: "rect"
+      width: 80
+      height: 100
+      x: 0
+      y: 210
+      originX: 0
+      originY: 0
+      fill: red
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+---
+case: Test parsing container with no width or height and width overflow-horizontal
+in:
+  - id: 'container-1'
+    type: "container"
+    direction: "horizontal"
+    width: 200
+    gap: 5
+    x: 240
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    rotation: 90
+    zIndex: 0
+    children:
+      - id: 'rect-1'
+        type: "rect"
+        width: 80
+        height: 100
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: red
+        rotation: 90
+      - id: 'rect-2'
+        type: "rect"
+        width: 100
+        height: 120
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: blue
+        rotation: 90
+out:
+  id: "container-1"
+  type: "container"
+  direction: "horizontal"
+  gap: 5
+  width: 200
+  height: 181
+  x: 140
+  y: 149.5
+  originX: 100
+  originY: 90.5
+  scroll: false
+  rotation: 90
+  zIndex: 0
+  children:
+    - id: 'rect-1'
+      type: "rect"
+      width: 96
+      height: 80
+      x: 0
+      y: 0
+      originX: 0
+      originY: 0
+      fill: red
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+    - id: 'rect-2'
+      type: "rect"
+      width: 120
+      height: 96
+      x: 0
+      y: 85
+      originX: 0
+      originY: 0
+      fill: blue
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+---
+case: Test parsing container with no width or height and width overflow-vertical
+in:
+  - id: 'container-1'
+    type: "container"
+    direction: "vertical"
+    height: 200
+    gap: 5
+    x: 240
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    rotation: 90
+    zIndex: 0
+    children:
+      - id: 'rect-1'
+        type: "rect"
+        width: 80
+        height: 100
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: red
+        rotation: 90
+      - id: 'rect-2'
+        type: "rect"
+        width: 100
+        height: 120
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: blue
+        rotation: 90
+      - id: 'rect-3'
+        type: "rect"
+        width: 100
+        height: 120
+        scaleX: 1.2
+        scaleY: 0.8
+        border:
+          alpha: 0.8
+        fill: blue
+        rotation: 90
+out:
+  id: "container-1"
+  type: "container"
+  direction: "vertical"
+  gap: 5
+  width: 245
+  height: 200
+  x: 117.5
+  y: 140
+  originX: 122.5
+  originY: 100
+  scroll: false
+  rotation: 90
+  zIndex: 0
+  children:
+    - id: 'rect-1'
+      type: "rect"
+      width: 96
+      height: 80
+      x: 0
+      y: 0
+      originX: 0
+      originY: 0
+      fill: red
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+    - id: 'rect-2'
+      type: "rect"
+      width: 120
+      height: 96
+      x: 0
+      y: 85
+      originX: 0
+      originY: 0
+      fill: blue
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+    - id: 'rect-3'
+      type: "rect"
+      width: 120
+      height: 96
+      x: 125
+      y: 0
+      originX: 0
+      originY: 0
+      fill: blue
+      border:
+        alpha: 0.8
+        width: 0
+        color: black
+      cursor: ""
+      pointerDown: ""
+      pointerUp: ""
+      pointerMove: ""
+      rotation: 90
+      zIndex: 0
+---
+case: Test parsing empty container
+in:
+  - id: 'container-1'
+    type: "container"
+    direction: "vertical"
+    gap: 5
+    x: 240
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    rotation: 90
+    zIndex: 0
+out:
+  id: "container-1"
+  type: "container"
+  direction: "vertical"
+  gap: 5
+  width: 0
+  height: 0
+  x: 240
+  y: 240
+  originX: 0
+  originY: 0
+  scroll: false
+  rotation: 90
+  zIndex: 0
+  children: []

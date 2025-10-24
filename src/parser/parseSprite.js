@@ -15,10 +15,10 @@ export function parseSprite(state) {
 
   return {
     ...astObj,
-    url: state.url,
-    alpha: state.alpha,
-    cursor: state.cursor,
-    clickUrl: state.clickUrl,
-    hoverUrl: state.hoverUrl
+    url: state.url ?? "",
+    alpha: state.alpha ?? 0,
+    cursor: state.cursor ?? "",
+    clickUrl: state.clickUrl ?? "",
+    hoverUrl: state.hoverUrl ?? ""
   };
 }

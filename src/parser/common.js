@@ -10,13 +10,16 @@
  * @returns {PositionAfterAnchor}
  */
 export function calculatePositionAfterAnchor({
-    positionX,
-    positionY,
+    positionX = 0,
+    positionY = 0,
     width,
     height,
-    anchorX,
-    anchorY
+    anchorX = 0,
+    anchorY = 0
 }){
+    if(!(typeof width ==="number") || !(typeof height === "number")){
+        throw new Error("Input Error: Width or height is missing")
+    }
     const origin = {
         x: width * anchorX,
         y: height * anchorY

@@ -9,17 +9,6 @@
  * @property {string} type - Type of the element
  */
 
-/** 
- * @typedef {Object} ASTNode
- * @property {string} type - Type of the AST node
- * @property {string} id - ID of the AST node
- * @property {number} x - X position of the AST node
- * @property {number} y - Y position of the AST node
- * @property {number} width - Width of the AST node
- * @property {number} height - Height of the AST node
- * @property {Object} [properties] - Properties of the AST node
- */
-
 /**
  * @typedef {Object} PositionAfterAnchorOptions
  * @property {{x: number, y: number}} position - Object with x/y coordinates
@@ -50,6 +39,8 @@
  * @property {number} zIndex
  * @property {number} originX
  * @property {number} originY
+ * @property {number} scaleX
+ * @property {number} scaleY
  */
 
 /**
@@ -59,6 +50,26 @@
  * @property {string} url
  * 
  * @typedef {ASTNode & SpriteASTProps } SpriteASTNode
+ */
+
+/**
+ * @typedef {Object} SpriteASTProps
+ * @property {'sprite'} type
+ * @property {number} alpha
+ * @property {string} url
+ * 
+ * @typedef {ASTNode & SpriteASTProps } SpriteASTNode
+ */
+
+/**
+ * @typedef {Object} ContainerASTProps
+ * @property {'container'} type
+ * @property {'horizontal' | 'vertical'} direction
+ * @property {SpriteASTNode | TextASTNode | RectASTNode | ContainerASTNode} children
+ * @property {number} gap
+ * @property {number} rotation
+ * @property {boolean} scroll
+ * @typedef {ASTNode & ContainerASTProps } ContainerASTNode
  */
 
 /**
