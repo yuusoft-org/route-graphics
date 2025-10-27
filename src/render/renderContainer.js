@@ -7,6 +7,7 @@ import { renderSprite } from './renderSprite.js';
  * @typedef {import('../types.js').Container} Container
  * @typedef {import('../types.js').ContainerASTNode} ContainerASTNode
  * @typedef {import('../types.js').SetupScrollingOptions} SetupScrollingOptions
+ * @typedef {import('../types.js').SetupClipping} SetupClipping
  */
 
 /**
@@ -70,6 +71,12 @@ export function renderContainer(containerASTNode, parent) {
         setupScrolling({
             container,
             element: containerASTNode,
+        })
+    }
+    else if(width || height){
+        setupClipping({
+            container,
+            element: containerASTNode
         })
     }
 
@@ -173,5 +180,28 @@ function setupScrolling({
           contentContainer.x = scrollXOffset;
         }
       });
+    }
+}
+
+/**
+ * Setup basic clipping for containers - constrains content to container dimensions
+ * @param {SetupClipping} params
+ */
+function setupClipping({
+    container,
+    element,
+}) {
+    // Only apply clipping if the container has specific dimensions
+    if (element.width || element.height) {
+        // Create clipping mask - acts as a viewport
+        const clip = new Graphics()
+            .rect(0, 0, element.width || 1000, element.height || 1000)
+            .fill({ color: 0xFF0000, alpha: 0 }); // Transparent mask
+
+        // Apply the mask to the container
+        container.mask = clip;
+
+        // Add the mask to container (mask must be in display list)
+        container.addChild(clip);
     }
 }

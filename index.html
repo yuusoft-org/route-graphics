@@ -294,6 +294,108 @@
                         }
                     }
                 ]
+            },
+            {
+                id: "clipping-container-1",
+                type: "container",
+                width: 200,
+                height: 150,
+                x: 650,
+                y: 300,
+                direction: "horizontal",
+                gap: 10,
+                rotation: 0,
+                scroll: false,
+                originX: 0,
+                originY: 0,
+                zIndex: 1,
+                children: [
+                    {
+                        id: "clip-item-1",
+                        type: "rect",
+                        width: 80,
+                        height: 40,
+                        x: 0,
+                        y: 0,
+                        fill: "red",
+                        border: {
+                            width: 2,
+                            color: "darkred",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    },
+                    {
+                        id: "clip-item-2",
+                        type: "rect",
+                        width: 80,
+                        height: 60,
+                        x: 90,
+                        y: 0,
+                        fill: "blue",
+                        border: {
+                            width: 2,
+                            color: "darkblue",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    },
+                    {
+                        id: "clip-item-3",
+                        type: "rect",
+                        width: 80,
+                        height: 50,
+                        x: 0,
+                        y: 70,
+                        fill: "green",
+                        border: {
+                            width: 2,
+                            color: "darkgreen",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    },
+                    {
+                        id: "clip-item-4",
+                        type: "rect",
+                        width: 80,
+                        height: 40,
+                        x: 90,
+                        y: 70,
+                        fill: "yellow",
+                        border: {
+                            width: 2,
+                            color: "orange",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    },
+                    {
+                        id: "clip-item-4",
+                        type: "rect",
+                        width: 80,
+                        height: 40,
+                        x: 180,
+                        y: 70,
+                        fill: "yellow",
+                        border: {
+                            width: 2,
+                            color: "orange",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    }
+                ]
             }
         ]
         renderApp(app,app.stage,ASTTree)
