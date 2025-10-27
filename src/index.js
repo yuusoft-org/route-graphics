@@ -9,7 +9,7 @@ import { SliderRendererPlugin } from "./plugins/elements/SliderRendererPlugin";
 import { AudioPlugin } from "./plugins/elements/AudioPlugin";
 import { createAssetBufferManager } from "./utils.js";
 import { renderApp } from "./render/renderApp.js";
-import {Application} from "pixi.js"
+import { Application } from "pixi.js"
 
 export default RouteGraphics;
 

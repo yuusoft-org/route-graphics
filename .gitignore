@@ -4,6 +4,8 @@ node_modules
 coverage
 vt/static/RouteGraphics.js
 vt/static/RouteGraphics.js.map
+vt_old/static/RouteGraphics.js
+vt_old/static/RouteGraphics.js.map
 .claude
 dist
 CLAUDE.md
