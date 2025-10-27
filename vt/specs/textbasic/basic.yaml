@@ -8,16 +8,18 @@ states:
         text: "Hello world"
         x: 10
         y: 10
+        width: 100
+        height: 20
         style:
-          fill: "white"
+          fill: "black"
           fontFamily: "Arial"
           fontSize: 16
       - id: "rect-1"
         type: "rect"
         width: 40
         height: 80
-        x: 200
-        y: 200
+        x: 100
+        y: 100
         fill: "red"
         border:
           width: 5
@@ -25,4 +27,311 @@ states:
           alpha: 1
         originX: 0
         originY: 0
-        rotation: 45
+        rotation: 0
+
+      - id: "sprite-1"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/538/100/100.jpg?hmac=1OOwsGQ5HpbT6Qjae_NY2WKbMiq-klJ8Dos-5QxbTj0"
+        width: 100
+        height: 100
+        x: 150
+        y: 50
+        alpha: 1
+        originX: 0
+        originY: 0
+        rotation: 0
+        zIndex: 1
+
+      - id: "container-1"
+        type: "container"
+        width: 300
+        height: 150
+        x: 50
+        y: 300
+        direction: "horizontal"
+        gap: 10
+        rotation: 0
+        scroll: false
+        originX: 0
+        originY: 0
+        zIndex: 2
+        children:
+          - id: "container-1-rect-1"
+            type: "rect"
+            width: 60
+            height: 60
+            x: 0
+            y: 0
+            fill: "blue"
+            border:
+              width: 2
+              color: "darkblue"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "container-1-text-1"
+            type: "text"
+            text: "In Container"
+            x: 0
+            y: 0
+            width: 80
+            height: 20
+            zIndex: 2
+            style:
+              fill: "white"
+              fontFamily: "Arial"
+              fontSize: 14
+
+          - id: "container-1-sprite-1"
+            type: "sprite"
+            url: "https://fastly.picsum.photos/id/410/100/100.jpg?hmac=UQRIsX0ye9GOjSO_dRTLH1fuP1gtMj6VYk3O7rk3Nzo"
+            width: 50
+            height: 50
+            x: 0
+            y: 0
+            alpha: 1
+            originX: 0
+            originY: 0
+            zIndex: 1
+            rotation: 0
+
+      - id: "container-2"
+        type: "container"
+        width: 200
+        height: 200
+        x: 400
+        y: 300
+        direction: "vertical"
+        gap: 15
+        rotation: 90
+        scroll: false
+        originX: 100
+        originY: 100
+        zIndex: 0
+        children:
+          - id: "container-2-rect-1"
+            type: "rect"
+            width: 150
+            height: 30
+            x: 0
+            y: 0
+            fill: "green"
+            border:
+              width: 3
+              color: "darkgreen"
+              alpha: 0.8
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "container-2-text-1"
+            type: "text"
+            text: "Vertical Container"
+            x: 0
+            y: 0
+            width: 150
+            height: 25
+            zIndex: 2
+            style:
+              fill: "yellow"
+              fontFamily: "Arial"
+              fontSize: 16
+
+          - id: "container-2-sprite-1"
+            type: "sprite"
+            url: "https://fastly.picsum.photos/id/56/80/60.jpg?hmac=z2xEwhp3bhp-FhnpEFkSZSVxcSlB6vHkqGFIj3o02gU"
+            width: 80
+            height: 60
+            x: 0
+            y: 0
+            alpha: 0.9
+            originX: 0
+            originY: 0
+            zIndex: 1
+            rotation: 0
+
+      - id: "scrolling-container-1"
+        type: "container"
+        width: 250
+        height: 100
+        x: 650
+        y: 50
+        direction: "vertical"
+        gap: 10
+        rotation: 0
+        scroll: true
+        originX: 0
+        originY: 0
+        zIndex: 3
+        children:
+          - id: "scroll-item-1"
+            type: "rect"
+            width: 200
+            height: 40
+            x: 0
+            y: 0
+            fill: "purple"
+            border:
+              width: 2
+              color: "darkviolet"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "scroll-item-2"
+            type: "text"
+            text: "Scrollable Item 2"
+            x: 0
+            y: 40
+            width: 200
+            height: 30
+            style:
+              fill: "white"
+              fontFamily: "Arial"
+              fontSize: 18
+
+          - id: "scroll-item-4"
+            type: "rect"
+            width: 200
+            height: 60
+            x: 0
+            y: 70
+            fill: "orange"
+            border:
+              width: 2
+              color: "darkorange"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "scroll-item-5"
+            type: "text"
+            text: "Keep scrolling to see more!"
+            x: 0
+            y: 130
+            width: 200
+            height: 25
+            style:
+              fill: "black"
+              fontFamily: "Arial"
+              fontSize: 16
+
+          - id: "scroll-item-7"
+            type: "rect"
+            width: 200
+            height: 50
+            x: 0
+            y: 155
+            fill: "cyan"
+            border:
+              width: 2
+              color: "darkcyan"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "scroll-item-8"
+            type: "text"
+            text: "Last scrollable item!"
+            x: 0
+            y: 205
+            width: 200
+            height: 25
+            style:
+              fill: "black"
+              fontFamily: "Arial"
+              fontSize: 16
+
+      - id: "clipping-container-1"
+        type: "container"
+        width: 200
+        height: 150
+        x: 650
+        y: 300
+        direction: "horizontal"
+        gap: 10
+        rotation: 0
+        scroll: false
+        originX: 0
+        originY: 0
+        zIndex: 1
+        children:
+          - id: "clip-item-1"
+            type: "rect"
+            width: 80
+            height: 40
+            x: 0
+            y: 0
+            fill: "red"
+            border:
+              width: 2
+              color: "darkred"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "clip-item-2"
+            type: "rect"
+            width: 80
+            height: 60
+            x: 90
+            y: 0
+            fill: "blue"
+            border:
+              width: 2
+              color: "darkblue"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "clip-item-3"
+            type: "rect"
+            width: 80
+            height: 50
+            x: 0
+            y: 70
+            fill: "green"
+            border:
+              width: 2
+              color: "darkgreen"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "clip-item-4"
+            type: "rect"
+            width: 80
+            height: 40
+            x: 90
+            y: 70
+            fill: "yellow"
+            border:
+              width: 2
+              color: "orange"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0
+
+          - id: "clip-item-5"
+            type: "rect"
+            width: 80
+            height: 40
+            x: 180
+            y: 70
+            fill: "yellow"
+            border:
+              width: 2
+              color: "orange"
+              alpha: 1
+            originX: 0
+            originY: 0
+            rotation: 0

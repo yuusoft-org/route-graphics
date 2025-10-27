@@ -22,6 +22,7 @@ export function renderRect(rectASTNode,parent){
         border,
         originX,
         originY,
+        zIndex,
         rotation
     } = rectASTNode
 
@@ -35,8 +36,9 @@ export function renderRect(rectASTNode,parent){
         })
 
     rect.label = id
-    rect.pivot.set(originX + x,originY + y)
+    rect.pivot.set(originX,originY)
     rect.rotation = (rotation * Math.PI) / 180
+    rect.zIndex = zIndex 
     
     parent.addChild(rect)
 }

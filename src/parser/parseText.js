@@ -25,7 +25,9 @@ export function parseText(state) {
 
   const { width, height } = CanvasTextMetrics.measureText(state.text, new TextStyle({
     fontFamily: textStyle.fontFamily,
-    fontSize: textStyle.fontSize
+    fontSize: textStyle.fontSize,
+    wordWrap: state.breakWords ?? false,
+    wordWrapWidth: state.wordWrapWidth ?? 0
   }));
 
   const astObj = parseCommonObject({...state,width,height})
@@ -33,6 +35,8 @@ export function parseText(state) {
   return {
     ...astObj,
     text:state.text ?? "",
+    breakWords: state.breakWords ?? false,
+    wordWrapWidth: state.wordWrapWidth ?? 0,
     style: {
       ...textStyle
     },
