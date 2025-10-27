@@ -29,6 +29,41 @@ out:
   zIndex: 0
   originX: 241.974609375
   originY: 14.5
+  breakWords: false
+  wordWrapWidth: 0
+  style: 
+    fontSize: 24
+    fontFamily: "Arial"
+    fill: "white"
+---
+case: Test parsing with word wrap
+in: 
+  - id: 'tl'
+    type: "text"
+    text: "This text is wrap"
+    x: 660
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    breakWords: true
+    wordWrapWidth: 200
+    style: 
+      fontSize: 24
+      fontFamily: "Arial"
+      fill: "white"
+out:
+  id: "tl"
+  type: "text"
+  text: "This text is wrap"
+  width: 197.90625
+  height: 29
+  x: 561.046875
+  y: 225.5
+  zIndex: 0
+  originX: 98.953125
+  originY: 14.5
+  breakWords: true
+  wordWrapWidth: 200
   style: 
     fontSize: 24
     fontFamily: "Arial"
@@ -54,6 +89,8 @@ out:
   zIndex: 0
   originX: 161.31640625
   originY: 9.5
+  breakWords: false
+  wordWrapWidth: 0
   style: 
     fontSize: 16
     fontFamily: "Arial"
@@ -78,6 +115,8 @@ out:
   zIndex: 0
   originX: 2.54296875
   originY: 9.5
+  breakWords: false
+  wordWrapWidth: 0
   style: 
     fontSize: 16
     fontFamily: "Arial"

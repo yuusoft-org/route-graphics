@@ -53,15 +53,6 @@
  */
 
 /**
- * @typedef {Object} SpriteASTProps
- * @property {'sprite'} type
- * @property {number} alpha
- * @property {string} url
- * 
- * @typedef {ASTNode & SpriteASTProps } SpriteASTNode
- */
-
-/**
  * @typedef {Object} ContainerASTProps
  * @property {'container'} type
  * @property {'horizontal' | 'vertical'} direction
@@ -92,6 +83,8 @@
 /**
  * @typedef {Object} TextASTProps
  * @property {string} text
+ * @property {number} wordWrapWidth
+ * @property {boolean} breakWords
  * @property {Object} [style] - Textstyle
  * 
  * @typedef {ASTNode & TextASTProps} TextASTNode

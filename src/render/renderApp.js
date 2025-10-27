@@ -1,6 +1,8 @@
 
 import { renderRect } from './renderRect.js';
 import renderText from './renderText.js';
+import { renderSprite } from './renderSprite.js';
+import { renderContainer } from './renderContainer.js';
 /**
  * @typedef {import('../types.js').Application} Application
  * @typedef {import('../types.js').ASTNode} ASTNode
@@ -26,8 +28,10 @@ export function renderApp(app,parent,ASTTree){
                 renderText(element,parent)
                 break;
             case "container":
+                renderContainer(element,parent)
                 break;
             case "sprite":
+                renderSprite(element,parent)
                 break;
             default:
         }
