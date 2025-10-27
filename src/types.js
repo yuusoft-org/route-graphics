@@ -64,6 +64,12 @@
  */
 
 /**
+ * @typedef {Object} SetupScrollingOptions
+ * @property {Container} container - The PIXI Container to enable scrolling on
+ * @property {ContainerContainerElement} element - The container element
+ */
+
+/**
  * @typedef {Object} RectASTProps
  * @property {'rect'} type
  * @property {string} fill - Fill color (e.g., "red")

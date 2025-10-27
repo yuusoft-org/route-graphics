@@ -74,7 +74,7 @@ export function parseContainer(state) {
     }
 
     if(direction === 'horizontal'){
-        if(state.width && child.width + currentRowWidth > state.width){
+        if(state.width && child.width + currentRowWidth > state.width && scroll){
             //Wrap the child
             currentX = 0;
             currentRowWidth = 0;
@@ -93,7 +93,7 @@ export function parseContainer(state) {
         containerHeight = Math.max(child.height + child.y, containerHeight);
     }
     else if(direction === 'vertical'){
-        if(state.height && child.height + currentColHeight > state.height){
+        if(state.height && child.height + currentColHeight > state.height && scroll){
             //Wrap the child
             currentY = 0;
             currentColHeight = 0;

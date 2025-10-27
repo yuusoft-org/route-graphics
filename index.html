@@ -184,6 +184,116 @@
                         rotation: 0
                     }
                 ]
+            },
+            {
+                id: "scrolling-container-1",
+                type: "container",
+                width: 250,
+                height: 100,
+                x: 650,
+                y: 50,
+                direction: "vertical",
+                gap: 10,
+                rotation: 0,
+                scroll: true,
+                originX: 0,
+                originY: 0,
+                zIndex: 3,
+                children: [
+                    {
+                        id: "scroll-item-1",
+                        type: "rect",
+                        width: 200,
+                        height: 40,
+                        x: 0,
+                        y: 0,
+                        fill: "purple",
+                        border: {
+                            width: 2,
+                            color: "darkviolet",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    },
+                    {
+                        id: "scroll-item-2",
+                        type: "text",
+                        text: "Scrollable Item 2",
+                        x: 0,
+                        y: 40,
+                        width: 200,
+                        height: 30,
+                        style: {
+                            fill: 'white',
+                            fontFamily: 'Arial',
+                            fontSize: 18,
+                        }
+                    },
+                    {
+                        id: "scroll-item-4",
+                        type: "rect",
+                        width: 200,
+                        height: 60,
+                        x: 0,
+                        y: 70,
+                        fill: "orange",
+                        border: {
+                            width: 2,
+                            color: "darkorange",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    },
+                    {
+                        id: "scroll-item-5",
+                        type: "text",
+                        text: "Keep scrolling to see more!",
+                        x: 0,
+                        y: 130,
+                        width: 200,
+                        height: 25,
+                        style: {
+                            fill: 'black',
+                            fontFamily: 'Arial',
+                            fontSize: 16,
+                        }
+                    },
+                    {
+                        id: "scroll-item-7",
+                        type: "rect",
+                        width: 200,
+                        height: 50,
+                        x: 0,
+                        y: 155,
+                        fill: "cyan",
+                        border: {
+                            width: 2,
+                            color: "darkcyan",
+                            alpha: 1
+                        },
+                        originX: 0,
+                        originY: 0,
+                        rotation: 0
+                    },
+                    {
+                        id: "scroll-item-8",
+                        type: "text",
+                        text: "Last scrollable item!",
+                        x: 0,
+                        y: 205,
+                        width: 200,
+                        height: 25,
+                        style: {
+                            fill: 'black',
+                            fontFamily: 'Arial',
+                            fontSize: 16,
+                        }
+                    }
+                ]
             }
         ]
         renderApp(app,app.stage,ASTTree)
