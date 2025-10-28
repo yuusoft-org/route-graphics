@@ -21,18 +21,20 @@ states:
       width: 80
       height: 80
       fill: "#00FF00"
+      rotation: 90
     - id: 'rect-half-turn'
       type: "rect"
-      x: 200
+      x: 400
       y: 100
       width: 80
       height: 80
       fill: blue
-      rotation: 45
+      rotation: 180
     - id: 'rect-custom-rotation'
       type: "rect"
-      x: 200
-      y: 200
+      x: 550
+      y: 100
       width: 80
       height: 80
       fill: yellow
+      rotation: 45

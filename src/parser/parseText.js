@@ -23,13 +23,15 @@ export function parseText(state) {
     ...state.style,
   }
 
-  const { width, height } = CanvasTextMetrics.measureText(state.text, new TextStyle({
-    fontFamily: textStyle.fontFamily,
-    fontSize: textStyle.fontSize
-  }));
+  if(state.width) {
+    textStyle.wordWrapWidth = state.width
+    textStyle.wordWrap = true
+  }
+
+  const { width, height } = CanvasTextMetrics.measureText(state.text, new TextStyle(textStyle));
 
   const astObj = parseCommonObject({...state,width,height})
-
+  console.log(astObj)
   return {
     ...astObj,
     text:state.text ?? "",

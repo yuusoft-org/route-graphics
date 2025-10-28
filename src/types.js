@@ -53,15 +53,6 @@
  */
 
 /**
- * @typedef {Object} SpriteASTProps
- * @property {'sprite'} type
- * @property {number} alpha
- * @property {string} url
- * 
- * @typedef {ASTNode & SpriteASTProps } SpriteASTNode
- */
-
-/**
  * @typedef {Object} ContainerASTProps
  * @property {'container'} type
  * @property {'horizontal' | 'vertical'} direction
@@ -70,6 +61,18 @@
  * @property {number} rotation
  * @property {boolean} scroll
  * @typedef {ASTNode & ContainerASTProps } ContainerASTNode
+ */
+
+/**
+ * @typedef {Object} SetupScrollingOptions
+ * @property {Container} container - The PIXI Container to enable scrolling on
+ * @property {ContainerContainerElement} element - The container element
+ */
+
+/**
+ * @typedef {Object} SetupClipping
+ * @property {Container} container - The PIXI Container to enable scrolling on
+ * @property {ContainerContainerElement} element - The container element
  */
 
 /**
@@ -92,6 +95,9 @@
 /**
  * @typedef {Object} TextASTProps
  * @property {string} text
+ * @property {number} wordWrapWidth
+ * @property {boolean} breakWords
+ * @property {number} width
  * @property {Object} [style] - Textstyle
  * 
  * @typedef {ASTNode & TextASTProps} TextASTNode

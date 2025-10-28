@@ -1,5 +1,5 @@
 ---
-title: Position
+title: Text
 ---
 states:
   - elements:
@@ -13,17 +13,17 @@ states:
           fill: "white"
       - id: 'b'
         type: "text"
-        text: "Hello World"
-        x: 100
-        y: 100
+        text: "Hi, how are you?"
+        x: 20
+        y: 60
         style: 
           fontSize: 24
           fill: "white"
       - id: 'c'
         type: "text"
-        text: "Hello World"
-        x: 200
-        y: 200
+        text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        x: 20
+        y: 100
         style: 
           fontSize: 24
           fill: "white"

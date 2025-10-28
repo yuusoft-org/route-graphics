@@ -11,6 +11,7 @@ states:
         style: 
           fontSize: 24
           fill: "white"
+          wordWrapWidth: 300
       - id: 'b'
         type: "text"
         text: "Hello World"
@@ -19,6 +20,7 @@ states:
         style: 
           fontSize: 24
           fill: "white"
+          wordWrapWidth: 300
       - id: 'c'
         type: "text"
         text: "Hello World"
@@ -27,3 +29,4 @@ states:
         style: 
           fontSize: 24
           fill: "white"
+          wordWrapWidth: 300

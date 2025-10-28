@@ -3,93 +3,111 @@ title: Anchor
 ---
 states:
   - elements:
+    - id: 'anchor'
+      type: "rect"
+      x: 960
+      y: 540
+      width: 25
+      height: 25
+      anchorX: 0.5
+      anchorY: 0.5
+      fill: red
     - id: 'tl'
       type: "text"
       text: "Hello World"
-      x: 120
-      y: 120
+      x: 760
+      y: 340
       anchorX: 0
       anchorY: 0
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'tc'
       type: "text"
       text: "Hello World"
-      x: 640
-      y: 120
+      x: 960
+      y: 340
       anchorX: 0.5
       anchorY: 0
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'tr'
       type: "text"
       text: "Hello World"
-      x: 1120
-      y: 120
+      x: 1160
+      y: 340
       anchorX: 1
       anchorY: 0
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'cl'
       type: "text"
       text: "Hello World"
-      x: 120
-      y: 360
+      x: 760
+      y: 540
       anchorX: 0
       anchorY: 0.5
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'cc'
       type: "text"
       text: "Hello World"
-      x: 640
-      y: 360
+      x: 960
+      y: 540
       anchorX: 0.5
       anchorY: 0.5
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'cr'
       type: "text"
       text: "Hello World"
-      x: 1120
-      y: 360
+      x: 1160
+      y: 540
       anchorX: 1
       anchorY: 0.5
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'bl'
       type: "text"
       text: "Hello World"
-      x: 120
-      y: 600
+      x: 760
+      y: 740
       anchorX: 0
       anchorY: 1
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'bc'
       type: "text"
       text: "Hello World"
-      x: 640
-      y: 600
+      x: 960
+      y: 740
       anchorX: 0.5
       anchorY: 1
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300
     - id: 'br'
       type: "text"
       text: "Hello World"
-      x: 1120
-      y: 600
+      x: 1160
+      y: 740
       anchorX: 1
       anchorY: 1
       style: 
         fontSize: 24
         fill: "white"
+        wordWrapWidth: 300

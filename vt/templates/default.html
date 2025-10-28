@@ -1,16 +1,29 @@
-<!doctype html>
-<html>
-  <head>
-    <title>2D Render</title>
-    <script src="https://cdn.jsdelivr.net/npm/rettangoli-ui@0.1.0-rc1/dist/rettangoli-ui.min.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
     <script>
       window.vtState = `
 {{ content }}
         `;
     </script>
-    <script type="module" src="/main.js"></script>
+    <script type="module">
+        import {
+            renderApp,
+            Application,
+        } from "/RouteGraphics.js"
+        import { parse } from "https://cdn.jsdelivr.net/npm/yaml@2.7.1/+esm";
+        const app = new Application()
+        await app.init({ background: '#000000', width: 1280, height: 720 });
+        document.body.appendChild(app.canvas);
+        const ASTTree = parse(window.vtState).states[0].elements;
+        renderApp(app,app.stage,ASTTree)
+    </script>
     <link rel="stylesheet" href="/public/theme.css" />
-  </head>
-
-  <body></body>
+</head>
+<body>
+    
+</body>
 </html>

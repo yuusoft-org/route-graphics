@@ -34,6 +34,40 @@ out:
     fontFamily: "Arial"
     fill: "white"
 ---
+case: Test parsing with word wrap
+in: 
+  - id: 'tl'
+    type: "text"
+    text: "This text is wrap"
+    x: 660
+    y: 240
+    anchorX: 0.5
+    anchorY: 0.5
+    width: 200
+    style: 
+      fontSize: 24
+      fontFamily: "Arial"
+      fill: "white"
+      breakWords: true
+out:
+  id: "tl"
+  type: "text"
+  text: "This text is wrap"
+  width: 197.90625
+  height: 29
+  x: 561.046875
+  y: 225.5
+  zIndex: 0
+  originX: 98.953125
+  originY: 14.5
+  style: 
+    fontSize: 24
+    fontFamily: "Arial"
+    fill: "white"
+    breakWords: true
+    wordWrap: true
+    wordWrapWidth: 200
+---
 case: Test parsing simple text object with no style
 in: 
   - id: 'tl'

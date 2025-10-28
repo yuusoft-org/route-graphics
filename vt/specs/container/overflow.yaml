@@ -1,5 +1,5 @@
 ---
-title: Scroll
+title: Overflow
 ---
 states:
   - elements:
@@ -8,7 +8,6 @@ states:
         direction: "horizontal"
         width: 200
         gap: 5
-        scroll: true
         zIndex: 0
         children:
           - id: 'rect-1'
@@ -53,7 +52,6 @@ states:
         height: 200
         x: 500
         gap: 5
-        scroll: true
         zIndex: 0
         children:
           - id: 'rect-1'

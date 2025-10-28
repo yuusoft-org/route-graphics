@@ -16,7 +16,7 @@ states:
         border:
           width: 12
           color: red
-          alpha: 0.5
+          alpha: 0
       - id: "rect-2"
         type: "rect"
         x: 300
@@ -27,49 +27,15 @@ states:
         border:
           width: 12
           color: red
-          alignment: 0.5
+          alpha: 0.5
       - id: "rect-3"
         type: "rect"
         x: 600
         y: 10
         width: 200
         height: 100
-        border:
-          width: 12
-          color: red
-          alignment: 0.5
-      - id: "rect-4"
-        type: "rect"
-        x: 10
-        y: 210
-        width: 200
-        height: 100
         fill: blue
-        radius: 12
         border:
           width: 12
           color: red
-          alpha: 0.5
-      - id: "rect-5"
-        type: "rect"
-        x: 300
-        y: 210
-        width: 200
-        height: 100
-        fill: blue
-        radius: 12
-        border:
-          width: 12
-          color: red
-          alignment: 0.5
-      - id: "rect-6"
-        type: "rect"
-        x: 600
-        y: 210
-        width: 200
-        height: 100
-        radius: 12
-        border:
-          width: 12
-          color: red
-          alignment: 0.5
+          alpha: 1
