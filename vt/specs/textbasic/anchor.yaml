@@ -13,7 +13,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'tc'
       type: "text"
       text: "Hello World"
@@ -24,7 +23,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'tr'
       type: "text"
       text: "Hello World"
@@ -35,7 +33,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'cl'
       type: "text"
       text: "Hello World"
@@ -46,7 +43,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'cc'
       type: "text"
       text: "Hello World"
@@ -57,7 +53,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'cr'
       type: "text"
       text: "Hello World"
@@ -68,7 +63,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'bl'
       type: "text"
       text: "Hello World"
@@ -79,7 +73,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'bc'
       type: "text"
       text: "Hello World"
@@ -90,7 +83,6 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
     - id: 'br'
       type: "text"
       text: "Hello World"
@@ -101,4 +93,3 @@ states:
       style: 
         fontSize: 24
         fill: "white"
-        wordWrapWidth: 300
