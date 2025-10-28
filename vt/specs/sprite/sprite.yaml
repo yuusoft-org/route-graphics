@@ -11,8 +11,8 @@ states:
         x: 150
         y: 50
         alpha: 1
-        originX: 0
-        originY: 0
+        anchorX: 0
+        anchorY: 0
         rotation: 0
         zIndex: 1
 
@@ -24,8 +24,8 @@ states:
         x: 0
         y: 0
         alpha: 1
-        originX: 0
-        originY: 0
+        anchorX: 0
+        anchorY: 0
         zIndex: 1
         rotation: 0
 
@@ -37,7 +37,7 @@ states:
         x: 180
         y: 70
         alpha: 0.9
-        originX: 0
-        originY: 0
+        anchorX: 0
+        anchorY: 0
         zIndex: 1
         rotation: 0

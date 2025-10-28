@@ -8,28 +8,84 @@ specs:
 ---
 states:
   - elements:
-    - id: 'rect-no-anchor'
+    - id: 'rect-tl'
       type: "rect"
-      x: 100
-      y: 200
+      x: 120
+      y: 120
       width: 80
       height: 80
       fill: red
-    - id: 'rect-center-anchor'
+      anchorX: 0
+      anchorY: 0
+    - id: 'rect-tc'
       type: "rect"
-      x: 250
-      y: 200
+      x: 640
+      y: 120
       width: 80
       height: 80
       fill: green
       anchorX: 0.5
-      anchorY: 0.5
-    - id: 'rect-bottom-right-anchor'
+      anchorY: 0
+    - id: 'rect-tr'
       type: "rect"
-      x: 400
-      y: 200
+      x: 1120
+      y: 120
       width: 80
       height: 80
       fill: blue
+      anchorX: 1
+      anchorY: 0
+    - id: 'rect-cl'
+      type: "rect"
+      x: 120
+      y: 360
+      width: 80
+      height: 80
+      fill: yellow
+      anchorX: 0
+      anchorY: 0.5
+    - id: 'rect-cc'
+      type: "rect"
+      x: 640
+      y: 360
+      width: 80
+      height: 80
+      fill: orange
+      anchorX: 0.5
+      anchorY: 0.5
+    - id: 'rect-cr'
+      type: "rect"
+      x: 1120
+      y: 360
+      width: 80
+      height: 80
+      fill: purple
+      anchorX: 1
+      anchorY: 0.5
+    - id: 'rect-bl'
+      type: "rect"
+      x: 120
+      y: 600
+      width: 80
+      height: 80
+      fill: cyan
+      anchorX: 0
+      anchorY: 1
+    - id: 'rect-bc'
+      type: "rect"
+      x: 640
+      y: 600
+      width: 80
+      height: 80
+      fill: magenta
+      anchorX: 0.5
+      anchorY: 1
+    - id: 'rect-br'
+      type: "rect"
+      x: 1120
+      y: 600
+      width: 80
+      height: 80
+      fill: brown
       anchorX: 1
       anchorY: 1

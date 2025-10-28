@@ -34,7 +34,7 @@ export async function renderSprite(spriteASTNode, parent) {
 
     sprite.alpha = alpha;
 
-    sprite.pivot.set(originX, originY);
+    // sprite.pivot.set(originX, originY);
 
     sprite.zIndex = zIndex;
 

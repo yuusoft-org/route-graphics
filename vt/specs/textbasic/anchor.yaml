@@ -6,8 +6,8 @@ states:
     - id: 'tl'
       type: "text"
       text: "Hello World"
-      x: 160
-      y: 140
+      x: 120
+      y: 120
       anchorX: 0
       anchorY: 0
       style: 
@@ -16,8 +16,8 @@ states:
     - id: 'tc'
       type: "text"
       text: "Hello World"
-      x: 360
-      y: 140
+      x: 640
+      y: 120
       anchorX: 0.5
       anchorY: 0
       style: 
@@ -26,8 +26,8 @@ states:
     - id: 'tr'
       type: "text"
       text: "Hello World"
-      x: 560
-      y: 140
+      x: 1120
+      y: 120
       anchorX: 1
       anchorY: 0
       style: 
@@ -36,8 +36,8 @@ states:
     - id: 'cl'
       type: "text"
       text: "Hello World"
-      x: 160
-      y: 340
+      x: 120
+      y: 360
       anchorX: 0
       anchorY: 0.5
       style: 
@@ -46,8 +46,8 @@ states:
     - id: 'cc'
       type: "text"
       text: "Hello World"
-      x: 360
-      y: 340
+      x: 640
+      y: 360
       anchorX: 0.5
       anchorY: 0.5
       style: 
@@ -56,8 +56,8 @@ states:
     - id: 'cr'
       type: "text"
       text: "Hello World"
-      x: 560
-      y: 340
+      x: 1120
+      y: 360
       anchorX: 1
       anchorY: 0.5
       style: 
@@ -66,8 +66,8 @@ states:
     - id: 'bl'
       type: "text"
       text: "Hello World"
-      x: 160
-      y: 540
+      x: 120
+      y: 600
       anchorX: 0
       anchorY: 1
       style: 
@@ -76,8 +76,8 @@ states:
     - id: 'bc'
       type: "text"
       text: "Hello World"
-      x: 360
-      y: 540
+      x: 640
+      y: 600
       anchorX: 0.5
       anchorY: 1
       style: 
@@ -86,8 +86,8 @@ states:
     - id: 'br'
       type: "text"
       text: "Hello World"
-      x: 560
-      y: 540
+      x: 1120
+      y: 600
       anchorX: 1
       anchorY: 1
       style: 

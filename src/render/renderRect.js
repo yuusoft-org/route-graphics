@@ -32,13 +32,15 @@ export function renderRect(rectASTNode,parent){
     
     if(border){
         rect.stroke({
-            ...border
+            color: border.color,
+            alpha: border.alpha,
+            width: border.width
         })
     }
 
     rect.label = id
-    rect.pivot.set(originX,originY)
-    rect.rotation = (rotation * Math.PI) / 180
+    // rect.pivot.set(originX,originY)
+    // rect.rotation = (rotation * Math.PI) / 180
     rect.zIndex = zIndex 
     
     parent.addChild(rect)

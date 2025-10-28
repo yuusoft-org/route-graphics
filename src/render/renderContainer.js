@@ -38,11 +38,11 @@ export function renderContainer(containerASTNode, parent) {
     container.width = width;
     container.height = height;
 
-    container.pivot.set(originX, originY);
+    // container.pivot.set(originX, originY);
 
-    if (rotation !== undefined) {
-        container.rotation = (rotation * Math.PI) / 180;
-    }
+    // if (rotation !== undefined) {
+    //     container.rotation = (rotation * Math.PI) / 180;
+    // }
 
     container.zIndex = zIndex;
 
@@ -174,32 +174,5 @@ function setupScrolling({
           contentContainer.x = scrollXOffset;
         }
       });
-    }
-}
-
-/**
- * Setup basic clipping for containers - constrains content to container dimensions
- * @param {SetupClipping} params
- */
-function setupClipping({
-    container,
-    element,
-}) {
-    let totalWidth = 0;
-    let totalHeight = 0;
-
-    element.children.forEach(child=>{
-      totalWidth = Math.max(child.width + child.x,totalWidth)
-      totalHeight = Math.max(child.height + child.y, totalHeight)
-    })
-
-    if (element.width || element.height) {
-        const clip = new Graphics()
-            .rect(0, 0, element.width || totalWidth, element.height || totalHeight)
-            .fill({ color: 0xFF0000, alpha: 0 });
-
-        container.mask = clip;
-
-        container.addChild(clip);
     }
 }

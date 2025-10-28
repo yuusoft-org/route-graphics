@@ -31,7 +31,7 @@ export function parseText(state) {
   const { width, height } = CanvasTextMetrics.measureText(state.text, new TextStyle(textStyle));
 
   const astObj = parseCommonObject({...state,width,height})
-
+  console.log(astObj)
   return {
     ...astObj,
     text:state.text ?? "",
