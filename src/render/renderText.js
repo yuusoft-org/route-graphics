@@ -12,11 +12,10 @@ import { Text } from 'pixi.js'
  * @param {Container} parent 
  */
 export default function renderText(textASTNode,parent){
+    if(textASTNode.id === "zh-label-true")console.log(textASTNode)
     const text = new Text({
         text: textASTNode.text,
         style: textASTNode.style,
-        wordWrap: textASTNode.breakWords,
-        wordWrapWidth: textASTNode.wordWrapWidth,
         label: textASTNode.id
     })
 

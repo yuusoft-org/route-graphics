@@ -73,12 +73,6 @@ export function renderContainer(containerASTNode, parent) {
             element: containerASTNode,
         })
     }
-    else if(width || height){
-        setupClipping({
-            container,
-            element: containerASTNode
-        })
-    }
 
     parent.addChild(container);
 }
@@ -191,17 +185,21 @@ function setupClipping({
     container,
     element,
 }) {
-    // Only apply clipping if the container has specific dimensions
-    if (element.width || element.height) {
-        // Create clipping mask - acts as a viewport
-        const clip = new Graphics()
-            .rect(0, 0, element.width || 1000, element.height || 1000)
-            .fill({ color: 0xFF0000, alpha: 0 }); // Transparent mask
+    let totalWidth = 0;
+    let totalHeight = 0;
 
-        // Apply the mask to the container
+    element.children.forEach(child=>{
+      totalWidth = Math.max(child.width + child.x,totalWidth)
+      totalHeight = Math.max(child.height + child.y, totalHeight)
+    })
+
+    if (element.width || element.height) {
+        const clip = new Graphics()
+            .rect(0, 0, element.width || totalWidth, element.height || totalHeight)
+            .fill({ color: 0xFF0000, alpha: 0 });
+
         container.mask = clip;
 
-        // Add the mask to container (mask must be in display list)
         container.addChild(clip);
     }
 }

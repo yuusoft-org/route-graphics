@@ -1,0 +1,32 @@
+---
+title: Position
+---
+states:
+  - elements:
+      - id: 'a'
+        type: "text"
+        text: "Hello World"
+        x: 20
+        y: 20
+        style: 
+          fontSize: 24
+          fill: "white"
+          wordWrapWidth: 300
+      - id: 'b'
+        type: "text"
+        text: "Hello World"
+        x: 100
+        y: 100
+        style: 
+          fontSize: 24
+          fill: "white"
+          wordWrapWidth: 300
+      - id: 'c'
+        type: "text"
+        text: "Hello World"
+        x: 200
+        y: 200
+        style: 
+          fontSize: 24
+          fill: "white"
+          wordWrapWidth: 300

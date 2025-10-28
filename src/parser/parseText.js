@@ -16,6 +16,7 @@ export function parseText(state) {
     fill: 'black',
     fontFamily: 'Arial',
     fontSize: 16,
+    wordWrap: true
   }
 
   const textStyle = {
@@ -23,11 +24,13 @@ export function parseText(state) {
     ...state.style,
   }
 
+  textStyle.wordWrap = textStyle.wordWrapWidth? true : false
+
   const { width, height } = CanvasTextMetrics.measureText(state.text, new TextStyle({
     fontFamily: textStyle.fontFamily,
     fontSize: textStyle.fontSize,
-    wordWrap: state.breakWords ?? false,
-    wordWrapWidth: state.wordWrapWidth ?? 0
+    wordWrap: state?.style?.breakWords ?? false,
+    wordWrapWidth: state?.style?.wordWrapWidth
   }));
 
   const astObj = parseCommonObject({...state,width,height})
@@ -35,8 +38,6 @@ export function parseText(state) {
   return {
     ...astObj,
     text:state.text ?? "",
-    breakWords: state.breakWords ?? false,
-    wordWrapWidth: state.wordWrapWidth ?? 0,
     style: {
       ...textStyle
     },

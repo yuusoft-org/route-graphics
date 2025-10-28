@@ -1,0 +1,35 @@
+---
+title: Anchor
+description: A rect's anchor properties for pivot point control
+specs:
+  - "`anchorX` should control horizontal pivot (0=left, 0.5=center, 1=right)"
+  - "`anchorY` should control vertical pivot (0=top, 0.5=center, 1=bottom)"
+  - "Anchor values should affect rotation and scaling origin"
+---
+states:
+  - elements:
+    - id: 'rect-no-anchor'
+      type: "rect"
+      x: 100
+      y: 200
+      width: 80
+      height: 80
+      fill: red
+    - id: 'rect-center-anchor'
+      type: "rect"
+      x: 250
+      y: 200
+      width: 80
+      height: 80
+      fill: green
+      anchorX: 0.5
+      anchorY: 0.5
+    - id: 'rect-bottom-right-anchor'
+      type: "rect"
+      x: 400
+      y: 200
+      width: 80
+      height: 80
+      fill: blue
+      anchorX: 1
+      anchorY: 1

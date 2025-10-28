@@ -74,40 +74,40 @@ export function parseContainer(state) {
     }
 
     if(direction === 'horizontal'){
-        if(state.width && child.width + currentRowWidth > state.width && scroll){
+        if(state.width && child.width + currentRowWidth > state.width && !scroll){
             //Wrap the child
             currentX = 0;
             currentRowWidth = 0;
-            lastRowHeight = maxRowHeight;
+            lastRowHeight += maxRowHeight + gap;
             maxRowHeight = child.height;
 
             child.x = 0;
-            child.y = lastRowHeight + gap;
+            child.y = lastRowHeight;
         }
         else{
-            currentRowWidth += child.width + gapValue;
-            maxRowHeight = Math.max(maxRowHeight, child.height);
+          maxRowHeight = Math.max(maxRowHeight, child.height);
         }
         currentX += child.width + gapValue;
+        currentRowWidth = child.x + child.width;
         containerWidth = Math.max(currentX, containerWidth);
         containerHeight = Math.max(child.height + child.y, containerHeight);
     }
     else if(direction === 'vertical'){
-        if(state.height && child.height + currentColHeight > state.height && scroll){
+        if(state.height && child.height + currentColHeight > state.height && !scroll){
             //Wrap the child
             currentY = 0;
             currentColHeight = 0;
-            lastColWidth = maxColWidth
+            lastColWidth += maxColWidth + gap
             maxColWidth = child.width;
 
-            child.x = lastColWidth + gap;
+            child.x = lastColWidth;
             child.y = 0;
         }
         else{
-            currentColHeight += child.height + gapValue;
-            maxColWidth = Math.max(maxColWidth, child.width);
+          maxColWidth = Math.max(maxColWidth, child.width);
         }
         currentY += child.height + gapValue;
+        currentColHeight = child.y + child.height;
         containerWidth = Math.max(child.width + child.x, containerWidth);
         containerHeight = Math.max(currentY, containerHeight)
     }
@@ -127,6 +127,6 @@ export function parseContainer(state) {
     direction,
     gap,
     scroll,
-    rotation: state.rotation
+    rotation: state.rotation ?? 0
   };
 }

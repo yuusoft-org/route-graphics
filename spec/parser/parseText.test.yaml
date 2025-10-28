@@ -29,12 +29,11 @@ out:
   zIndex: 0
   originX: 241.974609375
   originY: 14.5
-  breakWords: false
-  wordWrapWidth: 0
   style: 
     fontSize: 24
     fontFamily: "Arial"
     fill: "white"
+    wordWrap: false
 ---
 case: Test parsing with word wrap
 in: 
@@ -45,12 +44,12 @@ in:
     y: 240
     anchorX: 0.5
     anchorY: 0.5
-    breakWords: true
-    wordWrapWidth: 200
     style: 
       fontSize: 24
       fontFamily: "Arial"
       fill: "white"
+      breakWords: true
+      wordWrapWidth: 200
 out:
   id: "tl"
   type: "text"
@@ -62,12 +61,13 @@ out:
   zIndex: 0
   originX: 98.953125
   originY: 14.5
-  breakWords: true
-  wordWrapWidth: 200
   style: 
     fontSize: 24
     fontFamily: "Arial"
     fill: "white"
+    breakWords: true
+    wordWrap: true
+    wordWrapWidth: 200
 ---
 case: Test parsing simple text object with no style
 in: 
@@ -89,12 +89,11 @@ out:
   zIndex: 0
   originX: 161.31640625
   originY: 9.5
-  breakWords: false
-  wordWrapWidth: 0
   style: 
     fontSize: 16
     fontFamily: "Arial"
     fill: "black"
+    wordWrap: false
 ---
 case: Test parsing simple text object with no text
 in: 
@@ -115,9 +114,8 @@ out:
   zIndex: 0
   originX: 2.54296875
   originY: 9.5
-  breakWords: false
-  wordWrapWidth: 0
   style: 
     fontSize: 16
     fontFamily: "Arial"
     fill: "black"
+    wordWrap: false

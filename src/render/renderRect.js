@@ -29,11 +29,12 @@ export function renderRect(rectASTNode,parent){
     const rect = new Graphics()
         .rect(x,y,width,height)
         .fill(fill)
-        .stroke({
-            width: border.width,
-            fill: border.color,
-            alpha: border.alpha
+    
+    if(border){
+        rect.stroke({
+            ...border
         })
+    }
 
     rect.label = id
     rect.pivot.set(originX,originY)

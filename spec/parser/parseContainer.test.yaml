@@ -24,8 +24,6 @@ in:
         height: 100
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: red
         rotation: 90
       - id: 'rect-2'
@@ -34,8 +32,6 @@ in:
         height: 120
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: blue
         rotation: 90
       - id: 'rect-3'
@@ -44,8 +40,6 @@ in:
         height: 100
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: red
         rotation: 90
 out:
@@ -72,10 +66,6 @@ out:
       originX: 0
       originY: 0
       fill: red
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -91,10 +81,6 @@ out:
       originX: 0
       originY: 0
       fill: blue
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -110,10 +96,6 @@ out:
       originX: 0
       originY: 0
       fill: red
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -140,8 +122,6 @@ in:
         height: 100
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: red
         rotation: 90
       - id: 'rect-2'
@@ -150,8 +130,6 @@ in:
         height: 120
         x: 240
         y: 240
-        border:
-          alpha: 0.8
         fill: blue
         rotation: 90
       - id: 'rect-3'
@@ -160,8 +138,6 @@ in:
         height: 100
         x: 240
         y: 240
-        border:
-          alpha: 0.8
         fill: red
         rotation: 90
 out:
@@ -188,10 +164,6 @@ out:
       originX: 0
       originY: 0
       fill: red
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -207,10 +179,6 @@ out:
       originX: 0
       originY: 0
       fill: blue
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -226,10 +194,6 @@ out:
       originX: 0
       originY: 0
       fill: red
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -257,8 +221,6 @@ in:
         height: 100
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: red
         rotation: 90
       - id: 'rect-2'
@@ -267,8 +229,6 @@ in:
         height: 120
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: blue
         rotation: 90
 out:
@@ -295,10 +255,6 @@ out:
       originX: 0
       originY: 0
       fill: red
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -314,10 +270,6 @@ out:
       originX: 0
       originY: 0
       fill: blue
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -345,8 +297,6 @@ in:
         height: 100
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: red
         rotation: 90
       - id: 'rect-2'
@@ -355,8 +305,6 @@ in:
         height: 120
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: blue
         rotation: 90
       - id: 'rect-3'
@@ -365,8 +313,6 @@ in:
         height: 120
         scaleX: 1.2
         scaleY: 0.8
-        border:
-          alpha: 0.8
         fill: blue
         rotation: 90
 out:
@@ -393,10 +339,6 @@ out:
       originX: 0
       originY: 0
       fill: red
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -412,10 +354,6 @@ out:
       originX: 0
       originY: 0
       fill: blue
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""
@@ -431,10 +369,6 @@ out:
       originX: 0
       originY: 0
       fill: blue
-      border:
-        alpha: 0.8
-        width: 0
-        color: black
       cursor: ""
       pointerDown: ""
       pointerUp: ""

@@ -9,3 +9,21 @@ vt:
         - title: "Text Basic"
           files: "textbasic"
           description: "Basic text rendering tests"
+    - title: "Container"
+      type: "groupLabel"
+      items:
+        - title: "Container"
+          files: "container"
+          description: "Container rendering test"
+    - title: "Rect"
+      type: "groupLabel"
+      items:
+        - title: "Rect"
+          files: "rect"
+          description: "Rect rendering test"
+    - title: "Sprite"
+      type: "groupLabel"
+      items:
+        - title: "Sprite"
+          files: "sprite"
+          description: "Sprite rendering test"
