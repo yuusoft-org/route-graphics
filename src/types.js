@@ -97,6 +97,7 @@
  * @property {string} text
  * @property {number} wordWrapWidth
  * @property {boolean} breakWords
+ * @property {number} width
  * @property {Object} [style] - Textstyle
  * 
  * @typedef {ASTNode & TextASTProps} TextASTNode

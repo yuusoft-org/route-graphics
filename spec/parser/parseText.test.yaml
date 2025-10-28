@@ -33,7 +33,6 @@ out:
     fontSize: 24
     fontFamily: "Arial"
     fill: "white"
-    wordWrap: false
 ---
 case: Test parsing with word wrap
 in: 
@@ -44,12 +43,12 @@ in:
     y: 240
     anchorX: 0.5
     anchorY: 0.5
+    width: 200
     style: 
       fontSize: 24
       fontFamily: "Arial"
       fill: "white"
       breakWords: true
-      wordWrapWidth: 200
 out:
   id: "tl"
   type: "text"
@@ -93,7 +92,6 @@ out:
     fontSize: 16
     fontFamily: "Arial"
     fill: "black"
-    wordWrap: false
 ---
 case: Test parsing simple text object with no text
 in: 
@@ -118,4 +116,3 @@ out:
     fontSize: 16
     fontFamily: "Arial"
     fill: "black"
-    wordWrap: false

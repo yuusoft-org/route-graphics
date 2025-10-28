@@ -27,10 +27,10 @@ states:
         text: "This is a very long English sentence that demonstrates how word wrapping behaves with breakWords set to true. SupercalifragilisticexpialidociousAntidisestablishmentarianism"
         x: 50
         y: 150
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: true
       # English - breakWords: false (right column)
       - id: 'en-label-false'
@@ -46,10 +46,10 @@ states:
         text: "This is a very long English sentence that demonstrates how word wrapping behaves with breakWords set to false. SupercalifragilisticexpialidociousAntidisestablishmentarianism"
         x: 450
         y: 150
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: false
       # Chinese - breakWords: true (left column)
       - id: 'zh-label-true'
@@ -65,10 +65,10 @@ states:
         text: "这是一段很长的中文文本用来演示当breakWords设置为true时中文文本的换行行为表现。中文通常不使用空格分隔单词所以换行规则与英文有所不同。"
         x: 50
         y: 310
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: true
       # Chinese - breakWords: false (right column)
       - id: 'zh-label-false'
@@ -84,10 +84,10 @@ states:
         text: "这是一段很长的中文文本用来演示当breakWords设置为false时中文文本的换行行为表现。中文通常不使用空格分隔单词所以换行规则与英文有所不同。"
         x: 450
         y: 310
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: false
       # Japanese - breakWords: true (left column)
       - id: 'ja-label-true'
@@ -103,10 +103,10 @@ states:
         text: "これは非常に長い日本語のテキストでbreakWordsがtrueに設定されている時の改行動作を示すためのものです。ひらがなカタカナ漢字が混在する日本語の改行ルールは複雑です。"
         x: 50
         y: 470
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: true
       # Japanese - breakWords: false (right column)
       - id: 'ja-label-false'
@@ -122,10 +122,10 @@ states:
         text: "これは非常に長い日本語のテキストでbreakWordsがfalseに設定されている時の改行動作を示すためのものです。ひらがなカタカナ漢字が混在する日本語の改行ルールは複雑です。"
         x: 450
         y: 470
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: false
       # Korean - breakWords: true (left column)
       - id: 'ko-label-true'
@@ -141,10 +141,10 @@ states:
         text: "이것은 매우 긴 한국어 텍스트로서 breakWords가 true로 설정되었을 때의 줄바꿈 동작을 보여주기 위한 것입니다. 한글의 특성상 단어 구분과 줄바꿈 규칙이 독특합니다."
         x: 50
         y: 630
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: true
       # Korean - breakWords: false (right column)
       - id: 'ko-label-false'
@@ -160,8 +160,8 @@ states:
         text: "이것은 매우 긴 한국어 텍스트로서 breakWords가 false로 설정되었을 때의 줄바꿈 동작을 보여주기 위한 것입니다. 한글의 특성상 단어 구분과 줄바꿈 규칙이 독특합니다."
         x: 450
         y: 630
+        width: 350
         style: 
           fontSize: 16
           fill: "white"
-          wordWrapWidth: 350
           breakWords: false
