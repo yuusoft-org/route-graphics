@@ -27,3 +27,12 @@ states:
         style: 
           fontSize: 24
           fill: "white"
+  - elements:
+      - id: 'e'
+        type: "text"
+        text: "This is the next state"
+        x: 20
+        y: 20
+        style: 
+          fontSize: 24
+          fill: "white"

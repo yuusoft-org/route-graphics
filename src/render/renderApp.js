@@ -3,10 +3,11 @@ import { renderRect } from './renderRect.js';
 import renderText from './renderText.js';
 import { renderSprite } from './renderSprite.js';
 import { renderContainer } from './renderContainer.js';
-import { parseRect } from '../parser/parseRect.js'
-import { parseText } from '../parser/parseText.js'
-import { parseContainer } from '../parser/parseContainer.js'
-import { parseSprite } from '../parser/parseSprite.js'
+import { diffElements } from './common.js';
+import { deleteRect } from '../delete/deleteRect.js';
+import { deleteText } from '../delete/deleteText.js';
+import { deleteContainer } from '../delete/deleteContainer.js';
+import { deleteSprite } from '../delete/deleteSprite.js';
 /**
  * @typedef {import('../types.js').Application} Application
  * @typedef {import('../types.js').ASTNode} ASTNode
@@ -19,34 +20,39 @@ import { parseSprite } from '../parser/parseSprite.js'
  * @param {Container} parent 
  * @param {ASTNode[]} ASTTree 
 */
-export function renderApp(app,parent,ASTTree){
-    const parsedASTTree = ASTTree.map(node=>{
-        switch(node.type){
-            case "rect":
-                return parseRect(node)
-            case "container":
-                return parseContainer(node)
-            case "text":
-                return parseText(node)
-            case "sprite":
-                return parseSprite(node)
-        }
-    })
-    for (let index = 0; index < parsedASTTree.length; index++) {
-        const element = parsedASTTree[index];
-        
+export function renderApp(app,parent,prevASTTree,nextASTTree){
+    const {toAddElement,toDeleteElement,toUpdateElement} = diffElements(prevASTTree,nextASTTree)
+    for (const element of toDeleteElement){
         switch(element.type){
             case "rect":
-                renderRect(element,parent)
+                deleteRect(parent,element)
                 break;
             case "text":
-                renderText(element,parent)
+                deleteText(parent,element)
                 break;
             case "container":
-                renderContainer(element,parent)
+                deleteContainer(parent,element)
                 break;
             case "sprite":
-                renderSprite(element,parent)
+                deleteSprite(parent,element)
+                break;
+            default:
+        }
+    }
+
+    for (const element of toAddElement) {
+        switch(element.type){
+            case "rect":
+                renderRect(parent,element)
+                break;
+            case "text":
+                renderText(parent,element)
+                break;
+            case "container":
+                renderContainer(parent,element)
+                break;
+            case "sprite":
+                renderSprite(parent,element)
                 break;
             default:
         }

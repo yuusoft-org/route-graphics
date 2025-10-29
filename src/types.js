@@ -126,6 +126,13 @@
  */
 
 /**
+ * @typedef {Object} DiffElementResult
+ * @property {ASTNode[]} toAddElement
+ * @property {ASTNode[]} toDeleteElement
+ * @property {{"prev":ASTNode[],"next":ASTNode[]}} toUpdateElement
+ */
+
+/**
  * @typedef {Object} ContainerElementOptions
  * @property {number} [x] - The x-coordinate
  * @property {number} [y] - The y-coordinate
