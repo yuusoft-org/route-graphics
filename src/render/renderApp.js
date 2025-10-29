@@ -21,18 +21,6 @@ import { deleteSprite } from '../delete/deleteSprite.js';
  * @param {ASTNode[]} ASTTree 
 */
 export function renderApp(app,parent,prevASTTree,nextASTTree){
-    // const parsedASTTree = ASTTree.map(node=>{
-    //     switch(node.type){
-    //         case "rect":
-    //             return parseRect(node)
-    //         case "container":
-    //             return parseContainer(node)
-    //         case "text":
-    //             return parseText(node)
-    //         case "sprite":
-    //             return parseSprite(node)
-    //     }
-    // })
     const {toAddElement,toDeleteElement,toUpdateElement} = diffElements(prevASTTree,nextASTTree)
     for (const element of toDeleteElement){
         switch(element.type){
