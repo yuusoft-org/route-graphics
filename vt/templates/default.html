@@ -12,14 +12,40 @@
     <script type="module">
         import {
             renderApp,
+            parseJSONToAST,
             Application,
         } from "/RouteGraphics.js"
         import { parse } from "https://cdn.jsdelivr.net/npm/yaml@2.7.1/+esm";
         const app = new Application()
         await app.init({ background: '#000000', width: 1280, height: 720 });
         document.body.appendChild(app.canvas);
-        const ASTTree = parse(window.vtState).states[0].elements;
-        renderApp(app,app.stage,ASTTree)
+        let index = 0
+        const states = parse(window.vtState).states
+        let prevASTTree = []
+        let nextASTTree = parseJSONToAST(states[index].elements);
+        renderApp(app,app.stage,prevASTTree,nextASTTree)
+        prevASTTree = nextASTTree
+
+        const listenEvents = () => {
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "n") {
+                    if(states.length > index+1){
+                        index++
+                        nextASTTree = parseJSONToAST(states[index].elements);
+                        renderApp(app,app.stage,prevASTTree,nextASTTree)
+                        prevASTTree = nextASTTree
+                    }
+                } else if (e.key === "b") {
+                    if(index - 1 >= 0 ){
+                        index--;
+                        nextASTTree = parseJSONToAST(states[index].elements);
+                        renderApp(app,app.stage,prevASTTree,nextASTTree)
+                        prevASTTree = nextASTTree
+                    }
+                }
+            });
+        };
+        listenEvents()
     </script>
     <link rel="stylesheet" href="/public/theme.css" />
 </head>

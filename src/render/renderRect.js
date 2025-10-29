@@ -8,10 +8,10 @@ import { Graphics } from "pixi.js";
 
 /**
  * 
- * @param {RectASTNode} rectASTNode
  * @param {Container} parent 
+ * @param {RectASTNode} rectASTNode
  */
-export function renderRect(rectASTNode,parent){
+export function renderRect(parent,rectASTNode){
     const {
         id,
         x,

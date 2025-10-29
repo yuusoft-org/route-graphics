@@ -10,6 +10,7 @@ import { AudioPlugin } from "./plugins/elements/AudioPlugin";
 import { createAssetBufferManager } from "./utils.js";
 import { renderApp } from "./render/renderApp.js";
 import { Application } from "pixi.js"
+import parseJSONToAST from "./parser/index.js";
 
 export default RouteGraphics;
 
@@ -24,5 +25,6 @@ export {
   SliderRendererPlugin,
   Application,
   renderApp,
+  parseJSONToAST,
   createAssetBufferManager,
 };

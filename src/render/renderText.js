@@ -11,7 +11,7 @@ import { Text } from 'pixi.js'
  * @param {TextASTNode} textASTNode
  * @param {Container} parent 
  */
-export default function renderText(textASTNode,parent){
+export default function renderText(parent,textASTNode){
     const text = new Text({
         text: textASTNode.text,
         style: {

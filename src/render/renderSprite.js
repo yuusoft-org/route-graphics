@@ -7,10 +7,10 @@ import { Assets, Sprite } from "pixi.js";
 
 /**
  *
- * @param {SpriteASTNode} spriteASTNode
  * @param {Container} parent
+ * @param {SpriteASTNode} spriteASTNode
  */
-export async function renderSprite(spriteASTNode, parent) {
+export async function renderSprite( parent,spriteASTNode) {
     const {
         id,
         x,
