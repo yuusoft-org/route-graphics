@@ -29,7 +29,7 @@ export function diffElements(prevElements, nextElements){
             // Element is deleted
             toDeleteElement.push(prevEl)
         }
-        else if(prevEl && nextEl){
+        else if(JSON.stringify(prevEl) !== JSON.stringify(nextEl)){
             //Update element
             toUpdateElement.push({
                 prev: prevEl,
@@ -37,5 +37,6 @@ export function diffElements(prevElements, nextElements){
             })
         }
     }
+    console.log(toUpdateElement)
     return {toAddElement,toDeleteElement,toUpdateElement}
 }

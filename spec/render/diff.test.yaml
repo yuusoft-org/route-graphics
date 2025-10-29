@@ -1,0 +1,85 @@
+file: '../../src/render/common.js'
+group: render
+suites: [diffElements]
+---
+suite: diffElements
+exportName: diffElements
+---
+case: Test to get the changes between the prev and next elements
+in:
+  - []
+  - - id: "tl"
+      type: "text"
+out:
+  toAddElement:
+    - id: "tl"
+      type: "text"
+  toDeleteElement: []
+  toUpdateElement: []
+---
+case: Test delete array when elements are removed
+in:
+  - - id: "rect1"
+      type: "rect"
+    - id: "text1"
+      type: "text"
+  - - id: "text1"
+      type: "text"
+out:
+  toAddElement: []
+  toDeleteElement:
+    - id: "rect1"
+      type: "rect"
+  toUpdateElement: []
+---
+case: Test update array when elements have same id but different properties
+in:
+  - - id: "rect1"
+      type: "rect"
+    - id: "text1"
+      type: "text"
+      text: "Hello world"
+  - - id: "rect1"
+      type: "rect"
+    - id: "text1"
+      type: "text"
+      text: "Goodbye world"
+out:
+  toAddElement: []
+  toDeleteElement: []
+  toUpdateElement:
+    - prev:
+        id: "text1"
+        type: "text"
+        text: "Hello world"
+      next:
+        id: "text1"
+        type: "text"
+        text: "Goodbye world"
+---
+case: Test combined add, delete, and update arrays
+in:
+  - - id: "rect1"
+      type: "rect"
+    - id: "text1"
+      type: "text"
+    - id: "container1"
+      type: "container"
+  - - id: "rect1"
+      type: "rect"
+    - id: "text2"
+      type: "text"
+    - id: "sprite1"
+      type: "sprite"
+out:
+  toAddElement:
+    - id: "text2"
+      type: "text"
+    - id: "sprite1"
+      type: "sprite"
+  toDeleteElement:
+    - id: "text1"
+      type: "text"
+    - id: "container1"
+      type: "container"
+  toUpdateElement: []
