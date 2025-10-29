@@ -48,9 +48,5 @@ export const diffElements = (prevElements = [], nextElements = []) => {
     }
   }
 
-  // console.log({
-  //   toDeleteElements, toUpdateElements, toAddElements
-  // })
-
   return { toDeleteElements, toUpdateElements, toAddElements };
 };
