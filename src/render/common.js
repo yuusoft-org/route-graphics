@@ -37,6 +37,5 @@ export function diffElements(prevElements, nextElements){
             })
         }
     }
-    console.log(toUpdateElement)
     return {toAddElement,toDeleteElement,toUpdateElement}
 }
