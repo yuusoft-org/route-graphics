@@ -8,24 +8,24 @@ import { Assets } from "pixi.js";
 
 /**
  * @param {Container} container - The parent container to search in
- * @param {SpriteASTNode} prevSprite - Previous sprite state
- * @param {SpriteASTNode} nextSprite - Next sprite state
+ * @param {SpriteASTNode} prevAST - Previous sprite state
+ * @param {SpriteASTNode} nextAST - Next sprite state
  */
-export async function updateSprite(container, prevSprite, nextSprite) {
-    const spriteElement = container.children.find(child => child.label === prevSprite.id);
+export async function updateSprite(container, prevAST, nextAST) {
+    const spriteElement = container.children.find(child => child.label === prevAST.id);
 
     if (spriteElement) {
-        if (prevSprite.url !== nextSprite.url) {
-            const texture = await Assets.load(nextSprite.url);
+        if (prevAST.url !== nextAST.url) {
+            const texture = await Assets.load(nextAST.url);
             spriteElement.texture = texture;
         }
 
-        spriteElement.x = nextSprite.x;
-        spriteElement.y = nextSprite.y;
-        spriteElement.width = nextSprite.width;
-        spriteElement.height = nextSprite.height;
+        spriteElement.x = nextAST.x;
+        spriteElement.y = nextAST.y;
+        spriteElement.width = nextAST.width;
+        spriteElement.height = nextAST.height;
 
-        spriteElement.alpha = nextSprite.alpha;
-        spriteElement.zIndex = nextSprite.zIndex;
+        spriteElement.alpha = nextAST.alpha;
+        spriteElement.zIndex = nextAST.zIndex;
     }
 }

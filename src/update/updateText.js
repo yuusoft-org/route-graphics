@@ -6,26 +6,26 @@
 
 /**
  * @param {Container} container - The parent container to search in
- * @param {TextASTNode} prevText - Previous text state
- * @param {TextASTNode} nextText - Next text state
+ * @param {TextASTNode} prevAST - Previous text state
+ * @param {TextASTNode} nextAST - Next text state
  */
-export function updateText(container, prevText, nextText) {
-    const textElement = container.children.find(child => child.label === prevText.id);
+export function updateText(container, prevAST, nextAST) {
+    const textElement = container.children.find(child => child.label === prevAST.id);
 
     if (textElement) {
-        textElement.text = nextText.text;
+        textElement.text = nextAST.text;
 
         textElement.style = {
-            fill: nextText.style.fill,
-            fontFamily: nextText.style.fontFamily,
-            fontSize: nextText.style.fontSize,
-            wordWrap: nextText.style.wordWrap,
-            breakWords: nextText.style.breakWords,
-            wordWrapWidth: nextText.style.wordWrapWidth
+            fill: nextAST.style.fill,
+            fontFamily: nextAST.style.fontFamily,
+            fontSize: nextAST.style.fontSize,
+            wordWrap: nextAST.style.wordWrap,
+            breakWords: nextAST.style.breakWords,
+            wordWrapWidth: nextAST.style.wordWrapWidth
         };
 
-        textElement.x = nextText.x;
-        textElement.y = nextText.y;
-        textElement.zIndex = nextText.zIndex;
+        textElement.x = nextAST.x;
+        textElement.y = nextAST.y;
+        textElement.zIndex = nextAST.zIndex;
     }
 }

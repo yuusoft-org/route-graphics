@@ -10,24 +10,24 @@ import { deleteContainer } from "../delete/deleteContainer.js";
 
 /**
  * @param {Container} parentContainer - The parent container to search in
- * @param {ContainerASTNode} prevContainer - Previous container state
- * @param {ContainerASTNode} nextContainer - Next container state
+ * @param {ContainerASTNode} prevAST - Previous container state
+ * @param {ContainerASTNode} nextAST - Next container state
  * @param {import('pixi.js').Application} app - The PixiJS application
  */
-export function updateContainer(app, parentContainer, prevContainer, nextContainer) {
-    const oldContainerElement = parentContainer.children.find(child => child.label === prevContainer.id);
+export function updateContainer(app, parentContainer, prevAST, nextAST) {
+    const oldContainerElement = parentContainer.children.find(child => child.label === prevAST.id);
 
     if (oldContainerElement) {
         const oldIndex = parentContainer.children.indexOf(oldContainerElement);
 
         const newContainerElement = new Container();
 
-        newContainerElement.x = nextContainer.x;
-        newContainerElement.y = nextContainer.y;
-        newContainerElement.width = nextContainer.width;
-        newContainerElement.height = nextContainer.height;
-        newContainerElement.zIndex = nextContainer.zIndex;
-        newContainerElement.label = nextContainer.id;
+        newContainerElement.x = nextAST.x;
+        newContainerElement.y = nextAST.y;
+        newContainerElement.width = nextAST.width;
+        newContainerElement.height = nextAST.height;
+        newContainerElement.zIndex = nextAST.zIndex;
+        newContainerElement.label = nextAST.id;
 
         const children = [...oldContainerElement.children];
         children.forEach(child => {
@@ -38,8 +38,8 @@ export function updateContainer(app, parentContainer, prevContainer, nextContain
         oldContainerElement.destroy({children: true});
         parentContainer.addChildAt(newContainerElement, Math.min(oldIndex, parentContainer.children.length));
 
-        if(JSON.stringify(prevContainer.children) !== JSON.stringify(nextContainer.children)) {
-            renderApp(app, newContainerElement, prevContainer.children, nextContainer.children);
+        if(JSON.stringify(prevAST.children) !== JSON.stringify(nextAST.children)) {
+            renderApp(app, newContainerElement, prevAST.children, nextAST.children);
         }
     }
 }

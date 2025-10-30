@@ -6,27 +6,27 @@
 
 /**
  * @param {Container} container - The parent container to search in
- * @param {RectASTNode} prevRect - Previous rect state
- * @param {RectASTNode} nextRect - Next rect state
+ * @param {RectASTNode} prevAST - Previous rect state
+ * @param {RectASTNode} nextAST - Next rect state
  */
-export function updateRect(container, prevRect, nextRect) {
-    const rectElement = container.children.find(child => child.label === prevRect.id);
+export function updateRect(container, prevAST, nextAST) {
+    const rectElement = container.children.find(child => child.label === prevAST.id);
 
     
     if (rectElement) {
         rectElement.clear();
 
-        rectElement.rect(nextRect.x, nextRect.y, nextRect.width, nextRect.height)
-            .fill(nextRect.fill);
+        rectElement.rect(nextAST.x, nextAST.y, nextAST.width, nextAST.height)
+            .fill(nextAST.fill);
 
-        if (nextRect.border) {
+        if (nextAST.border) {
             rectElement.stroke({
-                color: nextRect.border.color,
-                alpha: nextRect.border.alpha,
-                width: nextRect.border.width
+                color: nextAST.border.color,
+                alpha: nextAST.border.alpha,
+                width: nextAST.border.width
             });
         }
         
-        rectElement.zIndex = nextRect.zIndex;
+        rectElement.zIndex = nextAST.zIndex;
     }
 }
