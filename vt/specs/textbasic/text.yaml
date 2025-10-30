@@ -36,3 +36,12 @@ states:
         style: 
           fontSize: 24
           fill: "white"
+  - elements:
+      - id: 'e'
+        type: "text"
+        text: "This text is the third state"
+        x: 100
+        y: 100
+        style: 
+          fontSize: 24
+          fill: "white"

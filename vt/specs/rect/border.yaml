@@ -39,3 +39,15 @@ states:
           width: 12
           color: red
           alpha: 1
+  - elements:
+      - id: "rect-1"
+        type: "rect"
+        x: 10
+        y: 10
+        width: 200
+        height: 100
+        fill: red
+        border:
+          width: 20
+          color: blue
+          alpha: 1

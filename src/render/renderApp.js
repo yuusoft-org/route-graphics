@@ -8,6 +8,10 @@ import { deleteRect } from '../delete/deleteRect.js';
 import { deleteText } from '../delete/deleteText.js';
 import { deleteContainer } from '../delete/deleteContainer.js';
 import { deleteSprite } from '../delete/deleteSprite.js';
+import { updateRect } from '../update/updateRect.js';
+import { updateText } from '../update/updateText.js';
+import { updateSprite } from '../update/updateSprite.js';
+import { updateContainer } from '../update/updateContainer.js';
 /**
  * @typedef {import('../types.js').Application} Application
  * @typedef {import('../types.js').ASTNode} ASTNode
@@ -53,6 +57,24 @@ export function renderApp(app,parent,prevASTTree,nextASTTree){
                 break;
             case "sprite":
                 renderSprite(parent,element)
+                break;
+            default:
+        }
+    }
+
+    for (const {prev, next} of toUpdateElement) {
+        switch(next.type) {
+            case "rect":
+                updateRect(parent, prev, next);
+                break;
+            case "text":
+                updateText(parent, prev, next);
+                break;
+            case "container":
+                updateContainer(app, parent, prev, next);
+                break;
+            case "sprite":
+                updateSprite(parent, prev, next);
                 break;
             default:
         }
