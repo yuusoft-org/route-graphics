@@ -1,0 +1,70 @@
+---
+title: Update Rectangle Border
+---
+states:
+  - elements:
+      - id: 'rect-1'
+        type: "rect"
+        x: 50
+        y: 50
+        width: 100
+        height: 80
+        fill: "red"
+        zIndex: 1
+      - id: 'rect-2'
+        type: "rect"
+        x: 200
+        y: 50
+        width: 100
+        height: 80
+        fill: "blue"
+        border:
+          color: "yellow"
+          width: 10
+          alpha: 1
+        zIndex: 1
+      - id: 'rect-3'
+        type: "rect"
+        x: 350
+        y: 50
+        width: 100
+        height: 80
+        fill: "green"
+        border:
+          color: "white"
+          width: 10
+          alpha: 0.8
+        zIndex: 1
+  - elements:
+      - id: 'rect-1'
+        type: "rect"
+        x: 50
+        y: 50
+        width: 100
+        height: 80
+        fill: "red"
+        border:
+          color: "white"
+          width: 10
+          alpha: 1
+        zIndex: 1
+      - id: 'rect-2'
+        type: "rect"
+        x: 200
+        y: 50
+        width: 100
+        height: 80
+        fill: "blue"
+        zIndex: 1
+      - id: 'rect-3'
+        type: "rect"
+        x: 350
+        y: 50
+        width: 100
+        height: 80
+        fill: "green"
+        border:
+          color: "purple"
+          width: 8
+          alpha: 0.5
+        zIndex: 1

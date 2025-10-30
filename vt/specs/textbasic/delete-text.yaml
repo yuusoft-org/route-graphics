@@ -1,0 +1,38 @@
+---
+title: Delete Text Elements
+---
+states:
+  - elements:
+      - id: 'text-1'
+        type: "text"
+        text: "This text will be deleted"
+        x: 20
+        y: 20
+        style:
+          fontSize: 24
+          fill: "white"
+      - id: 'text-2'
+        type: "text"
+        text: "This text will remain"
+        x: 20
+        y: 60
+        style:
+          fontSize: 24
+          fill: "white"
+      - id: 'text-3'
+        type: "text"
+        text: "This text will also be deleted"
+        x: 20
+        y: 100
+        style:
+          fontSize: 24
+          fill: "white"
+  - elements:
+      - id: 'text-2'
+        type: "text"
+        text: "This text will remain"
+        x: 20
+        y: 60
+        style:
+          fontSize: 24
+          fill: "white"

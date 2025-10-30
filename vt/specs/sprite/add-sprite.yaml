@@ -41,16 +41,3 @@ states:
         anchorY: 0
         zIndex: 1
         rotation: 0
-  - elements:
-      - id: "sprite-1"
-        type: "sprite"
-        url: "https://fastly.picsum.photos/id/56/80/60.jpg?hmac=z2xEwhp3bhp-FhnpEFkSZSVxcSlB6vHkqGFIj3o02gU"
-        width: 200
-        height: 200
-        x: 200
-        y: 250
-        alpha: 1
-        anchorX: 0
-        anchorY: 0
-        rotation: 0
-        zIndex: 1

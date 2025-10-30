@@ -1,0 +1,22 @@
+---
+title: Update Text Position and Content
+---
+states:
+  - elements:
+      - id: 'text-1'
+        type: "text"
+        text: "Original text"
+        x: 20
+        y: 20
+        style:
+          fontSize: 24
+          fill: "white"
+  - elements:
+      - id: 'text-1'
+        type: "text"
+        text: "Updated text content"
+        x: 100
+        y: 80
+        style:
+          fontSize: 24
+          fill: "white"

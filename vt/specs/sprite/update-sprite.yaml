@@ -1,0 +1,42 @@
+---
+title: Update Sprite Position and Properties
+---
+states:
+  - elements:
+      - id: "sprite-1"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/538/100/100.jpg?hmac=1OOwsGQ5HpbT6Qjae_NY2WKbMiq-klJ8Dos-5QxbTj0"
+        width: 100
+        height: 100
+        x: 50
+        y: 50
+        alpha: 1
+        zIndex: 1
+      - id: "sprite-2"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/410/80/80.jpg?hmac=UQRIsX0ye9GOjSO_dRTLH1fuP1gtMj6VYk3O7rk3Nzo"
+        width: 80
+        height: 80
+        x: 200
+        y: 100
+        alpha: 0.8
+        zIndex: 2
+  - elements:
+      - id: "sprite-1"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/538/100/100.jpg?hmac=1OOwsGQ5HpbT6Qjae_NY2WKbMiq-klJ8Dos-5QxbTj0"
+        width: 100
+        height: 100
+        x: 150
+        y: 200
+        alpha: 1
+        zIndex: 1
+      - id: "sprite-2"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/410/80/80.jpg?hmac=UQRIsX0ye9GOjSO_dRTLH1fuP1gtMj6VYk3O7rk3Nzo"
+        width: 80
+        height: 80
+        x: 200
+        y: 100
+        alpha: 0.8
+        zIndex: 2

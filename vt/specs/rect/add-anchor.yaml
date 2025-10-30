@@ -89,13 +89,3 @@ states:
       fill: brown
       anchorX: 1
       anchorY: 1
-  - elements: 
-    - id: 'rect-cc'
-      type: "rect"
-      x: 1120
-      y: 600
-      width: 80
-      height: 80
-      fill: orange
-      anchorX: 1
-      anchorY: 1
