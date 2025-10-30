@@ -14,6 +14,8 @@ export function updateRect(container, prevRect, nextRect) {
 
     
     if (rectElement) {
+        rectElement.clear();
+
         rectElement.rect(nextRect.x, nextRect.y, nextRect.width, nextRect.height)
             .fill(nextRect.fill);
 
