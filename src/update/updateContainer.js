@@ -1,5 +1,6 @@
-import { renderApp } from '../render/renderApp.js';
 import { Container } from "pixi.js";
+import { renderApp } from '../render/renderApp.js';
+import { deleteContainer } from "../delete/deleteContainer.js";
 
 /**
  * Update function for Container elements
@@ -14,19 +15,31 @@ import { Container } from "pixi.js";
  * @param {import('pixi.js').Application} app - The PixiJS application
  */
 export function updateContainer(app, parentContainer, prevContainer, nextContainer) {
-    const containerElement = parentContainer.children.find(child => child.label === prevContainer.id);
-    console.log("Prev: ",JSON.stringify(prevContainer,null,2))
-    console.log("Next: ",JSON.stringify(nextContainer,null,2))
-    if (containerElement) {
-        containerElement.x = nextContainer.x;
-        containerElement.y = nextContainer.y;
-        containerElement.width = nextContainer.width;
-        containerElement.height = nextContainer.height;
-        containerElement.zIndex = nextContainer.zIndex;
+    const oldContainerElement = parentContainer.children.find(child => child.label === prevContainer.id);
 
+    if (oldContainerElement) {
+        const oldIndex = parentContainer.children.indexOf(oldContainerElement);
+
+        const newContainerElement = new Container();
+
+        newContainerElement.x = nextContainer.x;
+        newContainerElement.y = nextContainer.y;
+        newContainerElement.width = nextContainer.width;
+        newContainerElement.height = nextContainer.height;
+        newContainerElement.zIndex = nextContainer.zIndex;
+        newContainerElement.label = nextContainer.id;
+
+        const children = [...oldContainerElement.children];
+        children.forEach(child => {
+            newContainerElement.addChild(child);
+        });
+
+        parentContainer.removeChild(oldContainerElement);
+        oldContainerElement.destroy({children: true});
+        parentContainer.addChildAt(newContainerElement, Math.min(oldIndex, parentContainer.children.length));
 
         if(JSON.stringify(prevContainer.children) !== JSON.stringify(nextContainer.children)) {
-            renderApp(app, containerElement, prevContainer.children, nextContainer.children);
+            renderApp(app, newContainerElement, prevContainer.children, nextContainer.children);
         }
     }
 }
