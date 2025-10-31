@@ -9,6 +9,7 @@ import { SliderRendererPlugin } from "./plugins/elements/SliderRendererPlugin";
 import { AudioPlugin } from "./plugins/elements/AudioPlugin";
 import { createAssetBufferManager } from "./utils.js";
 import { renderApp } from "./render/renderApp.js";
+import parse from "./parser/index.js";
 import { Application } from "pixi.js"
 import parseJSONToAST from "./parser/index.js";
 
@@ -25,6 +26,7 @@ export {
   SliderRendererPlugin,
   Application,
   renderApp,
+  parse,
   parseJSONToAST,
   createAssetBufferManager,
 };
