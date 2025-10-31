@@ -1,6 +1,5 @@
 import { Container } from "pixi.js";
 import { renderApp } from '../render/renderApp.js';
-import { deleteContainer } from "../delete/deleteContainer.js";
 
 /**
  * Update function for Container elements
@@ -22,7 +21,6 @@ export function updateContainer(app, parentContainer, prevAST, nextAST) {
         containerElement.y = nextAST.y;
         containerElement.zIndex = nextAST.zIndex;
         containerElement.label = nextAST.id;
-
 
         if(JSON.stringify(prevAST.children) !== JSON.stringify(nextAST.children)) {
             renderApp(app, containerElement, prevAST.children, nextAST.children);
