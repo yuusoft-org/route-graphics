@@ -25,7 +25,7 @@ export default function parseJSONToAST(JSONObject){
             case "sprite":
                 return parseSprite(node)
             default:
-                throw new Error(`${node.type} Type unknown`)
+                throw new Error(`Unsupported element type: ${node.type}`)
         }
     })
 
