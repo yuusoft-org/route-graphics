@@ -15,31 +15,17 @@ import { deleteContainer } from "../delete/deleteContainer.js";
  * @param {import('pixi.js').Application} app - The PixiJS application
  */
 export function updateContainer(app, parentContainer, prevAST, nextAST) {
-    const oldContainerElement = parentContainer.children.find(child => child.label === prevAST.id);
+    const containerElement = parentContainer.children.find(child => child.label === prevAST.id);
 
-    if (oldContainerElement) {
-        const oldIndex = parentContainer.children.indexOf(oldContainerElement);
+    if (containerElement) {
+        containerElement.x = nextAST.x;
+        containerElement.y = nextAST.y;
+        containerElement.zIndex = nextAST.zIndex;
+        containerElement.label = nextAST.id;
 
-        const newContainerElement = new Container();
-
-        newContainerElement.x = nextAST.x;
-        newContainerElement.y = nextAST.y;
-        newContainerElement.width = nextAST.width;
-        newContainerElement.height = nextAST.height;
-        newContainerElement.zIndex = nextAST.zIndex;
-        newContainerElement.label = nextAST.id;
-
-        const children = [...oldContainerElement.children];
-        children.forEach(child => {
-            newContainerElement.addChild(child);
-        });
-
-        parentContainer.removeChild(oldContainerElement);
-        oldContainerElement.destroy({children: true});
-        parentContainer.addChildAt(newContainerElement, Math.min(oldIndex, parentContainer.children.length));
 
         if(JSON.stringify(prevAST.children) !== JSON.stringify(nextAST.children)) {
-            renderApp(app, newContainerElement, prevAST.children, nextAST.children);
+            renderApp(app, containerElement, prevAST.children, nextAST.children);
         }
     }
 }

@@ -20,13 +20,8 @@ export function renderContainer(parent,containerASTNode) {
         id,
         x,
         y,
-        width,
-        height,
         children,
         scroll,
-        originX,
-        originY,
-        rotation,
         zIndex,
     } = containerASTNode;
 
@@ -34,9 +29,6 @@ export function renderContainer(parent,containerASTNode) {
 
     container.x = x;
     container.y = y;
-
-    container.width = width;
-    container.height = height;
 
     // container.pivot.set(originX, originY);
 
