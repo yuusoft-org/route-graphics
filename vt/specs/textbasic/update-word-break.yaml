@@ -1,0 +1,27 @@
+---
+title: Update Word Break Settings
+---
+states:
+  - elements:
+      - id: 'text-1'
+        type: "text"
+        text: "This is a long text that shofasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfadsfasdfasdfasdfuld wrap whden word wrap is enabled"
+        x: 20
+        y: 20
+        style:
+          fontSize: 16
+          fill: "white"
+          breakWords: false
+          wordWrapWidth: 200
+  - elements:
+      - id: 'text-1'
+        type: "text"
+        text: "This is a long text that shofasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfadsfasdfasdfasdfuld wrap whden word wrap is enabled"
+        x: 20
+        y: 20
+        width: 200
+        style:
+          fontSize: 16
+          fill: "white"
+          wordWrap: true
+          breakWords: true

@@ -1,0 +1,67 @@
+---
+title: Update to add nested Container
+---
+states:
+  - elements:
+      - id: 'container-1'
+        type: "container"
+        x: 50
+        y: 50
+        width: 300
+        height: 200
+        direction: "horizontal"
+        gap: 10
+        zIndex: 0
+        children:
+          - id: 'rect-1'
+            type: "rect"
+            width: 80
+            height: 60
+            fill: "red"
+          - id: 'rect-2'
+            type: "rect"
+            width: 100
+            height: 60
+            fill: "blue"
+  - elements:
+      - id: 'container-1'
+        type: "container"
+        x: 50
+        y: 50
+        width: 300
+        height: 200
+        direction: "horizontal"
+        gap: 10
+        zIndex: 0
+        children:
+          - id: 'rect-1'
+            type: "rect"
+            width: 80
+            height: 60
+            fill: "red"
+          - id: 'container-2'
+            type: "container"
+            direction: "vertical"
+            gap: 5
+            children:
+              - id: 'rect-3'
+                type: "rect"
+                width: 60
+                height: 40
+                fill: "green"
+              - id: 'rect-4'
+                type: "rect"
+                width: 60
+                height: 40
+                fill: "yellow"
+              - id: 'text-1'
+                type: "text"
+                text: "Nested"
+                style:
+                  fontSize: 12
+                  fill: "white"
+          - id: 'rect-2'
+            type: "rect"
+            width: 100
+            height: 60
+            fill: "blue"

@@ -12,6 +12,6 @@ export function deleteContainer(container,deletedASTNode){
     const containerElement = container.getChildByLabel(deletedASTNode.id)
 
     if(containerElement){
-        containerElement.destroy()
+        containerElement.destroy({children: true})
     }
 }

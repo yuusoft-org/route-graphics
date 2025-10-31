@@ -1,38 +1,38 @@
 ---
-title: Text
+title: Delete Text Elements
 ---
 states:
   - elements:
-      - id: 'a'
+      - id: 'text-1'
         type: "text"
-        text: "Hello World"
+        text: "This text will be deleted"
         x: 20
         y: 20
-        style: 
+        style:
           fontSize: 24
           fill: "white"
-      - id: 'b'
+      - id: 'text-2'
         type: "text"
-        text: "Hi, how are you?"
+        text: "This text will remain"
         x: 20
         y: 60
-        style: 
+        style:
           fontSize: 24
           fill: "white"
-      - id: 'c'
+      - id: 'text-3'
         type: "text"
-        text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        text: "This text will also be deleted"
         x: 20
         y: 100
-        style: 
+        style:
           fontSize: 24
           fill: "white"
   - elements:
-      - id: 'e'
+      - id: 'text-2'
         type: "text"
-        text: "This is the next state"
+        text: "This text will remain"
         x: 20
-        y: 20
-        style: 
+        y: 60
+        style:
           fontSize: 24
           fill: "white"

@@ -20,13 +20,8 @@ export function renderContainer(parent,containerASTNode) {
         id,
         x,
         y,
-        width,
-        height,
         children,
         scroll,
-        originX,
-        originY,
-        rotation,
         zIndex,
     } = containerASTNode;
 
@@ -34,9 +29,6 @@ export function renderContainer(parent,containerASTNode) {
 
     container.x = x;
     container.y = y;
-
-    container.width = width;
-    container.height = height;
 
     // container.pivot.set(originX, originY);
 
@@ -49,22 +41,22 @@ export function renderContainer(parent,containerASTNode) {
     container.label = id;
 
     for (const child of children) {
-        switch (child.type) {
-            case "rect":
-                renderRect(child, container);
-                break;
-            case "text":
-                renderText(child, container);
-                break;
-            case "sprite":
-                renderSprite(child, container);
-                break;
-            case "container":
-                renderContainer(child, container);
-                break;
-            default:
-                throw new Error("Unkown types")
-        }
+      switch (child.type) {
+        case "rect":
+            renderRect(container,child);
+            break;
+        case "text":
+            renderText(container,child);
+            break;
+        case "sprite":
+            renderSprite(container,child);
+            break;
+        case "container":
+            renderContainer(container,child);
+            break;
+        default:
+            throw new Error("Unkown types")
+      }
     }
 
     if(scroll){
@@ -81,7 +73,7 @@ export function renderContainer(parent,containerASTNode) {
  * @param {SetupScrollingOptions} params
  * @returns
  */
-function setupScrolling({
+export function setupScrolling({
     container,
     element,
 }) {

@@ -1,0 +1,50 @@
+---
+title: Update Sprite Anchor and Dimensions
+---
+states:
+  - elements:
+      - id: "sprite-1"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/538/100/100.jpg?hmac=1OOwsGQ5HpbT6Qjae_NY2WKbMiq-klJ8Dos-5QxbTj0"
+        width: 100
+        height: 100
+        x: 100
+        y: 100
+        alpha: 1
+        anchorX: 0
+        anchorY: 0
+        zIndex: 1
+      - id: "sprite-2"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/410/80/80.jpg?hmac=UQRIsX0ye9GOjSO_dRTLH1fuP1gtMj6VYk3O7rk3Nzo"
+        width: 80
+        height: 80
+        x: 250
+        y: 150
+        alpha: 1
+        anchorX: 0.5
+        anchorY: 0.5
+        zIndex: 1
+  - elements:
+      - id: "sprite-1"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/538/100/100.jpg?hmac=1OOwsGQ5HpbT6Qjae_NY2WKbMiq-klJ8Dos-5QxbTj0"
+        width: 150
+        height: 120
+        x: 200
+        y: 180
+        alpha: 1
+        anchorX: 0.5
+        anchorY: 1
+        zIndex: 1
+      - id: "sprite-2"
+        type: "sprite"
+        url: "https://fastly.picsum.photos/id/410/80/80.jpg?hmac=UQRIsX0ye9GOjSO_dRTLH1fuP1gtMj6VYk3O7rk3Nzo"
+        width: 60
+        height: 100
+        x: 250
+        y: 150
+        alpha: 1
+        anchorX: 1
+        anchorY: 0
+        zIndex: 1

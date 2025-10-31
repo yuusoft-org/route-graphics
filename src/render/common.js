@@ -1,3 +1,14 @@
+/**
+ * @typedef {import("../types.js").ASTNode} ASTNode
+ * @typedef {import("../types.js").DiffElementResult} DiffElementResult
+ */
+
+/**
+ * 
+ * @param {ASTNode} prevElements 
+ * @param {ASTNode} nextElements 
+ * @returns {DiffElementResult}
+ */
 export function diffElements(prevElements, nextElements){
     const allIdSet = new Set()
     const prevElementMap = new Map()
