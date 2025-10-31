@@ -9,8 +9,9 @@ import {
 } from "pixi.js";
 import "@pixi/unsafe-eval";
 import { BaseRouteGraphics } from "./types";
-import { diffElements } from "./common.js";
 import { AudioStage, AudioAsset } from "./AudioStage.js";
+import { renderApp } from "./render/renderApp.js";
+import parseJSONToAST from "./parser/index.js";
 
 /**
  * @typedef {import('./types.js').RouteGraphicsInitOptions} RouteGraphicsInitOptions
@@ -317,14 +318,16 @@ class RouteGraphics extends BaseRouteGraphics {
    * @param {RouteGraphicsState} state
    */
   render = (state) => {
+    const parsedElements = parseJSONToAST(state.elements)
+    const parsedState = {...state,elements:parsedElements}
     this._render(
       this._app,
       this._app.stage,
       this._state,
-      state,
+      parsedState,
       this._eventHandler,
     );
-    this._state = state;
+    this._state = parsedState;
   };
 
   /**
@@ -406,10 +409,7 @@ class RouteGraphics extends BaseRouteGraphics {
     // Apply global cursor styles if they exist and have changed
     this._applyGlobalCursorStyles(app, prevState.global, nextState.global);
 
-    const { toAddElements, toUpdateElements, toDeleteElements } = diffElements(
-      prevState.elements,
-      nextState.elements,
-    );
+    renderApp(app,parent,prevState.elements,nextState.elements)
 
     // Cancel any previous render operations
     if (this._currentAbortController) {
@@ -418,120 +418,6 @@ class RouteGraphics extends BaseRouteGraphics {
 
     // Create new AbortController for this render
     this._currentAbortController = new AbortController();
-    const signal = this._currentAbortController.signal;
-
-    const actions = [];
-
-    for (const toDeleteElement of toDeleteElements) {
-      const elementRenderer = this._getRendererByElement(toDeleteElement);
-      actions.push(() =>
-        elementRenderer.remove(
-          app,
-          {
-            parent: parent,
-            element: toDeleteElement,
-            elements: nextState.elements,
-            transitions: nextState.transitions,
-            getRendererByElement: this._getRendererByElement,
-            getTransitionByType: this._getTransitionByType,
-            eventHandler,
-          },
-          signal,
-        ),
-      );
-    }
-
-    for (const toAddElement of toAddElements) {
-      const elementRenderer = this._getRendererByElement(toAddElement);
-      actions.push(() =>
-        elementRenderer.add(
-          app,
-          {
-            parent: parent,
-            element: toAddElement,
-            elements: nextState.elements,
-            getRendererByElement: this._getRendererByElement,
-            transitions: nextState.transitions,
-            getTransitionByType: this._getTransitionByType,
-            eventHandler,
-          },
-          signal,
-        ),
-      );
-    }
-
-    for (const toUpdateElement of toUpdateElements) {
-      const elementRenderer = this._getRendererByElement(toUpdateElement.next);
-      actions.push(() =>
-        elementRenderer.update(
-          app,
-          {
-            parent: parent,
-            prevElement: toUpdateElement.prev,
-            nextElement: toUpdateElement.next,
-            elements: nextState.elements,
-            getRendererByElement: this._getRendererByElement,
-            transitions: nextState.transitions,
-            getTransitionByType: this._getTransitionByType,
-            eventHandler,
-          },
-          signal,
-        ),
-      );
-    }
-
-    try {
-      // Run all actions in parallel
-      await Promise.all(actions.map((action) => action()));
-
-      // Sort children AFTER all add/update operations complete
-      app.stage.children.sort((a, b) => {
-        const aElement = nextState.elements.find(
-          (element) => element.id === a.label,
-        );
-        const bElement = nextState.elements.find(
-          (element) => element.id === b.label,
-        );
-
-        if (aElement && bElement) {
-          // First, sort by zIndex if specified
-          const aZIndex = aElement.zIndex ?? 0;
-          const bZIndex = bElement.zIndex ?? 0;
-          if (aZIndex !== bZIndex) {
-            return aZIndex - bZIndex;
-          }
-
-          // If zIndex is the same or not specified, maintain order from nextState.elements
-          const aIndex = nextState.elements.findIndex(
-            (element) => element.id === a.label,
-          );
-          const bIndex = nextState.elements.findIndex(
-            (element) => element.id === b.label,
-          );
-          return aIndex - bIndex;
-        }
-
-        // Keep elements that aren't in nextState.elements at their current position
-        if (!aElement && !bElement) return 0;
-        if (!aElement) return -1;
-        if (!bElement) return 1;
-      });
-
-      eventHandler &&
-        eventHandler("completed", {
-          id: nextState.id,
-          diffTime: Date.now() - time,
-        });
-    } catch (error) {
-      if (error.name === "AbortError") {
-        // Operation was cancelled, this is expected
-        return;
-      }
-      console.error("Error:", error);
-      throw error;
-    } finally {
-      this._currentAbortController = undefined;
-    }
   };
 }
 
