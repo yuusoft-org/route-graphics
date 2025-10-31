@@ -79,4 +79,39 @@ export function renderApp(app,parent,prevASTTree,nextASTTree){
             default:
         }
     }
+    sortContainerChildren(parent,nextASTTree)
+}
+
+function sortContainerChildren(container, nextAST){
+    container.children.sort((a, b) => {
+        const aElement = nextAST.find(
+            (element) => element.id === a.label,
+        );
+        const bElement = nextAST.find(
+            (element) => element.id === b.label,
+        );
+
+        if (aElement && bElement) {
+            // First, sort by zIndex if specified
+            const aZIndex = aElement.zIndex ?? 0;
+            const bZIndex = bElement.zIndex ?? 0;
+            if (aZIndex !== bZIndex) {
+            return aZIndex - bZIndex;
+            }
+
+            // If zIndex is the same or not specified, maintain order from nextState.elements
+            const aIndex = nextAST.findIndex(
+                (element) => element.id === a.label,
+            );
+            const bIndex = nextAST.findIndex(
+                (element) => element.id === b.label,
+            );
+            return aIndex - bIndex;
+        }
+
+        // Keep elements that aren't in nextState.elements at their current position
+        if (!aElement && !bElement) return 0;
+        if (!aElement) return -1;
+        if (!bElement) return 1;
+    });
 }

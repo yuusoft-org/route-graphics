@@ -1,0 +1,66 @@
+---
+title: Update Container Position
+---
+states:
+  - elements:
+      - id: 'container-1'
+        type: "container"
+        x: 50
+        y: 50
+        width: 300
+        height: 200
+        direction: "horizontal"
+        gap: 10
+        zIndex: 0
+        children:
+          - id: 'rect-1'
+            type: "rect"
+            width: 80
+            height: 60
+            fill: "red"
+          - id: 'rect-2'
+            type: "rect"
+            width: 100
+            height: 60
+            fill: "blue"
+          - id: 'rect-3'
+            type: "rect"
+            width: 60
+            height: 60
+            fill: "green"
+          - id: 'rect-4'
+            type: "rect"
+            width: 60
+            height: 60
+            fill: "violet"
+  - elements:
+      - id: 'container-1'
+        type: "container"
+        x: 50
+        y: 50
+        width: 300
+        height: 200
+        direction: "horizontal"
+        gap: 10
+        zIndex: 0
+        children:
+          - id: 'rect-4'
+            type: "rect"
+            width: 60
+            height: 60
+            fill: "violet"
+          - id: 'rect-1'
+            type: "rect"
+            width: 80
+            height: 60
+            fill: "red"
+          - id: 'rect-3'
+            type: "rect"
+            width: 60
+            height: 60
+            fill: "green"
+          - id: 'rect-2'
+            type: "rect"
+            width: 100
+            height: 60
+            fill: "blue"
