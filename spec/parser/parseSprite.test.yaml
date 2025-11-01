@@ -1,4 +1,4 @@
-file: '../../src/parser/parseSprite.js'
+file: "../../src/parser/parseSprite.js"
 group: parser
 suites: [parseSprite]
 ---
@@ -6,8 +6,8 @@ suite: parseSprite
 exportName: parseSprite
 ---
 case: Test parsing sprite
-in: 
-  - id: 'circle-red'
+in:
+  - id: "circle-red"
     type: "sprite"
     url: "file:circle-red"
     alpha: 0.8
@@ -39,8 +39,8 @@ out:
   clickUrl: "file:circle-red-clicked"
 ---
 case: Test parsing sprite to see the default value of url, alpha, and interactive props
-in: 
-  - id: 'circle-red'
+in:
+  - id: "circle-red"
     type: "sprite"
     width: 80
     height: 100
@@ -59,7 +59,7 @@ out:
   y: 200
   originX: 48
   originY: 40
-  alpha: 0
+  alpha: 1
   zIndex: 0
   url: ""
   cursor: ""

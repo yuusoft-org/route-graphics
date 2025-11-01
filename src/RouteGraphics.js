@@ -241,7 +241,6 @@ class RouteGraphics extends BaseRouteGraphics {
         try {
           await fontFace.load();
           document.fonts.add(fontFace);
-          console.log(`Font loaded successfully: ${key}`);
         } catch (error) {
           console.error(`Failed to load font ${key}:`, error);
         } finally {
@@ -319,7 +318,7 @@ class RouteGraphics extends BaseRouteGraphics {
    */
   render = (state) => {
     const parsedElements = parseJSONToAST(state.elements)
-    const parsedState = {...state,elements:parsedElements}
+    const parsedState = { ...state, elements: parsedElements }
     this._render(
       this._app,
       this._app.stage,
@@ -404,12 +403,10 @@ class RouteGraphics extends BaseRouteGraphics {
    * @param {Function} eventHandler
    */
   _render = async (app, parent, prevState, nextState, eventHandler) => {
-    const time = Date.now();
-
     // Apply global cursor styles if they exist and have changed
     this._applyGlobalCursorStyles(app, prevState.global, nextState.global);
 
-    renderApp(app,parent,prevState.elements,nextState.elements)
+    renderApp(app, parent, prevState.elements, nextState.elements)
 
     // Cancel any previous render operations
     if (this._currentAbortController) {

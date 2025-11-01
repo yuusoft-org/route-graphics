@@ -1,4 +1,4 @@
-import { Assets, Sprite } from "pixi.js";
+import { Sprite, Texture } from "pixi.js";
 
 /**
  * @typedef {import('../types.js').Container} Container
@@ -10,35 +10,31 @@ import { Assets, Sprite } from "pixi.js";
  * @param {Container} parent
  * @param {SpriteASTNode} spriteASTNode
  */
-export async function renderSprite( parent,spriteASTNode) {
-    const {
-        id,
-        x,
-        y,
-        width,
-        height,
-        url,
-        alpha,
-        originX,
-        originY,
-        zIndex
-    } = spriteASTNode;
-    const texture = await Assets.load(url);
-    const sprite = new Sprite(texture);
+export async function renderSprite(parent, spriteASTNode) {
+  const {
+    id,
+    x,
+    y,
+    width,
+    height,
+    url,
+    alpha,
+    zIndex
+  } = spriteASTNode;
+  const texture = url ? Texture.from(url) : Texture.EMPTY;
+  const sprite = new Sprite(texture);
 
-    sprite.x = x;
-    sprite.y = y;
+  sprite.x = x;
+  sprite.y = y;
 
-    sprite.width = width;
-    sprite.height = height;
+  sprite.width = width;
+  sprite.height = height;
 
-    sprite.alpha = alpha;
+  sprite.alpha = alpha;
 
-    // sprite.pivot.set(originX, originY);
+  sprite.zIndex = zIndex;
 
-    sprite.zIndex = zIndex;
+  sprite.label = id;
 
-    sprite.label = id;
-
-    parent.addChild(sprite);
+  parent.addChild(sprite);
 }
