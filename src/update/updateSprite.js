@@ -1,4 +1,4 @@
-import { Assets } from "pixi.js";
+import { Texture } from "pixi.js";
 
 /**
  * Update function for Sprite elements
@@ -16,7 +16,7 @@ export async function updateSprite(container, prevAST, nextAST) {
 
     if (spriteElement) {
         if (prevAST.url !== nextAST.url) {
-            const texture = await Assets.load(nextAST.url);
+            const texture = nextAST.url ? Texture.from(nextAST.url) : Texture.EMPTY;
             spriteElement.texture = texture;
         }
 
