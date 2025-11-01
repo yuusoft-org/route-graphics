@@ -5,7 +5,7 @@ states:
   - elements:
       - id: "sprite-1"
         type: "sprite"
-        url: "https://fastly.picsum.photos/id/538/100/100.jpg?hmac=1OOwsGQ5HpbT6Qjae_NY2WKbMiq-klJ8Dos-5QxbTj0"
+        url: "circle-blue"
         width: 100
         height: 100
         x: 50
@@ -14,7 +14,7 @@ states:
         zIndex: 1
       - id: "sprite-2"
         type: "sprite"
-        url: "https://fastly.picsum.photos/id/410/100/100.jpg?hmac=UQRIsX0ye9GOjSO_dRTLH1fuP1gtMj6VYk3O7rk3Nzo"
+        url: "circle-red"
         width: 100
         height: 100
         x: 200
@@ -23,7 +23,7 @@ states:
         zIndex: 1
       - id: "sprite-3"
         type: "sprite"
-        url: "https://fastly.picsum.photos/id/56/80/60.jpg?hmac=z2xEwhp3bhp-FhnpEFkSZSVxcSlB6vHkqGFIj3o02gU"
+        url: "circle-green"
         width: 80
         height: 60
         x: 350
@@ -33,7 +33,7 @@ states:
   - elements:
       - id: "sprite-2"
         type: "sprite"
-        url: "https://fastly.picsum.photos/id/410/100/100.jpg?hmac=UQRIsX0ye9GOjSO_dRTLH1fuP1gtMj6VYk3O7rk3Nzo"
+        url: "circle-red"
         width: 100
         height: 100
         x: 200

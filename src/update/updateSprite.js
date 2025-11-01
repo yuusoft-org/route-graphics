@@ -12,20 +12,20 @@ import { Texture } from "pixi.js";
  * @param {SpriteASTNode} nextAST - Next sprite state
  */
 export async function updateSprite(container, prevAST, nextAST) {
-    const spriteElement = container.children.find(child => child.label === prevAST.id);
+  const spriteElement = container.children.find(child => child.label === prevAST.id);
 
-    if (spriteElement) {
-        if (prevAST.url !== nextAST.url) {
-            const texture = nextAST.url ? Texture.from(nextAST.url) : Texture.EMPTY;
-            spriteElement.texture = texture;
-        }
-
-        spriteElement.x = nextAST.x;
-        spriteElement.y = nextAST.y;
-        spriteElement.width = nextAST.width;
-        spriteElement.height = nextAST.height;
-
-        spriteElement.alpha = nextAST.alpha;
-        spriteElement.zIndex = nextAST.zIndex;
+  if (spriteElement) {
+    if (prevAST.url !== nextAST.url) {
+      const texture = nextAST.url ? Texture.from(nextAST.url) : Texture.EMPTY;
+      spriteElement.texture = texture;
     }
+
+    spriteElement.x = nextAST.x;
+    spriteElement.y = nextAST.y;
+    spriteElement.width = nextAST.width;
+    spriteElement.height = nextAST.height;
+
+    spriteElement.alpha = nextAST.alpha;
+    spriteElement.zIndex = nextAST.zIndex;
+  }
 }

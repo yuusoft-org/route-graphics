@@ -16,7 +16,7 @@ export function parseSprite(state) {
   return {
     ...astObj,
     url: state.url ?? "",
-    alpha: state.alpha ?? 0,
+    alpha: state.alpha ?? 1,
     cursor: state.cursor ?? "",
     clickUrl: state.clickUrl ?? "",
     hoverUrl: state.hoverUrl ?? ""
