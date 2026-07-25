@@ -1191,6 +1191,13 @@ const createRouteGraphics = () => {
       return;
     }
 
+    appInstance.audioStage?.validateGraphTransition?.({
+      prevAudio: state.audio,
+      nextAudio: nextState.audio,
+      prevAudioEffects: state.audioEffects,
+      nextAudioEffects: nextState.audioEffects,
+    });
+
     const continuityPlan = buildAnimationContinuityPlan({
       prevState: state,
       nextState,
@@ -1243,6 +1250,7 @@ const createRouteGraphics = () => {
       prevAudioEffects: state.audioEffects,
       nextAudioEffects: nextState.audioEffects,
       audioPlugins: plugins.audio,
+      eventHandler: handler,
     });
 
     state = nextState;

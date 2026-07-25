@@ -1,6 +1,6 @@
-# Command-Controlled Sound Playback Proposal
+# Command-Controlled Sound Playback
 
-Status: proposed. This interface is not implemented.
+Status: implemented for the Route Graphics 1.31.0 release.
 
 Last updated: 2026-07-25
 
@@ -20,7 +20,7 @@ Some consumers need transport controls for a retained sound:
 - seek without changing whether the sound is playing or paused
 - receive decoded duration, progress, natural completion, and playback errors
 
-This proposal adds those capabilities without exposing Route Graphics' internal
+This interface adds those capabilities without exposing Route Graphics' internal
 decode generation, source generation, cursor bookkeeping, or playback status.
 
 The public additions are limited to:
@@ -87,8 +87,8 @@ mode, and accepted command ID unchanged.
 To change modes, the consumer must first complete a render in which the sound
 ID is absent, then add the sound in a later render. Re-adding it starts a new
 runtime lifetime that may independently choose legacy or command-controlled
-mode. Removing and replacing a sound with the same ID in one render is not a
-mode transition because there is no observable absent lifetime.
+mode. Replacing a sound with the same ID in one render does not create an
+observable absent lifetime and therefore cannot change modes.
 
 ### Playback Command Fields
 
@@ -277,7 +277,9 @@ Once ready, the sound remains paused instead of starting. If no source has
 started yet, the retained cursor is the sound's current stored position, or
 zero when no position has been established.
 
-Pausing an already-paused sound is a no-op after the command is accepted.
+Pausing an already-paused, stopped, ended, or never-started sound is a no-op
+after the command is accepted. In particular, pausing a stopped sound does not
+arm a later `resume`; a new `play` command is required.
 
 ### Resume
 
@@ -507,8 +509,10 @@ Mixer properties do not require new commands:
 Updating only those properties must preserve the source, cursor, decode, and
 accepted command ID. Muting or setting volume to zero does not pause playback.
 
-`loop` may update the active source in place. `playbackRate` may also update in
-place, but Route Graphics must account for the rate when reporting position.
+`loop` may update without a transport command. Route Graphics may recreate the
+browser source at its captured cursor when needed to preserve segment
+boundaries. `playbackRate` may update in place, but Route Graphics must account
+for the rate when reporting position.
 
 These properties change source identity:
 
@@ -554,8 +558,8 @@ eventHandler(eventName, payload)
 ```
 
 Legacy sounds without `playback` do not emit these command-correlated events.
-These names are proposed and do not join the stable public event set until the
-interface is implemented and released.
+These names join the public event set with the release that includes this
+interface.
 
 All sound events are dispatched outside the active `render()` call so cached
 decode results cannot cause reentrant rendering.
@@ -676,8 +680,10 @@ not part of render state or event payloads.
 Ready, error, and progress events bind to the latest accepted command. If a
 decode settles under an older command, Route Graphics suppresses that stale
 event and publishes the settled result under the latest applicable command.
-When a decode is already settled as ready, Route Graphics can re-emit
-`soundReady` for a newly accepted command before publishing progress for it.
+An already-cached decode still emits `soundReady` when it is first bound to a
+new controlled sound lifetime or source identity. Once readiness has been
+announced for that lifetime, later commands reuse it without re-emitting
+`soundReady`.
 Deferred progress that still describes the current retained state is likewise
 rebound. For example, `play`, `stop`, then no-op `resume` during decode emits
 readiness and the deferred stopped-at-zero progress under the accepted
@@ -803,8 +809,8 @@ restriction that a looping channel cannot contain a command-controlled sound.
 
 ## Internal Implementation Requirements
 
-This proposal does not prescribe public methods for transport. An eventual
-implementation will need internal support for:
+This interface does not add public methods for transport. Its implementation
+includes:
 
 - a retained playback controller per command-controlled sound
 - private source/decode generations and callback tokens
@@ -850,7 +856,7 @@ consumers coordinate multiple counters and duplicate playback status.
 
 ## Required Test Coverage
 
-Implementation is not complete until tests cover:
+Test coverage includes:
 
 - strict command validation and operation-specific `positionMs`
 - multiple simultaneous command-controlled sounds

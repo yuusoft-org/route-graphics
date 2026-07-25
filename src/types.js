@@ -642,6 +642,13 @@
  */
 
 /**
+ * @typedef {Object} SoundPlaybackCommand
+ * @property {number} commandId - Monotonically increasing command identity
+ * @property {'play' | 'pause' | 'resume' | 'stop' | 'seek'} operation - Transport operation
+ * @property {number} [positionMs] - Segment-relative position for play and seek
+ */
+
+/**
  * @typedef {Object} SoundElement
  * @property {string} id - Unique identifier
  * @property {string} type - Should be "sound"
@@ -654,6 +661,7 @@
  * @property {number} [playbackRate=1] - Playback speed multiplier
  * @property {number} [startAt=0] - Start offset in seconds
  * @property {number|null} [endAt=null] - Optional end time in seconds
+ * @property {SoundPlaybackCommand} [playback] - Optional command-controlled playback instruction
  */
 
 /**

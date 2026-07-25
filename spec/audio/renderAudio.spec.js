@@ -8,6 +8,7 @@ describe("renderAudio", () => {
         renderGraph: vi.fn(),
       },
     };
+    const eventHandler = vi.fn();
     const nextAudioTree = [
       {
         id: "music",
@@ -38,6 +39,7 @@ describe("renderAudio", () => {
       prevAudioEffects: [],
       nextAudioEffects,
       audioPlugins: [],
+      eventHandler,
     });
 
     expect(app.audioStage.renderGraph).toHaveBeenCalledWith({
@@ -45,6 +47,7 @@ describe("renderAudio", () => {
       nextAudio: nextAudioTree,
       prevAudioEffects: [],
       nextAudioEffects,
+      eventHandler,
     });
   });
 

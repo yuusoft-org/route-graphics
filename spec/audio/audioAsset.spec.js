@@ -134,11 +134,13 @@ describe("AudioAsset", () => {
     const secondLoad = AudioAsset.load("click", arrayBuffer);
 
     expect(firstLoad).toBe(secondLoad);
+    expect(AudioAsset.getAssetPromise("click")).toBe(firstLoad);
     expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
 
     resolveDecode();
     await expect(firstLoad).resolves.toBe(decodedBuffer);
     expect(AudioAsset.getAsset("click")).toBe(decodedBuffer);
+    expect(AudioAsset.getAssetPromise("click")).toBeUndefined();
   });
 
   it("prepares the Vorbis fallback once and stores decoded PCM as an AudioBuffer", async () => {

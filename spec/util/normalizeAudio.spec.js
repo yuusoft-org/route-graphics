@@ -161,6 +161,108 @@ describe("normalizeAudioRenderState", () => {
     ).toThrow("audio[0].interruption must be one of immediate, loopEnd");
   });
 
+  it("normalizes strict playback commands", () => {
+    const result = flattenAudioNodes([
+      {
+        id: "music",
+        type: "sound",
+        src: "theme",
+        playback: {
+          commandId: 42,
+          operation: "play",
+          positionMs: 1200,
+        },
+      },
+      {
+        id: "ambience",
+        type: "sound",
+        src: "rain",
+        playback: {
+          commandId: 43,
+          operation: "pause",
+        },
+      },
+    ]);
+
+    expect(result.sounds[0].playback).toEqual({
+      commandId: 42,
+      operation: "play",
+      positionMs: 1200,
+    });
+    expect(result.sounds[1].playback).toEqual({
+      commandId: 43,
+      operation: "pause",
+    });
+  });
+
+  it.each([
+    [
+      { commandId: -1, operation: "play", positionMs: 0 },
+      "commandId must be a non-negative safe integer",
+    ],
+    [
+      { commandId: Number.MAX_SAFE_INTEGER + 1, operation: "pause" },
+      "commandId must be a non-negative safe integer",
+    ],
+    [
+      { commandId: 1, operation: "rewind" },
+      "operation must be one of play, pause, resume, stop, seek",
+    ],
+    [
+      { commandId: 1, operation: "play" },
+      "positionMs must be a finite non-negative number for play",
+    ],
+    [
+      { commandId: 1, operation: "seek", positionMs: Number.POSITIVE_INFINITY },
+      "positionMs must be a finite non-negative number for seek",
+    ],
+    [
+      { commandId: 1, operation: "pause", positionMs: 0 },
+      "positionMs is not allowed for pause",
+    ],
+    [
+      { commandId: 1, operation: "stop", status: "stopped" },
+      'unsupported playback field "status"',
+    ],
+  ])("rejects invalid playback command %#", (playback, message) => {
+    expect(() =>
+      flattenAudioNodes([
+        {
+          id: "music",
+          type: "sound",
+          src: "theme",
+          playback,
+        },
+      ]),
+    ).toThrow(message);
+  });
+
+  it("rejects command-controlled children in looping channels", () => {
+    expect(() =>
+      flattenAudioNodes([
+        {
+          id: "music",
+          type: "audio-channel",
+          loop: true,
+          children: [
+            {
+              id: "track",
+              type: "sound",
+              src: "theme",
+              playback: {
+                commandId: 1,
+                operation: "play",
+                positionMs: 0,
+              },
+            },
+          ],
+        },
+      ]),
+    ).toThrow(
+      "audio[0].children[0].playback is not allowed when audio[0].loop is true",
+    );
+  });
+
   it("rejects duplicate IDs across nodes and effects", () => {
     expect(() =>
       normalizeAudioRenderState({

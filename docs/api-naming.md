@@ -68,19 +68,18 @@ The public semantic event names are:
 
 These are the names Route Graphics consumers should listen for in `eventHandler`.
 
-### Proposed Event Names
+### Command-Controlled Sound Event Names
 
-The unimplemented command-controlled sound proposal reserves these candidate
-event names:
+Command-controlled sounds use these event names:
 
 - `soundReady`
 - `soundProgress`
 - `soundComplete`
 - `soundError`
 
-They are not part of the current stable public event set. Their proposed
-payloads and lifecycle rules are documented in
-[Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
+They join the public event set with the release that includes command-controlled
+playback. Their payloads and lifecycle rules are documented in
+[Command-Controlled Sound Playback](./audio-playback-commands.md).
 They follow the existing payload contract: sound runtime metadata is nested
 under `_event`, and `_event.id` identifies the sound.
 

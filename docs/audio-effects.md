@@ -23,14 +23,13 @@ also still accepts flat Route Graphics `sound` audio nodes for compatibility.
 ## Non-Goals
 
 - no nested audio channels in the first implementation
-- no command-style `play` / `stop` operation model in the currently implemented
-  channel graph
+- no requirement for ordinary declarative sounds to use command-style
+  operations
 - no required channel declarations in project resources
 - no audio filter or general-purpose DSP interface
 
-Command-controlled playback is now being designed as a separate opt-in
-extension for retained sounds. It is not implemented. See
-[Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
+Command-controlled playback is a separate opt-in extension for retained sounds.
+See [Command-Controlled Sound Playback](./audio-playback-commands.md).
 
 ## Render-State Shape
 
@@ -167,12 +166,18 @@ Fields:
 | `playbackRate` | number      | `1`      | Playback speed multiplier                    |
 | `startAt`      | number      | `0`      | Start offset in seconds                      |
 | `endAt`        | number/null | `null`   | Optional end time in seconds                 |
+| `playback`     | object      | omitted  | Optional command-controlled transport        |
 
 `startAt` and `endAt` are intended for partial playback. If `endAt` is present,
 duration is `endAt - startAt`.
 
 The channel audio graph uses `startDelayMs` only. `sound.delay` is not part of
 this interface.
+
+When `playback` is present, the sound uses ordered `play`, `pause`, `resume`,
+`stop`, and `seek` commands instead of automatic declarative startup. See
+[Command-Controlled Sound Playback](./audio-playback-commands.md) for the
+strict JSON shape, lifecycle events, and reconciliation rules.
 
 ### Sound Identity and Replay
 
@@ -450,11 +455,11 @@ The same `sound.id` and source identity fields mean continuation. It does not
 replay. Consumers must use a new playback-instance ID when replaying a one-shot
 sound.
 
-The proposed command-controlled playback extension does not change these rules
-for ordinary sounds. A sound opts into the proposed transport model only when
-it carries a `playback` command. See
-[Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
-Under that proposal, a command-controlled sound cannot be a child of an
+The command-controlled playback extension does not change these rules for
+ordinary sounds. A sound opts into the transport model only when it carries a
+`playback` command. See
+[Command-Controlled Sound Playback](./audio-playback-commands.md). A
+command-controlled sound cannot be a child of an
 `audio-channel` with `loop: true`, because channel-schedule replay would bypass
 command ordering. A non-looping channel may retain either interruption mode;
 an outgoing `loopEnd` instance finishes as an event-detached tail.

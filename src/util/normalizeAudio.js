@@ -2,6 +2,15 @@ import { SUPPORTED_EASING_NAMES } from "./animationTimeline.js";
 
 const AUDIO_NODE_TYPES = new Set(["audio-channel", "sound"]);
 const AUDIO_CHANNEL_INTERRUPTION_VALUES = new Set(["immediate", "loopEnd"]);
+const AUDIO_PLAYBACK_OPERATIONS = new Set([
+  "play",
+  "pause",
+  "resume",
+  "stop",
+  "seek",
+]);
+const AUDIO_PLAYBACK_POSITION_OPERATIONS = new Set(["play", "seek"]);
+const AUDIO_PLAYBACK_KEYS = new Set(["commandId", "operation", "positionMs"]);
 const AUDIO_TRANSITION_TYPE = "audio-transition";
 const AUDIO_EFFECT_TYPES = new Set([AUDIO_TRANSITION_TYPE]);
 const AUDIO_TRANSITION_PHASES = new Set(["enter", "exit", "update"]);
@@ -94,6 +103,55 @@ const assertUniqueId = (ids, id, path) => {
   ids.add(id);
 };
 
+const normalizePlaybackCommand = (playback, path) => {
+  assertRecord(playback, path);
+
+  for (const key of Object.keys(playback)) {
+    if (!AUDIO_PLAYBACK_KEYS.has(key)) {
+      throw new Error(
+        `Input error: unsupported playback field "${key}" at ${path}.`,
+      );
+    }
+  }
+
+  if (!Number.isSafeInteger(playback.commandId) || playback.commandId < 0) {
+    throw new Error(
+      `Input error: ${path}.commandId must be a non-negative safe integer.`,
+    );
+  }
+
+  if (!AUDIO_PLAYBACK_OPERATIONS.has(playback.operation)) {
+    throw new Error(
+      `Input error: ${path}.operation must be one of play, pause, resume, stop, seek.`,
+    );
+  }
+
+  const requiresPosition = AUDIO_PLAYBACK_POSITION_OPERATIONS.has(
+    playback.operation,
+  );
+  if (requiresPosition) {
+    if (
+      typeof playback.positionMs !== "number" ||
+      !Number.isFinite(playback.positionMs) ||
+      playback.positionMs < 0
+    ) {
+      throw new Error(
+        `Input error: ${path}.positionMs must be a finite non-negative number for ${playback.operation}.`,
+      );
+    }
+  } else if (playback.positionMs !== undefined) {
+    throw new Error(
+      `Input error: ${path}.positionMs is not allowed for ${playback.operation}.`,
+    );
+  }
+
+  return {
+    commandId: playback.commandId,
+    operation: playback.operation,
+    ...(requiresPosition ? { positionMs: playback.positionMs } : {}),
+  };
+};
+
 const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
   assertNonEmptyString(node.id, `${path}.id`);
   assertUniqueId(ids, node.id, `${path}.id`);
@@ -125,6 +183,11 @@ const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
     );
   }
 
+  const playback =
+    node.playback === undefined
+      ? undefined
+      : normalizePlaybackCommand(node.playback, `${path}.playback`);
+
   flattenedSounds.push({
     id: node.id,
     type: "sound",
@@ -138,6 +201,7 @@ const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
     startAt: node.startAt ?? 0,
     endAt: node.endAt ?? null,
     channelId,
+    ...(playback ? { playback } : {}),
   });
 };
 
@@ -193,6 +257,12 @@ const validateChannel = (
     if (node.loop === true && child.loop === true) {
       throw new Error(
         `Input error: ${childPath}.loop cannot be true when ${path}.loop is true.`,
+      );
+    }
+
+    if (node.loop === true && child.playback !== undefined) {
+      throw new Error(
+        `Input error: ${childPath}.playback is not allowed when ${path}.loop is true.`,
       );
     }
 

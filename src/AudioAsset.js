@@ -94,6 +94,8 @@ const getAsset = (url) => {
   return arrayBuffer;
 };
 
+const getAssetPromise = (url) => loadingAssets[url];
+
 const unload = (key) => {
   const hadAsset = !!loadedAssets[key] || !!loadingAssets[key];
   delete loadedAssets[key];
@@ -105,5 +107,6 @@ export const AudioAsset = {
   prepareDecoders,
   load,
   getAsset,
+  getAssetPromise,
   unload,
 };
