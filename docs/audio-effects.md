@@ -454,6 +454,9 @@ The proposed command-controlled playback extension does not change these rules
 for ordinary sounds. A sound opts into the proposed transport model only when
 it carries a `playback` command. See
 [Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
+Under that proposal, a command-controlled sound cannot be a child of an
+`audio-channel` with `loop: true`, because channel-schedule replay would bypass
+command ordering.
 
 Cross-state identity rules:
 

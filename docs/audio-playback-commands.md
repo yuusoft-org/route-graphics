@@ -156,11 +156,18 @@ Resolved position validation occurs once `durationMs` is known:
 - a position equal to `durationMs` is the valid terminal cursor
 - a position greater than `durationMs` cannot be executed
 
-A position beyond duration does not change the existing cursor, transport
-state, or active source. Route Graphics emits `soundError` with error code
-`invalid-position`. This is a command execution error, not a render-schema
-error: the higher command ID remains accepted, and any unchanged active source
-is rebound to that command for future event correlation.
+When source identity is unchanged, a position beyond duration does not change
+the existing cursor, transport state, or active source. Route Graphics emits
+`soundError` with error code `invalid-position`. This is a command execution
+error, not a render-schema error: the higher command ID remains accepted, and
+any unchanged active source is rebound to that command for future event
+correlation.
+
+A `play` command that also changes source identity is different: accepting the
+replacement first detaches the old source. If the position is invalid for the
+new source, Route Graphics does not roll back to the old identity or playback.
+The new sound remains stopped at position zero. The source replacement rules
+below define teardown and event ownership in detail.
 
 ## Command Ordering
 
@@ -239,7 +246,9 @@ A `play` position equal to `durationMs` tears down any previous active source,
 sets the cursor and transport state to ended, and emits `soundProgress`. It
 does not create a source or emit `soundComplete`, because no natural playback
 occurred. A position greater than `durationMs` follows the
-`invalid-position` rule above and leaves any existing playback unchanged.
+`invalid-position` rule above. It leaves playback unchanged when source
+identity is retained; during source replacement, it leaves the new sound
+stopped at zero and never restores the old source.
 
 When duration is not known yet, Route Graphics retains the requested play
 position and resolves these same boundary rules after decoding and segment
@@ -280,13 +289,18 @@ Pausing an already-paused sound is a no-op after the command is accepted.
 Resume continues from Route Graphics' captured cursor. The consumer does not
 send a position.
 
-Resuming while decode is pending records playing intent. Playback begins at the
-retained cursor after decode and browser audio-context requirements are
-satisfied.
+Pending decode does not make `resume` valid by itself. Resume records playing
+intent only when the controller is paused and has a retained paused cursor.
+Playback begins at that cursor after decode and browser audio-context
+requirements are satisfied.
 
-Resuming without a retained paused cursor is a no-op. The existing
-`resumeAudio()` method remains the separate browser autoplay-unlock hook; it is
-not a sound transport command.
+Resuming from stopped, ended, or never-started state is a no-op, including
+while decode is pending. Therefore `play`, then `stop`, then `resume` before
+decode settles remains stopped when decoding completes. A new `play` command
+is required to start it.
+
+The existing `resumeAudio()` method remains the separate browser
+autoplay-unlock hook; it is not a sound transport command.
 
 ### Stop
 
@@ -341,6 +355,49 @@ transport state, and active source.
 Repeating the same seek requires a higher command ID even when `positionMs` is
 unchanged.
 
+### Delayed Start
+
+`startDelayMs` belongs to source identity, but command-controlled transport
+owns its countdown:
+
+- every successful `play` below duration cancels any previous delayed start and
+  applies the full current `startDelayMs`
+- the countdown begins after decode and segment validation succeed
+- a pending countdown is an internal playing-intent substate, so `resume` while
+  it is already counting down is an accepted no-op
+- position remains at the requested play cursor and periodic progress does not
+  begin until the browser source starts
+- `pause` during the countdown cancels the timer, preserves the remaining delay
+  and cursor, and enters paused state
+- `resume` from that paused state continues the remaining delay; it does not
+  reapply the full delay
+- `seek` during the countdown updates the pending start cursor and preserves
+  the remaining delay and playing intent
+- `seek` while paused updates the cursor and preserves any retained remaining
+  delay
+- `stop`, removal, source replacement, and destruction cancel and clear the
+  delayed start
+
+A `play` or `seek` to the terminal cursor cancels the delayed start and enters
+ended state. An out-of-range `play` or `seek` with unchanged source identity
+is an execution error and leaves the existing delayed start, remaining delay,
+and cursor unchanged while rebinding correlation to the accepted command. An
+out-of-range `play` during source replacement follows the replacement rule:
+the old delayed start is cancelled and the new identity remains stopped at
+zero.
+
+If `play` is issued while decode is pending, the full delay is retained but
+does not count down yet. A pause before decode completes retains that full
+delay; a later valid resume starts the countdown after readiness. A stop before
+decode completes clears it, and a later resume is the stopped-state no-op
+defined above.
+
+`soundReady` is emitted before the delay countdown begins. Pausing, seeking, or
+stopping during a known-duration delayed start emits the same immediate
+`soundProgress` as performing that operation on an active source. No
+`soundComplete` is emitted unless actual non-looping playback later reaches its
+natural end.
+
 ## Multiple Controlled Sounds
 
 The interface is not limited to one controlled sound:
@@ -380,6 +437,25 @@ This allows a consumer to pause retained story BGM while starting another
 controlled music sound. Voice and sound effects may remain ordinary sounds
 without `playback`.
 
+### Audio-Channel Loop Restriction
+
+A command-controlled sound may be a child of an `audio-channel` only when that
+channel has `loop: false`. A looping channel automatically restarts its complete
+child schedule without a new command ID, so combining the two ownership models
+is invalid.
+
+Route Graphics rejects any render that:
+
+- adds a command-controlled sound to a channel with `loop: true`
+- moves a command-controlled sound into a channel with `loop: true`
+- changes a containing channel to `loop: true` while it has a
+  command-controlled child
+
+The render is rejected before audio reconciliation, leaving the previous
+channel and sound runtime unchanged. Use `loop: true` on the controlled sound
+itself when one command should authorize continuous looping, or keep the
+channel non-looping and issue higher playback commands explicitly.
+
 ## Changes Outside the Playback Command
 
 Mixer properties do not require new commands:
@@ -404,6 +480,24 @@ Changing a source-identity property on a command-controlled sound requires a
 higher command ID with operation `play`. Changing source identity while
 retaining the same command ID, or pairing the change with another operation, is
 an invalid cross-render transition.
+
+An accepted source replacement is committed before decode or resolved-position
+validation for the new identity:
+
+1. Route Graphics makes the new source identity current.
+2. It cancels the old delayed start, detaches the old active source from the
+   playback controller, and invalidates its decode and event bindings.
+3. An outgoing instance may remain audible only for a configured exit
+   transition. It cannot receive later transport commands or emit
+   `soundReady`, `soundProgress`, `soundComplete`, or `soundError`.
+4. Route Graphics decodes and validates the new identity under the new command.
+5. If decoding, segment validation, position validation, or playback fails, the
+   new identity remains current and stopped at position zero.
+
+Replacement is never rolled back to the old source. A later command operates
+only on the new identity. A later `play` may reuse a successfully decoded new
+buffer after `invalid-position`; decode and asset failures follow the fresh
+attempt rule defined for `play`.
 
 ## Public Events
 
@@ -512,7 +606,9 @@ contents, stack traces, or other sensitive implementation details.
 
 `invalid-position` means a `play` or `seek` position is greater than the
 decoded playable segment's `durationMs`. It leaves existing transport state
-unchanged.
+unchanged when source identity is retained. During source replacement, the old
+identity has already been detached and the new identity remains stopped at
+zero.
 
 ## Event Correlation and Rebinding
 
@@ -537,9 +633,15 @@ decode settles under an older command, Route Graphics suppresses that stale
 event and publishes the settled result under the latest applicable command.
 When a decode is already settled as ready, Route Graphics can re-emit
 `soundReady` for a newly accepted command before publishing progress for it.
+Deferred progress that still describes the current retained state is likewise
+rebound. For example, `play`, `stop`, then no-op `resume` during decode emits
+readiness and the deferred stopped-at-zero progress under the accepted
+`resume` command ID.
 
-A new `play` following an error creates a fresh attempt. It must not re-emit the
-previous error as the result of the new command.
+A new `play` following an asset, decode, or playback failure creates a fresh
+attempt. It must not re-emit the previous error as the result of the new
+command. `invalid-position` does not invalidate an otherwise usable decoded
+buffer, so a later valid `play` may reuse that buffer.
 
 Completion is tied to the latest accepted command under which the current
 active source remains valid:
@@ -574,7 +676,9 @@ individual browser source node.
 - seek reuses the retained decode
 - changing source identity replaces the retained decode
 - removing the sound releases its binding and suppresses later callbacks
-- a new `play` after error creates a fresh attempt
+- an invalid position retains a successfully decoded buffer
+- a new `play` after an asset, decode, or playback failure creates a fresh
+  attempt
 
 If a sound references an asset that is already decoded, it still emits
 `soundReady` with the current command correlation. If an asset is decoding,
@@ -648,8 +752,9 @@ Its behavior remains:
 
 No new command ID or events are required for legacy sounds.
 
-Audio channels require no interface changes. Existing channel and sound volume,
-mute, pan, loop, timing, and transition fields remain unchanged.
+Audio channels require no new fields. Existing channel and sound volume, mute,
+pan, sound-loop, timing, and transition fields remain unchanged, subject to the
+restriction that a looping channel cannot contain a command-controlled sound.
 
 ## Internal Implementation Requirements
 
@@ -709,9 +814,13 @@ Implementation is not complete until tests cover:
 - repeated play and repeated seek
 - pause/resume cursor continuity
 - pause, resume, stop, play, and queued seek while decoding
+- play, stop, then resume while decoding
 - play and seek positions below, equal to, and greater than duration
 - retained-sound transitions into and out of command-controlled mode
 - source-identity change requirements
+- source replacement followed by decode, segment, position, or playback failure
+- full and remaining `startDelayMs` behavior for every transport operation
+- rejection of command-controlled children in looping channels
 - volume, mute, pan, and channel updates without restart
 - playback-rate-aware progress
 - segment-relative duration and position
