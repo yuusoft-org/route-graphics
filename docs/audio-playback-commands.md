@@ -68,8 +68,27 @@ A command-controlled sound has the normal sound fields plus `playback`:
 }
 ```
 
-`playback` is optional. Its presence opts that sound into command-controlled
-transport and correlated sound events.
+`playback` is optional when a sound ID first appears. Its presence opts that
+sound into command-controlled transport and correlated sound events for that
+sound's retained lifetime.
+
+### Playback Mode Lifetime
+
+Playback mode cannot change while a sound with the same ID is retained across
+renders:
+
+- a legacy sound cannot gain `playback`
+- a command-controlled sound cannot lose `playback`
+
+Either transition is a validation error. Route Graphics rejects that render
+before audio reconciliation and leaves the existing source, cursor, decode,
+mode, and accepted command ID unchanged.
+
+To change modes, the consumer must first complete a render in which the sound
+ID is absent, then add the sound in a later render. Re-adding it starts a new
+runtime lifetime that may independently choose legacy or command-controlled
+mode. Removing and replacing a sound with the same ID in one render is not a
+mode transition because there is no observable absent lifetime.
 
 ### Playback Command Fields
 
@@ -130,6 +149,19 @@ The resolved segment must be finite and positive. `startAt` must be below the
 decoded source duration, and `endAt`, when present, must be greater than
 `startAt` and no greater than the decoded source duration.
 
+Command schema validation accepts any finite, non-negative `positionMs`.
+Resolved position validation occurs once `durationMs` is known:
+
+- a position below `durationMs` is playable
+- a position equal to `durationMs` is the valid terminal cursor
+- a position greater than `durationMs` cannot be executed
+
+A position beyond duration does not change the existing cursor, transport
+state, or active source. Route Graphics emits `soundError` with error code
+`invalid-position`. This is a command execution error, not a render-schema
+error: the higher command ID remains accepted, and any unchanged active source
+is rebound to that command for future event correlation.
+
 ## Command Ordering
 
 `commandId` is the only public synchronization value.
@@ -150,6 +182,13 @@ Route Graphics compares command IDs for each sound:
 
 Gaps between command IDs are valid. Ordinary renders, progress updates, volume
 changes, and mute changes retain the current command ID.
+
+A schema-invalid command is not accepted and does not advance correlation. A
+schema-valid command with a higher ID is accepted before its transport effect
+is evaluated. It therefore advances correlation even when the operation is a
+state-dependent no-op or later produces an execution error such as
+`invalid-position`. Any active source that survives the command is rebound to
+the newly accepted command without restarting.
 
 This rule is necessary because repeated render state is otherwise ambiguous.
 These two command objects have identical content:
@@ -194,7 +233,18 @@ Restart:
 
 There is no separate public `start` or `restart` operation. A new `play`
 command always creates a new active source at the requested segment-relative
-position.
+position when that position is below `durationMs`.
+
+A `play` position equal to `durationMs` tears down any previous active source,
+sets the cursor and transport state to ended, and emits `soundProgress`. It
+does not create a source or emit `soundComplete`, because no natural playback
+occurred. A position greater than `durationMs` follows the
+`invalid-position` rule above and leaves any existing playback unchanged.
+
+When duration is not known yet, Route Graphics retains the requested play
+position and resolves these same boundary rules after decoding and segment
+validation. Route Graphics emits `soundReady` before starting valid playback,
+reporting terminal progress, or emitting `invalid-position`.
 
 If a previous decode attempt failed, a new `play` command starts a fresh
 attempt rather than rebinding the previous error.
@@ -276,10 +326,17 @@ Seeking while playing replaces the browser source internally without reporting
 natural completion. Seeking while paused updates the retained cursor without
 starting playback.
 
-Seeking before duration is known or beyond duration is a no-op. Seeking exactly
-to duration enters the internal ended state but does not emit
-`soundComplete`, because completion was caused by a command rather than natural
-playback.
+Seeking before duration is known is queued, not discarded. After decoding and
+segment validation, Route Graphics resolves the requested position before
+dispatching events. It emits `soundReady` first, followed by `soundProgress`
+for a successful seek or `soundError` with `invalid-position` for a position
+beyond duration.
+
+Seeking exactly to duration tears down any active source and enters the ended
+state. It emits `soundProgress` but not `soundComplete`, because completion was
+caused by a command rather than natural playback. Seeking beyond duration
+follows the `invalid-position` rule and preserves the existing cursor,
+transport state, and active source.
 
 Repeating the same seek requires a higher command ID even when `positionMs` is
 unchanged.
@@ -364,35 +421,47 @@ interface is implemented and released.
 All sound events are dispatched outside the active `render()` call so cached
 decode results cannot cause reentrant rendering.
 
+Sound lifecycle metadata follows the existing event payload contract in
+`api-naming.md`: renderer-provided fields live under the reserved `_event`
+object, and `_event.id` identifies the sound. These events do not place runtime
+metadata at the payload's top level.
+
 ### `soundReady`
 
 Emitted when decoding and playable-segment validation succeed:
 
 ```json
 {
-  "soundId": "music-room:player",
-  "commandId": 42,
-  "positionMs": 0,
-  "durationMs": 180000
+  "_event": {
+    "id": "music-room:player",
+    "commandId": 42,
+    "positionMs": 0,
+    "durationMs": 180000
+  }
 }
 ```
 
 ### `soundProgress`
 
 Emitted at least every 250 milliseconds while playing and immediately after a
-successful pause, seek, or stop when duration is known:
+successful pause, seek, or stop when duration is known. A `play` or `seek`
+command that moves to the terminal cursor also emits it:
 
 ```json
 {
-  "soundId": "music-room:player",
-  "commandId": 44,
-  "positionMs": 83000,
-  "durationMs": 180000
+  "_event": {
+    "id": "music-room:player",
+    "commandId": 44,
+    "positionMs": 83000,
+    "durationMs": 180000
+  }
 }
 ```
 
-When pause, seek, or stop occurs before duration is known, the corresponding
-position event is deferred until `soundReady`.
+When a cursor-changing operation is resolved during pending decode,
+`soundReady` is emitted first. A successful pause, seek, stop, or terminal
+`play` then emits one immediate `soundProgress`. A queued `play` or `seek`
+beyond duration emits `soundError` instead of progress.
 
 ### `soundComplete`
 
@@ -400,10 +469,12 @@ Emitted only when active non-looping playback reaches its natural end:
 
 ```json
 {
-  "soundId": "music-room:player",
-  "commandId": 45,
-  "positionMs": 180000,
-  "durationMs": 180000
+  "_event": {
+    "id": "music-room:player",
+    "commandId": 45,
+    "positionMs": 180000,
+    "durationMs": 180000
+  }
 }
 ```
 
@@ -412,24 +483,36 @@ failure, audio-context suspension, or Route Graphics destruction.
 
 ### `soundError`
 
-Emitted when a controlled sound cannot become ready or play:
+Emitted when a controlled sound cannot become ready or execute a command:
 
 ```json
 {
-  "soundId": "music-room:player",
-  "commandId": 42,
-  "errorCode": "decode-failed"
+  "_event": {
+    "id": "music-room:player",
+    "commandId": 42,
+    "errorCode": "decode-failed"
+  }
 }
 ```
 
 Initial stable error codes:
 
 ```json
-["asset-unavailable", "decode-failed", "invalid-segment", "playback-failed"]
+[
+  "asset-unavailable",
+  "decode-failed",
+  "invalid-segment",
+  "invalid-position",
+  "playback-failed"
+]
 ```
 
 The payload must not expose browser exception messages, asset URLs, file
 contents, stack traces, or other sensitive implementation details.
+
+`invalid-position` means a `play` or `seek` position is greater than the
+decoded playable segment's `durationMs`. It leaves existing transport state
+unchanged.
 
 ## Event Correlation and Rebinding
 
@@ -438,11 +521,14 @@ state:
 
 ```json
 {
-  "soundId": "music-room:player",
-  "commandId": 42
+  "_event": {
+    "id": "music-room:player",
+    "commandId": 42
+  }
 }
 ```
 
+Consumers compare `payload._event.id` and `payload._event.commandId`.
 Route Graphics owns additional private instance and callback tokens. They are
 not part of render state or event payloads.
 
@@ -455,14 +541,23 @@ When a decode is already settled as ready, Route Graphics can re-emit
 A new `play` following an error creates a fresh attempt. It must not re-emit the
 previous error as the result of the new command.
 
-Completion remains tied to the command that created the currently active
-playing source:
+Completion is tied to the latest accepted command under which the current
+active source remains valid:
 
-- `play` creates a completion binding
-- `resume` creates a new active-source binding
-- `seek` while playing creates a new active-source binding
-- pause, stop, seek replacement, sound replacement, and removal invalidate the
-  previous binding
+- `play`, `resume`, and `seek` while playing bind their new active source
+- any accepted higher command that leaves an active source unchanged rebinds
+  that source to the new command without restarting it
+- source replacement invalidates the previous private binding before binding
+  the replacement
+- pause, stop, transition to ended, sound removal, and sound replacement
+  invalidate the binding without reporting completion
+
+The rebinding rule includes accepted no-ops such as `resume` while already
+playing and execution errors such as an out-of-range position. If that
+unchanged source later reaches its natural end, `soundComplete` carries the
+latest accepted command ID rather than the ID that originally created the
+browser source. Schema-invalid, repeated, lower, and otherwise stale commands
+do not advance or rebind correlation.
 
 The browser `AudioBufferSourceNode.onended` callback is not sufficient to
 identify natural completion because intentional `stop()` calls also trigger it.
@@ -610,14 +705,17 @@ Implementation is not complete until tests cover:
 - strict command validation and operation-specific `positionMs`
 - multiple simultaneous command-controlled sounds
 - same, lower, and higher command IDs
+- accepted no-op and execution-error completion rebinding
 - repeated play and repeated seek
 - pause/resume cursor continuity
-- pause, resume, stop, and seek while decoding
+- pause, resume, stop, play, and queued seek while decoding
+- play and seek positions below, equal to, and greater than duration
+- retained-sound transitions into and out of command-controlled mode
 - source-identity change requirements
 - volume, mute, pan, and channel updates without restart
 - playback-rate-aware progress
 - segment-relative duration and position
-- ready, progress, complete, and error payloads
+- ready, progress, complete, and error payloads under `_event`
 - cached and in-flight decode rebinding
 - retry after decode error
 - intentional `onended` suppression

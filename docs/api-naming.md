@@ -81,6 +81,8 @@ event names:
 They are not part of the current stable public event set. Their proposed
 payloads and lifecycle rules are documented in
 [Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
+They follow the existing payload contract: sound runtime metadata is nested
+under `_event`, and `_event.id` identifies the sound.
 
 ## Semantic Meaning
 
