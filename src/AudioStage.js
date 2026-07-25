@@ -1091,7 +1091,16 @@ export const createAudioStage = () => {
       }
 
       if (candidate.positionMs > control.durationMs) {
-        if (candidate.operation === "seek" && candidate.fallback) {
+        if (candidate.fallback) {
+          if (candidate.fallbackState) {
+            control.status = candidate.fallbackState.status;
+            control.cursorMs = candidate.fallbackState.cursorMs;
+            control.pausedCursorRetained =
+              candidate.fallbackState.pausedCursorRetained;
+            control.remainingDelayMs = candidate.fallbackState.remainingDelayMs;
+            control.deferredProgress = candidate.fallbackState.deferredProgress;
+            instance.playbackPending = candidate.fallbackState.playbackPending;
+          }
           const fallbackResult = resolve(candidate.fallback, false);
           return {
             ...fallbackResult,
@@ -1226,6 +1235,7 @@ export const createAudioStage = () => {
     stopControlledSource(instance);
     control.status = "stopped";
     control.cursorMs = 0;
+    control.pendingPosition = null;
     control.pausedCursorRetained = false;
     control.remainingDelayMs = 0;
     queueControlledError(instance, errorCode);
@@ -1353,6 +1363,7 @@ export const createAudioStage = () => {
 
       const commandId = control.commandId;
       const resolution = resolvePendingControlledPosition(instance);
+      const playRequestId = instance.playRequestId;
       control.readyAnnounced = true;
       try {
         emitControlledEventNow(
@@ -1365,11 +1376,17 @@ export const createAudioStage = () => {
           commandId,
         );
       } finally {
-        if (
-          control.commandId === commandId &&
-          isCurrentControlledInstance(instance)
-        ) {
-          applyResolvedControlledState(instance, resolution);
+        if (isCurrentControlledInstance(instance)) {
+          if (control.commandId === commandId) {
+            applyResolvedControlledState(instance, resolution);
+          } else if (
+            control.status === "playing" &&
+            !instance.source &&
+            instance.pendingTimeoutId === null &&
+            instance.playRequestId === playRequestId
+          ) {
+            startControlledPlayback(instance, control.remainingDelayMs);
+          }
         }
       }
     });
@@ -1453,6 +1470,17 @@ export const createAudioStage = () => {
     const control = instance.control;
     switch (command.operation) {
       case "play": {
+        const fallback = control.pendingPosition;
+        const fallbackState = fallback
+          ? {
+              status: control.status,
+              cursorMs: control.cursorMs,
+              pausedCursorRetained: control.pausedCursorRetained,
+              remainingDelayMs: control.remainingDelayMs,
+              deferredProgress: control.deferredProgress,
+              playbackPending: instance.playbackPending,
+            }
+          : null;
         cancelControlledPendingStart(instance);
         stopControlledSource(instance);
         control.status = "playing";
@@ -1462,7 +1490,8 @@ export const createAudioStage = () => {
         control.pendingPosition = {
           operation: "play",
           positionMs: command.positionMs,
-          fallback: null,
+          fallback,
+          fallbackState,
         };
         control.deferredProgress = false;
         instance.playbackPending = true;

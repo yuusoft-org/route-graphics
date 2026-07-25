@@ -257,6 +257,12 @@ position and resolves these same boundary rules after decoding and segment
 validation. Route Graphics emits `soundReady` before starting valid playback,
 reporting terminal progress, or emitting `invalid-position`.
 
+If multiple `play` commands arrive while the same source is decoding and the
+latest position is out of range, Route Graphics falls back through the earlier
+pending commands and preserves the most recent executable cursor and transport
+state. The `invalid-position` error still carries the latest accepted command
+ID. A source-identity replacement has no earlier same-source fallback.
+
 If a previous decode attempt failed, a new `play` command starts a fresh
 attempt rather than rebinding the previous error.
 
@@ -563,6 +569,12 @@ interface.
 
 All sound events are dispatched outside the active `render()` call so cached
 decode results cannot cause reentrant rendering.
+
+An event handler may synchronously render another state. In particular, a
+higher command issued from `soundReady` is applied before startup completes. If
+that command preserves playing intent, Route Graphics starts at the resulting
+latest cursor; pause, stop, terminal seek, removal, or destruction still prevent
+startup.
 
 Sound lifecycle metadata follows the existing event payload contract in
 `api-naming.md`: renderer-provided fields live under the reserved `_event`

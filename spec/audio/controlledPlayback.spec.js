@@ -438,6 +438,62 @@ describe("command-controlled sound playback", () => {
     ).toBe(2);
   });
 
+  it("starts a seek issued reentrantly from soundReady", async () => {
+    const { context, eventHandler, render } = await setupControlledStage();
+    eventHandler.mockImplementation((eventName) => {
+      if (eventName === "soundReady") {
+        render([
+          playbackSound({
+            commandId: 2,
+            operation: "seek",
+            positionMs: 4000,
+          }),
+        ]);
+      }
+    });
+
+    render([
+      playbackSound({
+        commandId: 1,
+        operation: "play",
+        positionMs: 1000,
+      }),
+    ]);
+    await flushMicrotasks();
+
+    expect(context.sources).toHaveLength(1);
+    expect(context.sources[0].start).toHaveBeenCalledWith(10, 4, 6);
+    expect(eventsByName(eventHandler, "soundProgress").at(-1)).toEqual({
+      _event: {
+        id: "player",
+        commandId: 2,
+        positionMs: 4000,
+        durationMs: 10000,
+      },
+    });
+  });
+
+  it("starts pending play after a reentrant no-op resume from soundReady", async () => {
+    const { context, eventHandler, render } = await setupControlledStage();
+    eventHandler.mockImplementation((eventName) => {
+      if (eventName === "soundReady") {
+        render([playbackSound({ commandId: 2, operation: "resume" })]);
+      }
+    });
+
+    render([
+      playbackSound({
+        commandId: 1,
+        operation: "play",
+        positionMs: 2000,
+      }),
+    ]);
+    await flushMicrotasks();
+
+    expect(context.sources).toHaveLength(1);
+    expect(context.sources[0].start).toHaveBeenCalledWith(10, 2, 8);
+  });
+
   it("reports only an error for an out-of-range seek queued during decode", async () => {
     let resolveDecode;
     const decodePromise = new Promise((resolve) => {
@@ -471,6 +527,52 @@ describe("command-controlled sound playback", () => {
       "soundReady",
       "soundError",
     ]);
+    expect(eventsByName(eventHandler, "soundError").at(-1)).toEqual({
+      _event: {
+        id: "player",
+        commandId: 2,
+        errorCode: "invalid-position",
+      },
+    });
+  });
+
+  it("preserves a valid pending play when a later play is out of range", async () => {
+    let resolveDecode;
+    const decodePromise = new Promise((resolve) => {
+      resolveDecode = resolve;
+    });
+    const { context, eventHandler, render } = await setupControlledStage({
+      assets: new Map(),
+      pendingAssets: new Map([["track", decodePromise]]),
+    });
+
+    render([
+      playbackSound({
+        commandId: 1,
+        operation: "play",
+        positionMs: 1000,
+      }),
+    ]);
+    render([
+      playbackSound({
+        commandId: 2,
+        operation: "play",
+        positionMs: 11000,
+      }),
+    ]);
+    resolveDecode({ duration: 10 });
+    await flushMicrotasks();
+
+    expect(context.sources).toHaveLength(1);
+    expect(context.sources[0].start).toHaveBeenCalledWith(10, 1, 9);
+    expect(eventsByName(eventHandler, "soundReady").at(-1)).toEqual({
+      _event: {
+        id: "player",
+        commandId: 2,
+        positionMs: 1000,
+        durationMs: 10000,
+      },
+    });
     expect(eventsByName(eventHandler, "soundError").at(-1)).toEqual({
       _event: {
         id: "player",
