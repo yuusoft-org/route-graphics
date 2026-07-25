@@ -23,9 +23,14 @@ also still accepts flat Route Graphics `sound` audio nodes for compatibility.
 ## Non-Goals
 
 - no nested audio channels in the first implementation
-- no command-style `play` / `stop` operation model in Route Graphics
+- no command-style `play` / `stop` operation model in the currently implemented
+  channel graph
 - no required channel declarations in project resources
 - no audio filter or general-purpose DSP interface
+
+Command-controlled playback is now being designed as a separate opt-in
+extension for retained sounds. It is not implemented. See
+[Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
 
 ## Render-State Shape
 
@@ -438,11 +443,17 @@ Route Graphics should keep audio declarative.
 - Removed audio node or effect: keep the internal node alive until `exit`
   transition from the previous `audioEffects` completes, then stop and clean up.
 
-No explicit `op: play` or `op: stop` is needed in Route Graphics render state.
+No explicit `op: play` or `op: stop` is needed for the currently implemented
+declarative sound lifecycle.
 
 The same `sound.id` and source identity fields mean continuation. It does not
 replay. Consumers must use a new playback-instance ID when replaying a one-shot
 sound.
+
+The proposed command-controlled playback extension does not change these rules
+for ordinary sounds. A sound opts into the proposed transport model only when
+it carries a `playback` command. See
+[Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
 
 Cross-state identity rules:
 
