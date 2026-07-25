@@ -456,7 +456,8 @@ it carries a `playback` command. See
 [Command-Controlled Sound Playback Proposal](./audio-playback-commands.md).
 Under that proposal, a command-controlled sound cannot be a child of an
 `audio-channel` with `loop: true`, because channel-schedule replay would bypass
-command ordering.
+command ordering. A non-looping channel may retain either interruption mode;
+an outgoing `loopEnd` instance finishes as an event-detached tail.
 
 Cross-state identity rules:
 

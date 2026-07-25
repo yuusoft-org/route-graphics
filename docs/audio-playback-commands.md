@@ -166,8 +166,10 @@ correlation.
 A `play` command that also changes source identity is different: accepting the
 replacement first detaches the old source. If the position is invalid for the
 new source, Route Graphics does not roll back to the old identity or playback.
-The new sound remains stopped at position zero. The source replacement rules
-below define teardown and event ownership in detail.
+The new sound remains stopped at position zero. Any exit-transition or
+`loopEnd` tail remains detached and event-suppressed; it is never restored as
+the controlled source. The source replacement rules below define teardown and
+event ownership in detail.
 
 ## Command Ordering
 
@@ -329,12 +331,14 @@ Use `pause` rather than `stop` when the cursor must be preserved.
 }
 ```
 
-Seek moves to `positionMs` and preserves the current playback state:
+Seek changes the cursor only when the sound is playing, delay-pending, or
+paused:
 
 - playing remains playing
+- delay-pending remains delay-pending
 - paused remains paused
-- stopped remains stopped at the requested next-start position
-- ended becomes stopped when seeking earlier than duration
+- stopped remains stopped at its existing cursor; the seek is an accepted no-op
+- ended remains ended at the terminal cursor; the seek is an accepted no-op
 
 Seeking while playing replaces the browser source internally without reporting
 natural completion. Seeking while paused updates the retained cursor without
@@ -343,14 +347,21 @@ starting playback.
 Seeking before duration is known is queued, not discarded. After decoding and
 segment validation, Route Graphics resolves the requested position before
 dispatching events. It emits `soundReady` first, followed by `soundProgress`
-for a successful seek or `soundError` with `invalid-position` for a position
-beyond duration.
+when the current transport state permits the seek or `soundError` with
+`invalid-position` for a position beyond duration. An in-range seek that
+resolves while stopped or ended remains a no-op and emits no progress.
 
-Seeking exactly to duration tears down any active source and enters the ended
-state. It emits `soundProgress` but not `soundComplete`, because completion was
-caused by a command rather than natural playback. Seeking beyond duration
-follows the `invalid-position` rule and preserves the existing cursor,
-transport state, and active source.
+Seeking exactly to duration from playing, delay-pending, or paused state tears
+down any active or delayed source and enters the ended state. It emits
+`soundProgress` but not `soundComplete`, because completion was caused by a
+command rather than natural playback. From stopped or ended state, the same
+in-range command is the no-op defined above. Seeking beyond duration follows
+the `invalid-position` rule and preserves the existing cursor, transport state,
+and active source.
+
+To start a stopped or ended sound at a selected position, issue `play` with
+that `positionMs`. A stopped seek does not arm a later `resume` or override the
+position carried by a later `play`.
 
 Repeating the same seek requires a higher command ID even when `positionMs` is
 unchanged.
@@ -375,16 +386,18 @@ owns its countdown:
   the remaining delay and playing intent
 - `seek` while paused updates the cursor and preserves any retained remaining
   delay
-- `stop`, removal, source replacement, and destruction cancel and clear the
-  delayed start
+- `stop`, destruction, and removal or source replacement of a top-level sound
+  or a sound under immediate channel interruption cancel and clear the delayed
+  start
 
-A `play` or `seek` to the terminal cursor cancels the delayed start and enters
-ended state. An out-of-range `play` or `seek` with unchanged source identity
-is an execution error and leaves the existing delayed start, remaining delay,
-and cursor unchanged while rebinding correlation to the accepted command. An
-out-of-range `play` during source replacement follows the replacement rule:
-the old delayed start is cancelled and the new identity remains stopped at
-zero.
+While a delayed start exists, a `play` or `seek` to the terminal cursor cancels
+it and enters ended state. An out-of-range `play` or `seek` with unchanged
+source identity is an execution error and leaves the existing delayed start,
+remaining delay, and cursor unchanged while rebinding correlation to the
+accepted command. An out-of-range `play` during source replacement follows the
+replacement rule: an old delayed start is cancelled for immediate interruption
+or transferred to an event-detached `loopEnd` tail, and the new identity
+remains stopped at zero.
 
 If `play` is issued while decode is pending, the full delay is retained but
 does not count down yet. A pause before decode completes retains that full
@@ -456,6 +469,33 @@ channel and sound runtime unchanged. Use `loop: true` on the controlled sound
 itself when one command should authorize continuous looping, or keep the
 channel non-looping and issue higher playback commands explicitly.
 
+### Audio-Channel Interruption
+
+A command-controlled sound in an allowed non-looping channel preserves the
+channel's existing `interruption` behavior:
+
+- `interruption: "immediate"` detaches and tears down an outgoing sound,
+  subject to any configured exit transition
+- `interruption: "loopEnd"` immediately detaches the outgoing sound from its
+  playback controller, then allows its already-authorized schedule iteration
+  to finish
+
+For `loopEnd`, an active source finishes its current iteration. A pending decode
+or delayed start that was already authorized is allowed to become ready, finish
+its retained delay, and play once. A looping sound is switched to non-looping
+for that final iteration. No new channel schedule or sound loop begins.
+
+The detached outgoing instance cannot receive later playback commands and
+cannot emit `soundReady`, `soundProgress`, `soundComplete`, or `soundError`.
+Those events belong only to the retained or replacement controller. Configured
+exit transitions run concurrently with the loop-end tail, and cleanup waits
+until both the transition and final iteration have finished.
+
+An explicit `stop` command always takes precedence over channel interruption
+and stops the current controlled sound immediately. Once removal or replacement
+has detached a loop-end tail, later commands address only the retained or
+replacement sound and do not affect that outgoing tail.
+
 ## Changes Outside the Playback Command
 
 Mixer properties do not require new commands:
@@ -485,11 +525,16 @@ An accepted source replacement is committed before decode or resolved-position
 validation for the new identity:
 
 1. Route Graphics makes the new source identity current.
-2. It cancels the old delayed start, detaches the old active source from the
-   playback controller, and invalidates its decode and event bindings.
+2. It detaches the old instance from the playback controller and invalidates
+   its public event bindings. A top-level sound or immediate channel
+   interruption cancels its delayed start and begins active-source teardown,
+   allowing only a configured exit-transition tail. `loopEnd` interruption
+   transfers any already-authorized pending or active iteration to the detached
+   outgoing tail defined above.
 3. An outgoing instance may remain audible only for a configured exit
-   transition. It cannot receive later transport commands or emit
-   `soundReady`, `soundProgress`, `soundComplete`, or `soundError`.
+   transition, a `loopEnd` tail, or both. It cannot receive later transport
+   commands or emit `soundReady`, `soundProgress`, `soundComplete`, or
+   `soundError`.
 4. Route Graphics decodes and validates the new identity under the new command.
 5. If decoding, segment validation, position validation, or playback fails, the
    new identity remains current and stopped at position zero.
@@ -815,12 +860,14 @@ Implementation is not complete until tests cover:
 - pause/resume cursor continuity
 - pause, resume, stop, play, and queued seek while decoding
 - play, stop, then resume while decoding
+- stopped and ended seeks as accepted no-ops that do not arm resume
 - play and seek positions below, equal to, and greater than duration
 - retained-sound transitions into and out of command-controlled mode
 - source-identity change requirements
 - source replacement followed by decode, segment, position, or playback failure
 - full and remaining `startDelayMs` behavior for every transport operation
 - rejection of command-controlled children in looping channels
+- immediate and loop-end interruption of active, decoding, and delayed sounds
 - volume, mute, pan, and channel updates without restart
 - playback-rate-aware progress
 - segment-relative duration and position
