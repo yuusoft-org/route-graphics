@@ -8,6 +8,7 @@ const ROOT_CHANNEL_ID = "__route_graphics_audio_root__";
 const DIRECT_CHANNEL_ID = "__route_graphics_audio_direct__";
 const AUDIO_AUTOMATION_SAMPLE_INTERVAL_MS = 16;
 const AUDIO_AUTOMATION_MAX_SAMPLES = 1024;
+const CONTROLLED_PROGRESS_INTERVAL_MS = 250;
 const audioParamAutomation = new WeakMap();
 
 const isAudioDebugEnabled = () =>
@@ -79,6 +80,37 @@ const getCurrentParamValue = (param, context = getAudioContext()) => {
   return automation.normalizeValue(
     getTimelineValueAtTime(automation.timeline, elapsedMs),
   );
+};
+
+const integrateAudioParamValue = (param, startTime, endTime) => {
+  const durationSeconds = Math.max(0, endTime - startTime);
+  if (durationSeconds === 0) {
+    return 0;
+  }
+
+  const automation = audioParamAutomation.get(param);
+  if (!automation) {
+    return durationSeconds * Math.max(0, getParamValue(param, 1));
+  }
+
+  const durationMs = durationSeconds * 1000;
+  const sampleCount = Math.min(
+    AUDIO_AUTOMATION_MAX_SAMPLES,
+    Math.max(1, Math.ceil(durationMs / AUDIO_AUTOMATION_SAMPLE_INTERVAL_MS)),
+  );
+  const sampleDurationSeconds = durationSeconds / sampleCount;
+  let integratedSeconds = 0;
+
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const sampleTime = startTime + (sample + 0.5) * sampleDurationSeconds;
+    const elapsedMs = Math.max(0, (sampleTime - automation.startTime) * 1000);
+    const value = automation.normalizeValue(
+      getTimelineValueAtTime(automation.timeline, elapsedMs),
+    );
+    integratedSeconds += Math.max(0, value) * sampleDurationSeconds;
+  }
+
+  return integratedSeconds;
 };
 
 const setParamAtTime = (param, value, time) => {
@@ -487,6 +519,33 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     pendingTimeoutId: null,
     cleanupTimeoutId: null,
     playRequestId: 0,
+    playback: sound.playback ?? null,
+    control: sound.playback
+      ? {
+          commandId: -1,
+          status: "stopped",
+          cursorMs: 0,
+          durationMs: null,
+          decodedBuffer: null,
+          ready: false,
+          readyAnnounced: false,
+          readyTaskQueued: false,
+          decodeRequestId: 0,
+          decodePending: false,
+          pendingPosition: null,
+          deferredProgress: false,
+          pausedCursorRetained: false,
+          remainingDelayMs: 0,
+          delayDeadlineMs: null,
+          progressIntervalId: null,
+          sourceToken: 0,
+          sourceCursorMs: 0,
+          sourceStartedAt: null,
+          eventsSuppressed: false,
+          detached: false,
+          lastErrorCode: null,
+        }
+      : null,
   };
 };
 
@@ -648,6 +707,17 @@ const stopSource = (sound, delayMs = 0) => {
 const cleanupSound = (sound) => {
   sound.onSourceEnded = null;
 
+  if (sound.control) {
+    sound.control.decodeRequestId += 1;
+    sound.control.sourceToken += 1;
+    sound.control.eventsSuppressed = true;
+    sound.control.detached = true;
+    if (sound.control.progressIntervalId !== null) {
+      clearInterval(sound.control.progressIntervalId);
+      sound.control.progressIntervalId = null;
+    }
+  }
+
   if (sound.pendingTimeoutId !== null) {
     clearTimeout(sound.pendingTimeoutId);
     sound.pendingTimeoutId = null;
@@ -769,6 +839,868 @@ export const createAudioStage = () => {
   const currentSoundKeyById = new Map();
   const directAudios = new Map();
   let soundGeneration = 0;
+  let soundEventHandler;
+  let destroyed = false;
+
+  const isCurrentControlledInstance = (instance) =>
+    !destroyed &&
+    instance?.control &&
+    !instance.control.eventsSuppressed &&
+    !instance.control.detached &&
+    sounds.get(instance.internalId) === instance &&
+    currentSoundKeyById.get(instance.id) === instance.internalId;
+
+  const getControlledPositionMs = (instance) => {
+    const control = instance.control;
+    if (
+      !control ||
+      control.status !== "playing" ||
+      !instance.source ||
+      control.sourceStartedAt === null ||
+      control.durationMs === null
+    ) {
+      return Math.max(0, control?.cursorMs ?? 0);
+    }
+
+    const context = getAudioContext();
+    const playedSeconds = integrateAudioParamValue(
+      instance.source.playbackRate,
+      control.sourceStartedAt,
+      context.currentTime,
+    );
+    let positionMs = control.sourceCursorMs + playedSeconds * 1000;
+    if (instance.loop && control.durationMs > 0) {
+      positionMs %= control.durationMs;
+    } else {
+      positionMs = Math.min(positionMs, control.durationMs);
+    }
+
+    return Math.max(0, positionMs);
+  };
+
+  const captureControlledPosition = (instance) => {
+    const control = instance.control;
+    if (!control) return 0;
+
+    control.cursorMs = getControlledPositionMs(instance);
+    control.sourceCursorMs = control.cursorMs;
+    control.sourceStartedAt = getAudioContext().currentTime;
+    return control.cursorMs;
+  };
+
+  const normalizeEventPosition = (value) =>
+    Math.max(0, Math.round(toFiniteParamValue(value, 0)));
+
+  const emitControlledEventNow = (
+    instance,
+    eventName,
+    fields,
+    commandId = instance.control?.commandId,
+  ) => {
+    if (
+      !isCurrentControlledInstance(instance) ||
+      instance.control.commandId !== commandId
+    ) {
+      return false;
+    }
+
+    soundEventHandler?.(eventName, {
+      _event: {
+        id: instance.id,
+        commandId,
+        ...fields,
+      },
+    });
+    return true;
+  };
+
+  const queueControlledEvent = (
+    instance,
+    eventName,
+    fields,
+    commandId = instance.control?.commandId,
+  ) => {
+    queueMicrotask(() => {
+      emitControlledEventNow(instance, eventName, fields, commandId);
+    });
+  };
+
+  const getControlledEventPosition = (instance) =>
+    normalizeEventPosition(getControlledPositionMs(instance));
+
+  const queueControlledProgress = (instance) => {
+    const control = instance.control;
+    if (!control?.ready || control.durationMs === null) return;
+
+    queueMicrotask(() => {
+      if (!isCurrentControlledInstance(instance)) {
+        return;
+      }
+
+      emitControlledEventNow(
+        instance,
+        "soundProgress",
+        {
+          positionMs: getControlledEventPosition(instance),
+          durationMs: normalizeEventPosition(control.durationMs),
+        },
+        control.commandId,
+      );
+    });
+  };
+
+  const queueControlledError = (instance, errorCode) => {
+    const control = instance.control;
+    if (!control) return;
+
+    control.lastErrorCode = errorCode;
+    queueControlledEvent(
+      instance,
+      "soundError",
+      { errorCode },
+      control.commandId,
+    );
+  };
+
+  const stopControlledProgress = (instance) => {
+    const control = instance.control;
+    if (!control || control.progressIntervalId === null) return;
+
+    clearInterval(control.progressIntervalId);
+    control.progressIntervalId = null;
+  };
+
+  const startControlledProgress = (instance) => {
+    const control = instance.control;
+    stopControlledProgress(instance);
+    if (!control || !instance.source || control.status !== "playing") {
+      return;
+    }
+
+    control.progressIntervalId = setInterval(() => {
+      if (
+        !isCurrentControlledInstance(instance) ||
+        control.status !== "playing" ||
+        !instance.source
+      ) {
+        stopControlledProgress(instance);
+        return;
+      }
+      queueControlledProgress(instance);
+    }, CONTROLLED_PROGRESS_INTERVAL_MS);
+  };
+
+  const getRemainingControlledDelayMs = (instance) => {
+    const control = instance.control;
+    if (!control) return 0;
+    if (control.delayDeadlineMs === null) {
+      return Math.max(0, control.remainingDelayMs);
+    }
+
+    return Math.max(0, control.delayDeadlineMs - Date.now());
+  };
+
+  const cancelControlledPendingStart = (
+    instance,
+    { preserveRemainingDelay = false } = {},
+  ) => {
+    const control = instance.control;
+    if (!control) return;
+
+    const remainingDelayMs = preserveRemainingDelay
+      ? getRemainingControlledDelayMs(instance)
+      : 0;
+    instance.playRequestId = (instance.playRequestId ?? 0) + 1;
+    instance.playbackPending = false;
+    if (instance.pendingTimeoutId !== null) {
+      clearTimeout(instance.pendingTimeoutId);
+      instance.pendingTimeoutId = null;
+    }
+    control.delayDeadlineMs = null;
+    control.remainingDelayMs = remainingDelayMs;
+  };
+
+  const stopControlledSource = (instance) => {
+    const control = instance.control;
+    if (!control) return;
+
+    stopControlledProgress(instance);
+    control.sourceToken += 1;
+    control.sourceStartedAt = null;
+    const source = instance.source;
+    instance.source = null;
+    instance.sourceEnded = true;
+    if (!source) return;
+
+    source.onended = null;
+    try {
+      source.stop(getAudioContext().currentTime);
+    } catch {
+      // Stopping an already-stopped source is harmless.
+    }
+    disconnect(source);
+  };
+
+  const validateControlledSegment = (instance, audioBuffer) => {
+    const decodedDuration = toFiniteParamValue(
+      audioBuffer?.duration,
+      Number.NaN,
+    );
+    const segmentStart = toFiniteParamValue(instance.startAt, Number.NaN);
+    const segmentEnd =
+      instance.endAt === null || instance.endAt === undefined
+        ? decodedDuration
+        : toFiniteParamValue(instance.endAt, Number.NaN);
+
+    if (
+      !Number.isFinite(decodedDuration) ||
+      !Number.isFinite(segmentStart) ||
+      !Number.isFinite(segmentEnd) ||
+      segmentStart < 0 ||
+      segmentStart >= decodedDuration ||
+      segmentEnd <= segmentStart ||
+      segmentEnd > decodedDuration
+    ) {
+      return null;
+    }
+
+    return (segmentEnd - segmentStart) * 1000;
+  };
+
+  const configureControlledLoop = (instance, source) => {
+    const control = instance.control;
+    source.loop = instance.loop ?? false;
+    if (!source.loop || control.durationMs === null) {
+      return;
+    }
+
+    source.loopStart = instance.startAt;
+    source.loopEnd = instance.startAt + control.durationMs / 1000;
+  };
+
+  const resolvePendingControlledPosition = (instance) => {
+    const control = instance.control;
+    const pending = control?.pendingPosition;
+    if (!control || !pending || control.durationMs === null) {
+      return { invalidPosition: false, terminal: false };
+    }
+
+    const resolve = (candidate, reportInvalid) => {
+      if (!candidate) {
+        return { invalidPosition: false, terminal: false };
+      }
+
+      if (candidate.positionMs > control.durationMs) {
+        if (candidate.fallback) {
+          if (candidate.fallbackState) {
+            control.status = candidate.fallbackState.status;
+            control.cursorMs = candidate.fallbackState.cursorMs;
+            control.pausedCursorRetained =
+              candidate.fallbackState.pausedCursorRetained;
+            control.remainingDelayMs = candidate.fallbackState.remainingDelayMs;
+            control.deferredProgress = candidate.fallbackState.deferredProgress;
+            instance.playbackPending = candidate.fallbackState.playbackPending;
+          }
+          const fallbackResult = resolve(candidate.fallback, false);
+          return {
+            ...fallbackResult,
+            invalidPosition: reportInvalid,
+          };
+        }
+        if (candidate.operation === "play") {
+          control.status = "stopped";
+          control.cursorMs = 0;
+          control.remainingDelayMs = 0;
+          control.pausedCursorRetained = false;
+          instance.playbackPending = false;
+        }
+        return {
+          invalidPosition: reportInvalid,
+          terminal: false,
+        };
+      }
+
+      if (candidate.operation === "seekNoop") {
+        return { invalidPosition: false, terminal: false };
+      }
+
+      control.cursorMs = candidate.positionMs;
+      if (candidate.positionMs === control.durationMs) {
+        control.status = "ended";
+        control.remainingDelayMs = 0;
+        control.pausedCursorRetained = false;
+        instance.playbackPending = false;
+        return { invalidPosition: false, terminal: true };
+      }
+
+      return { invalidPosition: false, terminal: false };
+    };
+
+    const result = resolve(pending, true);
+    control.pendingPosition = null;
+    return result;
+  };
+
+  const createControlledSource = (instance) => {
+    const control = instance.control;
+    const context = getAudioContext();
+    const source = context.createBufferSource();
+    source.buffer = control.decodedBuffer;
+    configureControlledLoop(instance, source);
+
+    applyPlaybackRate({
+      source,
+      targetValue: instance.playbackRate ?? 1,
+      transition: instance.playbackRateTransition,
+    });
+    instance.playbackRateTransition = null;
+    connect(source, instance.gainNode);
+
+    const sourceToken = control.sourceToken + 1;
+    control.sourceToken = sourceToken;
+    instance.sourceEnded = false;
+    source.onended = () => {
+      if (instance.source !== source || control.sourceToken !== sourceToken) {
+        return;
+      }
+
+      instance.sourceEnded = true;
+      if (instance.finishing) {
+        instance.onSourceEnded?.();
+        return;
+      }
+      if (
+        control.eventsSuppressed ||
+        control.detached ||
+        control.status !== "playing" ||
+        instance.loop
+      ) {
+        return;
+      }
+
+      stopControlledProgress(instance);
+      instance.source = null;
+      disconnect(source);
+      control.status = "ended";
+      control.cursorMs = control.durationMs;
+      control.sourceStartedAt = null;
+      queueControlledEvent(
+        instance,
+        "soundComplete",
+        {
+          positionMs: normalizeEventPosition(control.durationMs),
+          durationMs: normalizeEventPosition(control.durationMs),
+        },
+        control.commandId,
+      );
+    };
+
+    const offsetSeconds = instance.startAt + control.cursorMs / 1000;
+    const remainingSeconds = Math.max(
+      0,
+      (control.durationMs - control.cursorMs) / 1000,
+    );
+    const startTime = Math.max(0, toFiniteParamValue(context.currentTime, 0));
+    instance.sourceStartedAt = startTime;
+    instance.sourceStartOffset = offsetSeconds;
+    control.sourceStartedAt = startTime;
+    control.sourceCursorMs = control.cursorMs;
+
+    try {
+      if (
+        source.loop &&
+        instance.endAt !== null &&
+        instance.endAt !== undefined
+      ) {
+        source.loopStart = instance.startAt;
+        source.loopEnd = instance.endAt;
+        source.start(startTime, offsetSeconds);
+      } else if (!source.loop) {
+        source.start(startTime, offsetSeconds, remainingSeconds);
+      } else {
+        source.start(startTime, offsetSeconds);
+      }
+    } catch (error) {
+      source.onended = null;
+      disconnect(source);
+      throw error;
+    }
+
+    return source;
+  };
+
+  const failControlledPlayback = (instance, errorCode) => {
+    const control = instance.control;
+    cancelControlledPendingStart(instance);
+    stopControlledSource(instance);
+    control.status = "stopped";
+    control.cursorMs = 0;
+    control.pendingPosition = null;
+    control.pausedCursorRetained = false;
+    control.remainingDelayMs = 0;
+    queueControlledError(instance, errorCode);
+    if (instance.finishing) {
+      instance.sourceEnded = true;
+      instance.onSourceEnded?.();
+    }
+  };
+
+  const startControlledPlayback = (instance, delayMs = 0) => {
+    const control = instance.control;
+    if (
+      !control?.ready ||
+      control.durationMs === null ||
+      control.cursorMs >= control.durationMs
+    ) {
+      return;
+    }
+
+    cancelControlledPendingStart(instance);
+    stopControlledSource(instance);
+    control.status = "playing";
+    control.remainingDelayMs = Math.max(0, delayMs);
+    instance.sourceEnded = false;
+    instance.playbackPending = true;
+    const playRequestId = (instance.playRequestId ?? 0) + 1;
+    instance.playRequestId = playRequestId;
+    const context = getAudioContext();
+    const needsResume =
+      context.state === "suspended" && typeof context.resume === "function";
+
+    const start = () => {
+      if (
+        instance.playRequestId !== playRequestId ||
+        control.status !== "playing"
+      ) {
+        return;
+      }
+
+      instance.pendingTimeoutId = null;
+      control.delayDeadlineMs = null;
+      control.remainingDelayMs = 0;
+      try {
+        instance.source = createControlledSource(instance);
+      } catch {
+        failControlledPlayback(instance, "playback-failed");
+        return;
+      }
+      instance.playbackPending = false;
+      startControlledProgress(instance);
+      if (instance.finishing) {
+        instance.onFinishingSourceStarted?.();
+      }
+    };
+
+    const scheduleStart = () => {
+      if (
+        instance.playRequestId !== playRequestId ||
+        control.status !== "playing"
+      ) {
+        return;
+      }
+
+      if (control.remainingDelayMs > 0) {
+        control.delayDeadlineMs = Date.now() + control.remainingDelayMs;
+        instance.pendingTimeoutId = setTimeout(start, control.remainingDelayMs);
+        return;
+      }
+      start();
+    };
+
+    const resumePromise = resumeAudioContext(context);
+    if (needsResume) {
+      void resumePromise.then(scheduleStart);
+    } else {
+      scheduleStart();
+    }
+  };
+
+  const applyResolvedControlledState = (
+    instance,
+    { invalidPosition, terminal },
+  ) => {
+    const control = instance.control;
+    if (invalidPosition) {
+      queueControlledError(instance, "invalid-position");
+      control.deferredProgress = false;
+      if (control.status === "playing") {
+        startControlledPlayback(instance, control.remainingDelayMs);
+      }
+      return;
+    }
+    if (terminal) {
+      cancelControlledPendingStart(instance);
+      stopControlledSource(instance);
+      queueControlledProgress(instance);
+      return;
+    }
+
+    if (control.status === "playing") {
+      startControlledPlayback(instance, control.remainingDelayMs);
+    }
+    if (control.deferredProgress) {
+      control.deferredProgress = false;
+      queueControlledProgress(instance);
+    }
+  };
+
+  const scheduleControlledReady = (instance) => {
+    const control = instance.control;
+    if (!control || control.readyTaskQueued || control.readyAnnounced) {
+      return;
+    }
+
+    control.readyTaskQueued = true;
+    queueMicrotask(() => {
+      control.readyTaskQueued = false;
+      if (
+        !isCurrentControlledInstance(instance) ||
+        !control.ready ||
+        control.readyAnnounced
+      ) {
+        return;
+      }
+
+      const commandId = control.commandId;
+      const resolution = resolvePendingControlledPosition(instance);
+      const playRequestId = instance.playRequestId;
+      control.readyAnnounced = true;
+      try {
+        emitControlledEventNow(
+          instance,
+          "soundReady",
+          {
+            positionMs: getControlledEventPosition(instance),
+            durationMs: normalizeEventPosition(control.durationMs),
+          },
+          commandId,
+        );
+      } finally {
+        if (isCurrentControlledInstance(instance)) {
+          if (control.commandId === commandId) {
+            applyResolvedControlledState(instance, resolution);
+          } else if (
+            control.status === "playing" &&
+            !instance.source &&
+            instance.pendingTimeoutId === null &&
+            instance.playRequestId === playRequestId
+          ) {
+            startControlledPlayback(instance, control.remainingDelayMs);
+          }
+        }
+      }
+    });
+  };
+
+  const settleControlledDecode = (instance, decodeRequestId, audioBuffer) => {
+    const control = instance.control;
+    if (
+      !control ||
+      control.decodeRequestId !== decodeRequestId ||
+      control.detached
+    ) {
+      return;
+    }
+
+    control.decodePending = false;
+    const durationMs = validateControlledSegment(instance, audioBuffer);
+    if (durationMs === null) {
+      failControlledPlayback(instance, "invalid-segment");
+      return;
+    }
+
+    control.decodedBuffer = audioBuffer;
+    control.durationMs = durationMs;
+    control.ready = true;
+    control.lastErrorCode = null;
+
+    if (control.eventsSuppressed && instance.finishing) {
+      const resolution = resolvePendingControlledPosition(instance);
+      if (resolution.invalidPosition || control.status !== "playing") {
+        instance.sourceEnded = true;
+        instance.onSourceEnded?.();
+        return;
+      }
+      startControlledPlayback(instance, control.remainingDelayMs);
+      return;
+    }
+
+    scheduleControlledReady(instance);
+  };
+
+  const beginControlledDecode = (instance) => {
+    const control = instance.control;
+    if (!control || control.decodePending || control.ready) return;
+
+    const decodeRequestId = control.decodeRequestId + 1;
+    control.decodeRequestId = decodeRequestId;
+    control.decodePending = true;
+    instance.playbackPending = control.status === "playing";
+    const cachedBuffer = AudioAsset.getAsset(instance.src);
+    if (cachedBuffer) {
+      queueMicrotask(() => {
+        settleControlledDecode(instance, decodeRequestId, cachedBuffer);
+      });
+      return;
+    }
+
+    const assetPromise = AudioAsset.getAssetPromise?.(instance.src);
+    if (!assetPromise) {
+      queueMicrotask(() => {
+        if (control.decodeRequestId !== decodeRequestId) return;
+        control.decodePending = false;
+        failControlledPlayback(instance, "asset-unavailable");
+      });
+      return;
+    }
+
+    Promise.resolve(assetPromise).then(
+      (audioBuffer) => {
+        settleControlledDecode(instance, decodeRequestId, audioBuffer);
+      },
+      () => {
+        if (control.decodeRequestId !== decodeRequestId) return;
+        control.decodePending = false;
+        failControlledPlayback(instance, "decode-failed");
+      },
+    );
+  };
+
+  const applyPendingControlledCommand = (instance, command) => {
+    const control = instance.control;
+    switch (command.operation) {
+      case "play": {
+        const fallback = control.pendingPosition;
+        const fallbackState = fallback
+          ? {
+              status: control.status,
+              cursorMs: control.cursorMs,
+              pausedCursorRetained: control.pausedCursorRetained,
+              remainingDelayMs: control.remainingDelayMs,
+              deferredProgress: control.deferredProgress,
+              playbackPending: instance.playbackPending,
+            }
+          : null;
+        cancelControlledPendingStart(instance);
+        stopControlledSource(instance);
+        control.status = "playing";
+        control.cursorMs = command.positionMs;
+        control.pausedCursorRetained = false;
+        control.remainingDelayMs = instance.startDelayMs;
+        control.pendingPosition = {
+          operation: "play",
+          positionMs: command.positionMs,
+          fallback,
+          fallbackState,
+        };
+        control.deferredProgress = false;
+        instance.playbackPending = true;
+        break;
+      }
+      case "pause": {
+        if (control.status !== "playing") {
+          break;
+        }
+        cancelControlledPendingStart(instance, {
+          preserveRemainingDelay: true,
+        });
+        control.status = "paused";
+        control.pausedCursorRetained = true;
+        control.deferredProgress = true;
+        instance.playbackPending = false;
+        break;
+      }
+      case "resume": {
+        if (control.status !== "paused" || !control.pausedCursorRetained) {
+          break;
+        }
+        control.status = "playing";
+        control.pausedCursorRetained = false;
+        instance.playbackPending = true;
+        break;
+      }
+      case "stop": {
+        const changed =
+          control.status !== "stopped" ||
+          control.cursorMs !== 0 ||
+          instance.playbackPending;
+        cancelControlledPendingStart(instance);
+        stopControlledSource(instance);
+        control.status = "stopped";
+        control.cursorMs = 0;
+        control.pausedCursorRetained = false;
+        control.remainingDelayMs = 0;
+        control.pendingPosition = null;
+        control.deferredProgress ||= changed;
+        instance.playbackPending = false;
+        break;
+      }
+      case "seek": {
+        const canSeek =
+          control.status === "playing" || control.status === "paused";
+        control.pendingPosition = {
+          operation: canSeek ? "seek" : "seekNoop",
+          positionMs: command.positionMs,
+          fallback: canSeek ? control.pendingPosition : null,
+        };
+        control.deferredProgress = canSeek;
+        break;
+      }
+    }
+  };
+
+  const applyReadyControlledCommand = (instance, command) => {
+    const control = instance.control;
+    const durationMs = control.durationMs;
+
+    switch (command.operation) {
+      case "play": {
+        if (command.positionMs > durationMs) {
+          queueControlledError(instance, "invalid-position");
+          return;
+        }
+
+        cancelControlledPendingStart(instance);
+        stopControlledSource(instance);
+        control.pausedCursorRetained = false;
+        control.cursorMs = command.positionMs;
+        if (command.positionMs === durationMs) {
+          control.status = "ended";
+          control.remainingDelayMs = 0;
+          queueControlledProgress(instance);
+          return;
+        }
+
+        control.status = "playing";
+        control.remainingDelayMs = instance.startDelayMs;
+        startControlledPlayback(instance, instance.startDelayMs);
+        return;
+      }
+      case "pause": {
+        if (control.status !== "playing") {
+          return;
+        }
+
+        if (instance.source) {
+          captureControlledPosition(instance);
+        }
+        const remainingDelayMs = getRemainingControlledDelayMs(instance);
+        cancelControlledPendingStart(instance, {
+          preserveRemainingDelay: true,
+        });
+        stopControlledSource(instance);
+        control.status = "paused";
+        control.pausedCursorRetained = true;
+        control.remainingDelayMs = remainingDelayMs;
+        queueControlledProgress(instance);
+        return;
+      }
+      case "resume": {
+        if (
+          control.status !== "paused" ||
+          !control.pausedCursorRetained ||
+          control.cursorMs >= durationMs
+        ) {
+          return;
+        }
+
+        control.status = "playing";
+        control.pausedCursorRetained = false;
+        startControlledPlayback(instance, control.remainingDelayMs);
+        return;
+      }
+      case "stop": {
+        const changed =
+          control.status !== "stopped" ||
+          control.cursorMs !== 0 ||
+          instance.source !== null ||
+          instance.playbackPending;
+        if (!changed) return;
+
+        cancelControlledPendingStart(instance);
+        stopControlledSource(instance);
+        control.status = "stopped";
+        control.cursorMs = 0;
+        control.pausedCursorRetained = false;
+        control.remainingDelayMs = 0;
+        queueControlledProgress(instance);
+        return;
+      }
+      case "seek": {
+        if (command.positionMs > durationMs) {
+          queueControlledError(instance, "invalid-position");
+          return;
+        }
+        if (control.status === "stopped" || control.status === "ended") {
+          return;
+        }
+        if (command.positionMs === durationMs) {
+          cancelControlledPendingStart(instance);
+          stopControlledSource(instance);
+          control.status = "ended";
+          control.cursorMs = durationMs;
+          control.pausedCursorRetained = false;
+          control.remainingDelayMs = 0;
+          queueControlledProgress(instance);
+          return;
+        }
+
+        if (control.status === "paused") {
+          control.cursorMs = command.positionMs;
+          queueControlledProgress(instance);
+          return;
+        }
+
+        if (!instance.source) {
+          control.cursorMs = command.positionMs;
+          queueControlledProgress(instance);
+          return;
+        }
+
+        stopControlledSource(instance);
+        control.cursorMs = command.positionMs;
+        control.status = "playing";
+        startControlledPlayback(instance, 0);
+        queueControlledProgress(instance);
+      }
+    }
+  };
+
+  const acceptControlledCommand = (instance, command) => {
+    const control = instance.control;
+    if (!control || command.commandId <= control.commandId) {
+      return false;
+    }
+
+    const isInitialCommand = control.commandId < 0;
+    control.commandId = command.commandId;
+    control.lastErrorCode = null;
+    instance.playback = command;
+
+    if (control.ready && control.readyAnnounced) {
+      applyReadyControlledCommand(instance, command);
+      return true;
+    }
+
+    applyPendingControlledCommand(instance, command);
+    if (!control.ready && !control.decodePending) {
+      if (isInitialCommand || command.operation === "play") {
+        control.readyAnnounced = false;
+        beginControlledDecode(instance);
+      }
+    } else if (control.ready) {
+      scheduleControlledReady(instance);
+    }
+    return true;
+  };
+
+  const suppressControlledEvents = (instance) => {
+    const control = instance?.control;
+    if (!control) return;
+
+    control.eventsSuppressed = true;
+    stopControlledProgress(instance);
+  };
 
   const getCurrentChannelSounds = (channelId) => {
     const channelSounds = [];
@@ -1029,7 +1961,11 @@ export const createAudioStage = () => {
       "playbackRate",
       phase,
     );
-    playSound(instance);
+    if (instance.control) {
+      acceptControlledCommand(instance, sound.playback);
+    } else {
+      playSound(instance);
+    }
     return instance;
   };
 
@@ -1237,8 +2173,18 @@ export const createAudioStage = () => {
     const nextVolumeValue = getVolumeValue(sound);
     const volumeChanged = currentVolumeValue !== nextVolumeValue;
     const panChanged = instance.pan !== sound.pan;
+    const loopChanged = instance.loop !== sound.loop;
     const playbackRateChanged = instance.playbackRate !== sound.playbackRate;
     const startDelayChanged = instance.startDelayMs !== sound.startDelayMs;
+    const sourceBeforeUpdate = instance.source;
+
+    if (
+      instance.control &&
+      instance.source &&
+      (loopChanged || playbackRateChanged)
+    ) {
+      captureControlledPosition(instance);
+    }
 
     if (instance.channelId !== sound.channelId) {
       const parentChannel = getParentChannelForSound(sound);
@@ -1256,7 +2202,7 @@ export const createAudioStage = () => {
     instance.channelId = sound.channelId;
     bindChannelLoopCompletion(instance);
 
-    if (instance.source) {
+    if (instance.source && !instance.control) {
       instance.source.loop = sound.loop;
     }
 
@@ -1295,7 +2241,9 @@ export const createAudioStage = () => {
         "playbackRate",
         "update",
       );
-      if (instance.source) {
+      if (instance.control && loopChanged && instance.source) {
+        instance.playbackRateTransition = playbackRateTransition;
+      } else if (instance.source) {
         applyPlaybackRate({
           source: instance.source,
           targetValue: sound.playbackRate,
@@ -1306,12 +2254,28 @@ export const createAudioStage = () => {
       }
     }
 
-    if (startDelayChanged && instance.pendingTimeoutId !== null) {
+    if (
+      !instance.control &&
+      startDelayChanged &&
+      instance.pendingTimeoutId !== null
+    ) {
       playSound(instance);
+    }
+
+    if (instance.control) {
+      acceptControlledCommand(instance, sound.playback);
+      if (
+        loopChanged &&
+        instance.source === sourceBeforeUpdate &&
+        instance.control.status === "playing"
+      ) {
+        stopControlledSource(instance);
+        startControlledPlayback(instance, 0);
+      }
     }
   };
 
-  const renderGraph = ({
+  const validateGraphTransition = ({
     prevAudio = [],
     nextAudio = [],
     prevAudioEffects = [],
@@ -1353,6 +2317,65 @@ export const createAudioStage = () => {
         );
       }
     }
+
+    for (const [id, prevSound] of prevSoundById) {
+      const nextSound = nextSoundById.get(id);
+      if (!nextSound) continue;
+
+      const wasControlled = prevSound.playback !== undefined;
+      const isControlled = nextSound.playback !== undefined;
+      if (wasControlled !== isControlled) {
+        throw new Error(
+          `Input error: sound "${id}" cannot change command-controlled playback mode while retained.`,
+        );
+      }
+
+      if (isControlled && !hasSameSoundSourceIdentity(prevSound, nextSound)) {
+        const currentKey = currentSoundKeyById.get(id);
+        const currentInstance = currentKey ? sounds.get(currentKey) : null;
+        const acceptedCommandId =
+          currentInstance?.control?.commandId ?? prevSound.playback.commandId;
+        if (
+          nextSound.playback.operation !== "play" ||
+          nextSound.playback.commandId <= acceptedCommandId
+        ) {
+          throw new Error(
+            `Input error: command-controlled sound "${id}" must change source identity with a higher play command.`,
+          );
+        }
+      }
+    }
+
+    return {
+      prev,
+      next,
+      prevChannelById,
+      nextChannelById,
+      prevSoundById,
+      nextSoundById,
+    };
+  };
+
+  const renderGraph = ({
+    prevAudio = [],
+    nextAudio = [],
+    prevAudioEffects = [],
+    nextAudioEffects = [],
+    eventHandler = soundEventHandler,
+  } = {}) => {
+    const {
+      next,
+      prevChannelById,
+      nextChannelById,
+      prevSoundById,
+      nextSoundById,
+    } = validateGraphTransition({
+      prevAudio,
+      nextAudio,
+      prevAudioEffects,
+      nextAudioEffects,
+    });
+    soundEventHandler = eventHandler;
 
     ensureRootChannel(ROOT_CHANNEL_ID);
 
@@ -1447,6 +2470,7 @@ export const createAudioStage = () => {
         prevSound.channelId !== null &&
         prevChannelById.get(prevSound.channelId)?.interruption === "loopEnd";
       const finishPreviousSound = () => {
+        suppressControlledEvents(instance);
         if (!finishAtLoopEnd) {
           return removeSoundInstance(
             instance,
@@ -1670,6 +2694,8 @@ export const createAudioStage = () => {
   };
 
   const destroy = () => {
+    destroyed = true;
+    soundEventHandler = undefined;
     for (const sound of sounds.values()) {
       cleanupSound(sound);
     }
@@ -1690,6 +2716,7 @@ export const createAudioStage = () => {
     getById,
     resume,
     tick,
+    validateGraphTransition,
     renderGraph,
     destroy,
     _inspect: () => ({

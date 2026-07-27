@@ -66,6 +66,7 @@ const renderPluginDiff = ({
  * @param {Object[]} [params.prevAudioEffects] - Previous audio effects
  * @param {Object[]} [params.nextAudioEffects] - Next audio effects
  * @param {import("./audio/audioPlugin.js").AudioPlugin[]} params.audioPlugins - Array of audio plugins
+ * @param {Function} [params.eventHandler] - Route Graphics event handler
  */
 export const renderAudio = ({
   app,
@@ -74,6 +75,7 @@ export const renderAudio = ({
   prevAudioEffects = [],
   nextAudioEffects = [],
   audioPlugins,
+  eventHandler,
 }) => {
   normalizeAudioRenderState({
     audio: prevAudioTree,
@@ -90,6 +92,7 @@ export const renderAudio = ({
       nextAudio: filterGraphAudio(nextAudioTree),
       prevAudioEffects,
       nextAudioEffects,
+      eventHandler,
     });
     renderPluginDiff({
       app,

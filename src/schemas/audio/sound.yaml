@@ -58,3 +58,44 @@ properties:
     description: Optional end time in seconds
     default: null
     minimum: 0
+  playback:
+    type: object
+    description: Optional command-controlled playback instruction
+    additionalProperties: false
+    required:
+      - commandId
+      - operation
+    properties:
+      commandId:
+        type: integer
+        minimum: 0
+        maximum: 9007199254740991
+        description: Monotonically increasing command identity
+      operation:
+        type: string
+        enum: [play, pause, resume, stop, seek]
+        description: Transport operation
+      positionMs:
+        type: number
+        minimum: 0
+        description: Segment-relative position required by play and seek
+    allOf:
+      - if:
+          properties:
+            operation:
+              enum: [play, seek]
+          required:
+            - operation
+        then:
+          required:
+            - positionMs
+      - if:
+          properties:
+            operation:
+              enum: [pause, resume, stop]
+          required:
+            - operation
+        then:
+          not:
+            required:
+              - positionMs
