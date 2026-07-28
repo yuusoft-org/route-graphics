@@ -36,7 +36,7 @@ describe("input plugin", () => {
   it("applies and resets degree rotation around the configured origin", () => {
     const parent = new Container();
     const eventHandler = vi.fn();
-    const { app } = createApp();
+    const { app, bridgeState } = createApp();
     const initialElement = parseInput({
       state: {
         id: "rotated-input",
@@ -66,6 +66,21 @@ describe("input plugin", () => {
     expect(input.pivot.x).toBe(24);
     expect(input.pivot.y).toBe(12);
     expect(input.rotation).toBeCloseTo(Math.PI / 4);
+
+    const initialBridgeOptions = bridgeState.mountArgs[1];
+    const initialGeometry = initialBridgeOptions.getGeometry();
+    const inputCenter = input.toGlobal({
+      x: initialElement.width / 2,
+      y: initialElement.height / 2,
+    });
+
+    expect(initialBridgeOptions.hitTest(inputCenter)).toBe(true);
+    expect(
+      initialBridgeOptions.hitTest({
+        x: initialGeometry.x + 1,
+        y: initialGeometry.y + 1,
+      }),
+    ).toBe(false);
 
     const nextElement = parseInput({
       state: {

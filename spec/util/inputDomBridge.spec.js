@@ -465,6 +465,54 @@ describe("inputDomBridge", () => {
     }
   });
 
+  it("blurs when the pointer is inside the AABB but outside the transformed input shape", () => {
+    vi.useFakeTimers();
+
+    try {
+      const { app } = createApp();
+      const bridge = createInputDomBridge({ app });
+      const callbacks = {
+        onBlur: vi.fn(),
+      };
+      const hitTest = vi.fn(() => false);
+
+      const input = bridge.mount("rotated-name", {
+        value: "abc",
+        padding: { top: 1, right: 1, bottom: 1, left: 1 },
+        textStyle: { fontSize: 18, fill: "#ffffff", align: "left" },
+        getGeometry: () => ({
+          x: 10,
+          y: 20,
+          width: 80,
+          height: 40,
+          visible: true,
+        }),
+        hitTest,
+        callbacks,
+      });
+
+      input.focus();
+      document.body.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 60,
+          clientY: 100,
+        }),
+      );
+      vi.runAllTimers();
+
+      expect(hitTest).toHaveBeenCalledWith({
+        x: 20,
+        y: 40,
+      });
+      expect(callbacks.onBlur).toHaveBeenCalledTimes(1);
+
+      bridge.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("suppresses transient blur callbacks when the input is immediately refocused", () => {
     vi.useFakeTimers();
 

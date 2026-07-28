@@ -521,6 +521,31 @@ export const getInputGeometry = (app, container, fallbackElement) => {
   };
 };
 
+export const hitTestInput = (container, element, point) => {
+  if (
+    !container ||
+    container.destroyed === true ||
+    typeof container.toLocal !== "function" ||
+    !Number.isFinite(point?.x) ||
+    !Number.isFinite(point?.y) ||
+    !Number.isFinite(element?.width) ||
+    !Number.isFinite(element?.height) ||
+    element.width <= 0 ||
+    element.height <= 0
+  ) {
+    return false;
+  }
+
+  const localPoint = container.toLocal(point);
+
+  return (
+    localPoint.x >= 0 &&
+    localPoint.x <= element.width &&
+    localPoint.y >= 0 &&
+    localPoint.y <= element.height
+  );
+};
+
 export const syncInputView = (runtime, element) => {
   const padding = resolvePadding(element.padding);
   const contentWidth = Math.max(

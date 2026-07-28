@@ -2,6 +2,7 @@ import { isDeepEqual } from "../../../util/isDeepEqual.js";
 import {
   INPUT_RUNTIME,
   getInputGeometry,
+  hitTestInput,
   syncInputView,
 } from "./inputShared.js";
 import { setElementRenderState } from "../elementRenderState.js";
@@ -231,6 +232,7 @@ export const updateInput = ({
         eventHandler,
       }),
       getGeometry: () => getInputGeometry(app, container, nextRuntimeElement),
+      hitTest: (point) => hitTestInput(container, nextRuntimeElement, point),
     });
     setElementRenderState(container, nextElement);
     commitRenderState?.(container);

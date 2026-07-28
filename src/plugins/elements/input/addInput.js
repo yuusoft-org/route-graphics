@@ -6,6 +6,7 @@ import {
   createInputDisplay,
   getInputGeometry,
   getInputIndexFromLocalPoint,
+  hitTestInput,
   syncInputView,
 } from "./inputShared.js";
 import {
@@ -338,6 +339,7 @@ export const addInput = ({
       eventHandler,
     }),
     getGeometry: () => getInputGeometry(app, container, element),
+    hitTest: (point) => hitTestInput(container, element, point),
   });
 
   parent.addChild(container);
