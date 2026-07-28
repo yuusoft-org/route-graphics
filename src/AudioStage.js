@@ -476,6 +476,13 @@ const createChannelInstance = (channel, outputNode) => {
     pan: channel.pan ?? 0,
     loop: channel.loop ?? false,
     interruption: channel.interruption ?? "immediate",
+    playback: channel.playback ?? null,
+    control: channel.playback
+      ? {
+          commandId: -1,
+          status: "playing",
+        }
+      : null,
     outputNode,
     cleanupTimeoutId: null,
     deferredRemovalToken: null,
@@ -517,6 +524,9 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     playbackRateTransition: null,
     playbackPending: false,
     pendingTimeoutId: null,
+    pendingDelayMs: 0,
+    delayDeadlineMs: null,
+    channelPauseState: null,
     cleanupTimeoutId: null,
     playRequestId: 0,
     playback: sound.playback ?? null,
@@ -549,7 +559,7 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
   };
 };
 
-const createSourceForSound = (sound) => {
+const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   const context = getAudioContext();
   const audioBuffer = AudioAsset.getAsset(sound.src);
   debugAudio("asset lookup", {
@@ -587,7 +597,7 @@ const createSourceForSound = (sound) => {
     sound.onSourceEnded?.();
   };
 
-  const offset = sound.startAt ?? 0;
+  const offset = startOffset;
   const duration =
     sound.endAt !== null && sound.endAt !== undefined
       ? Math.max(sound.endAt - offset, 0)
@@ -597,7 +607,7 @@ const createSourceForSound = (sound) => {
   sound.sourceStartOffset = offset;
 
   if (source.loop && sound.endAt !== null && sound.endAt !== undefined) {
-    source.loopStart = offset;
+    source.loopStart = sound.startAt ?? 0;
     source.loopEnd = sound.endAt;
     source.start(startTime, offset);
   } else if (duration !== undefined) {
@@ -620,11 +630,17 @@ const createSourceForSound = (sound) => {
   return source;
 };
 
-const playSound = (sound) => {
+const playSound = (
+  sound,
+  { startOffset = sound.startAt ?? 0, startDelayMs = sound.startDelayMs } = {},
+) => {
   if (sound.pendingTimeoutId !== null) {
     clearTimeout(sound.pendingTimeoutId);
     sound.pendingTimeoutId = null;
   }
+  sound.delayDeadlineMs = null;
+  sound.pendingDelayMs = Math.max(0, startDelayMs ?? 0);
+  sound.channelPauseState = null;
 
   const context = getAudioContext();
   const playRequestId = (sound.playRequestId ?? 0) + 1;
@@ -637,7 +653,8 @@ const playSound = (sound) => {
     loop: sound.loop,
     volume: sound.volume,
     muted: sound.muted,
-    startDelayMs: sound.startDelayMs,
+    startDelayMs: sound.pendingDelayMs,
+    startOffset,
     contextState: context.state,
   });
   const needsResume =
@@ -649,8 +666,10 @@ const playSound = (sound) => {
     }
 
     sound.pendingTimeoutId = null;
+    sound.delayDeadlineMs = null;
+    sound.pendingDelayMs = 0;
     const previousSource = sound.source;
-    sound.source = createSourceForSound(sound);
+    sound.source = createSourceForSound(sound, startOffset);
     sound.playbackPending = false;
     if (previousSource && previousSource !== sound.source) {
       disconnect(previousSource);
@@ -668,8 +687,9 @@ const playSound = (sound) => {
       return;
     }
 
-    if (sound.startDelayMs > 0) {
-      sound.pendingTimeoutId = setTimeout(start, sound.startDelayMs);
+    if (sound.pendingDelayMs > 0) {
+      sound.delayDeadlineMs = Date.now() + sound.pendingDelayMs;
+      sound.pendingTimeoutId = setTimeout(start, sound.pendingDelayMs);
       return;
     }
 
@@ -688,6 +708,8 @@ const playSound = (sound) => {
 const stopSource = (sound, delayMs = 0) => {
   sound.playRequestId = (sound.playRequestId ?? 0) + 1;
   sound.playbackPending = false;
+  sound.pendingDelayMs = 0;
+  sound.delayDeadlineMs = null;
 
   if (sound.pendingTimeoutId !== null) {
     clearTimeout(sound.pendingTimeoutId);
@@ -1717,9 +1739,205 @@ export const createAudioStage = () => {
     return channelSounds;
   };
 
+  const getRemainingLegacyDelayMs = (sound) => {
+    if (sound.delayDeadlineMs === null) {
+      return Math.max(0, sound.pendingDelayMs);
+    }
+
+    return Math.max(0, sound.delayDeadlineMs - Date.now());
+  };
+
+  const getLegacyPlaybackOffset = (sound, context = getAudioContext()) => {
+    const source = sound.source;
+    const segmentStart = Math.max(0, toFiniteParamValue(sound.startAt, 0));
+    if (!source || sound.sourceStartedAt === null) {
+      return Math.max(
+        segmentStart,
+        toFiniteParamValue(sound.sourceStartOffset, segmentStart),
+      );
+    }
+
+    const startedAt = toFiniteParamValue(
+      sound.sourceStartedAt,
+      context.currentTime,
+    );
+    const elapsedSourceSeconds = integrateAudioParamValue(
+      source.playbackRate,
+      startedAt,
+      context.currentTime,
+    );
+    const startOffset = toFiniteParamValue(
+      sound.sourceStartOffset,
+      segmentStart,
+    );
+    const configuredEnd =
+      sound.endAt === null || sound.endAt === undefined
+        ? Number.NaN
+        : toFiniteParamValue(sound.endAt, Number.NaN);
+    const bufferEnd = toFiniteParamValue(
+      source.buffer?.duration,
+      Number.POSITIVE_INFINITY,
+    );
+    const segmentEnd = Number.isFinite(configuredEnd)
+      ? configuredEnd
+      : bufferEnd;
+    const absoluteOffset = startOffset + elapsedSourceSeconds;
+
+    if (source.loop && Number.isFinite(segmentEnd)) {
+      const loopDuration = segmentEnd - segmentStart;
+      if (loopDuration > 0) {
+        const relativeOffset =
+          (((absoluteOffset - segmentStart) % loopDuration) + loopDuration) %
+          loopDuration;
+        return segmentStart + relativeOffset;
+      }
+      return segmentStart;
+    }
+
+    return Math.max(segmentStart, Math.min(absoluteOffset, segmentEnd));
+  };
+
+  const stopLegacySourceForChannelPause = (sound) => {
+    const source = sound.source;
+    sound.playRequestId = (sound.playRequestId ?? 0) + 1;
+    sound.playbackPending = false;
+    sound.pendingDelayMs = 0;
+    sound.delayDeadlineMs = null;
+    if (sound.pendingTimeoutId !== null) {
+      clearTimeout(sound.pendingTimeoutId);
+      sound.pendingTimeoutId = null;
+    }
+    if (!source) return;
+
+    source.onended = null;
+    sound.source = null;
+    sound.sourceStartedAt = null;
+    try {
+      source.stop(getAudioContext().currentTime);
+    } catch {
+      // Stopping an already-stopped source is harmless while pausing.
+    }
+    disconnect(source);
+  };
+
+  const pauseSoundForChannel = (sound) => {
+    if (sound.control || sound.channelPauseState) {
+      return;
+    }
+
+    if (sound.source && !sound.sourceEnded) {
+      const offset = getLegacyPlaybackOffset(sound);
+      sound.channelPauseState = {
+        kind: "active",
+        offset,
+        remainingDelayMs: 0,
+      };
+      stopLegacySourceForChannelPause(sound);
+      sound.sourceEnded = false;
+      return;
+    }
+
+    if (sound.playbackPending || sound.pendingTimeoutId !== null) {
+      const remainingDelayMs = getRemainingLegacyDelayMs(sound);
+      sound.channelPauseState = {
+        kind: "pending",
+        offset: sound.startAt,
+        remainingDelayMs,
+      };
+      stopLegacySourceForChannelPause(sound);
+      sound.sourceEnded = false;
+      return;
+    }
+
+    sound.channelPauseState = { kind: "ended" };
+  };
+
+  const stageSoundForPausedChannel = (sound) => {
+    sound.sourceEnded = false;
+    sound.playbackPending = false;
+    sound.channelPauseState = {
+      kind: "pending",
+      offset: sound.startAt,
+      remainingDelayMs: sound.startDelayMs,
+    };
+  };
+
+  const resumeSoundFromChannelPause = (sound) => {
+    const pauseState = sound.channelPauseState;
+    if (!pauseState) {
+      return;
+    }
+
+    sound.channelPauseState = null;
+    if (pauseState.kind === "ended") {
+      return;
+    }
+
+    const segmentEnd =
+      sound.endAt === null || sound.endAt === undefined
+        ? Number.POSITIVE_INFINITY
+        : sound.endAt;
+    if (!sound.loop && pauseState.offset >= segmentEnd) {
+      sound.sourceEnded = true;
+      return;
+    }
+
+    playSound(sound, {
+      startOffset: pauseState.offset,
+      startDelayMs: pauseState.remainingDelayMs,
+    });
+  };
+
+  const syncSoundWithChannelPlayback = (sound) => {
+    if (sound.control) {
+      return;
+    }
+
+    const channel = sound.channelId ? channels.get(sound.channelId) : null;
+    if (channel?.control?.status === "paused") {
+      if (
+        !sound.source &&
+        !sound.playbackPending &&
+        !sound.channelPauseState &&
+        !sound.sourceEnded
+      ) {
+        stageSoundForPausedChannel(sound);
+      } else {
+        pauseSoundForChannel(sound);
+      }
+      return;
+    }
+
+    resumeSoundFromChannelPause(sound);
+  };
+
+  const acceptChannelPlaybackCommand = (channel, command) => {
+    const control = channel.control;
+    if (!control || command.commandId <= control.commandId) {
+      return false;
+    }
+
+    control.commandId = command.commandId;
+    channel.playback = command;
+    const nextStatus = command.operation === "pause" ? "paused" : "playing";
+    if (nextStatus === control.status) {
+      return true;
+    }
+
+    if (command.operation === "pause") {
+      control.status = "paused";
+      getCurrentChannelSounds(channel.id).forEach(pauseSoundForChannel);
+      return true;
+    }
+
+    control.status = "playing";
+    getCurrentChannelSounds(channel.id).forEach(resumeSoundFromChannelPause);
+    return true;
+  };
+
   const restartLoopingChannelIfComplete = (channelId) => {
     const channel = channels.get(channelId);
-    if (!channel?.loop) {
+    if (!channel?.loop || channel.control?.status === "paused") {
       return;
     }
 
@@ -1749,6 +1967,12 @@ export const createAudioStage = () => {
 
   const finishChannelLoop = (channelId) => {
     for (const sound of getCurrentChannelSounds(channelId)) {
+      if (sound.channelPauseState?.kind === "pending") {
+        sound.channelPauseState = { kind: "ended" };
+        sound.sourceEnded = true;
+        continue;
+      }
+
       if (!sound.playbackPending) {
         continue;
       }
@@ -1805,6 +2029,9 @@ export const createAudioStage = () => {
         targetValue: channel.pan,
         transition: panTransition,
       });
+      if (created.control) {
+        acceptChannelPlaybackCommand(created, channel.playback);
+      }
       return created;
     }
 
@@ -1824,6 +2051,9 @@ export const createAudioStage = () => {
 
       if (loopInterrupted) {
         finishChannelLoop(channel.id);
+      }
+      if (existing.control) {
+        acceptChannelPlaybackCommand(existing, channel.playback);
       }
 
       if (volumeChanged && volumeTransition) {
@@ -1865,6 +2095,9 @@ export const createAudioStage = () => {
       targetValue: channel.pan,
       transition: panTransition,
     });
+    if (created.control) {
+      acceptChannelPlaybackCommand(created, channel.playback);
+    }
     return created;
   };
 
@@ -1963,6 +2196,8 @@ export const createAudioStage = () => {
     );
     if (instance.control) {
       acceptControlledCommand(instance, sound.playback);
+    } else if (parentChannel.control?.status === "paused") {
+      stageSoundForPausedChannel(instance);
     } else {
       playSound(instance);
     }
@@ -2272,6 +2507,8 @@ export const createAudioStage = () => {
         stopControlledSource(instance);
         startControlledPlayback(instance, 0);
       }
+    } else {
+      syncSoundWithChannelPlayback(instance);
     }
   };
 
@@ -2314,6 +2551,19 @@ export const createAudioStage = () => {
       if (nextChannelById.has(id)) {
         throw new Error(
           `Input error: audio node "${id}" cannot change type from "sound" to "audio-channel" between render states.`,
+        );
+      }
+    }
+
+    for (const [id, prevChannel] of prevChannelById) {
+      const nextChannel = nextChannelById.get(id);
+      if (!nextChannel) continue;
+
+      const wasControlled = prevChannel.playback !== undefined;
+      const isControlled = nextChannel.playback !== undefined;
+      if (wasControlled !== isControlled) {
+        throw new Error(
+          `Input error: audio-channel "${id}" cannot change command-controlled playback mode while retained.`,
         );
       }
     }

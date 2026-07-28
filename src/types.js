@@ -665,6 +665,12 @@
  */
 
 /**
+ * @typedef {Object} AudioChannelPlaybackCommand
+ * @property {number} commandId - Monotonically increasing command identity
+ * @property {'pause' | 'resume'} operation - Channel transport operation
+ */
+
+/**
  * @typedef {Object} AudioChannelElement
  * @property {string} id - Unique identifier
  * @property {string} type - Should be "audio-channel"
@@ -673,6 +679,7 @@
  * @property {number} [pan=0] - Stereo pan from -1 to 1
  * @property {boolean} [loop=false] - Whether to repeat the complete child sound schedule
  * @property {'immediate' | 'loopEnd'} [interruption='immediate'] - Whether interruption stops immediately or finishes the active schedule iteration
+ * @property {AudioChannelPlaybackCommand} [playback] - Optional cursor-preserving channel transport instruction
  * @property {SoundElement[]} [children=[]] - Sound nodes owned by the channel
  */
 

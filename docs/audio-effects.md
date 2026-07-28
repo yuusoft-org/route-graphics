@@ -107,20 +107,24 @@ volume: 80
 muted: false
 pan: 0
 loop: false
+playback:
+  commandId: 1
+  operation: resume
 children: []
 ```
 
 Fields:
 
-| Field      | Type            | Default  | Description                                    |
-| ---------- | --------------- | -------- | ---------------------------------------------- |
-| `id`       | string          | required | Stable globally unique channel ID              |
-| `type`     | `audio-channel` | required | Node type                                      |
-| `volume`   | number          | `100`    | Local channel volume, `0` to `100`             |
-| `muted`    | boolean         | `false`  | Forces this channel's effective output to zero |
-| `pan`      | number          | `0`      | Stereo pan, `-1` left to `1` right             |
-| `loop`     | boolean         | `false`  | Repeats the complete child schedule            |
-| `children` | sound[]         | `[]`     | Sound nodes owned by this channel              |
+| Field      | Type            | Default  | Description                                     |
+| ---------- | --------------- | -------- | ----------------------------------------------- |
+| `id`       | string          | required | Stable globally unique channel ID               |
+| `type`     | `audio-channel` | required | Node type                                       |
+| `volume`   | number          | `100`    | Local channel volume, `0` to `100`              |
+| `muted`    | boolean         | `false`  | Forces this channel's effective output to zero  |
+| `pan`      | number          | `0`      | Stereo pan, `-1` left to `1` right              |
+| `loop`     | boolean         | `false`  | Repeats the complete child schedule             |
+| `playback` | object          | omitted  | Optional channel-level `pause`/`resume` command |
+| `children` | sound[]         | `[]`     | Sound nodes owned by this channel               |
 
 First implementation rule:
 
@@ -132,6 +136,9 @@ First implementation rule:
   finished. Looping channels cannot contain child sounds with `loop: true`.
 - Changing a channel from `loop: true` to `loop: false` cancels child sounds
   that have not started yet and lets already-playing child sounds finish.
+- Optional channel `playback` preserves active child cursors and remaining
+  delays across monotonic `pause`/`resume` commands. See
+  [Command-Controlled Sound Playback](./audio-playback-commands.md#audio-channel-pause-and-resume).
 
 ### Sounds
 
@@ -459,17 +466,18 @@ The command-controlled playback extension does not change these rules for
 ordinary sounds. A sound opts into the transport model only when it carries a
 `playback` command. See
 [Command-Controlled Sound Playback](./audio-playback-commands.md). A
-command-controlled sound cannot be a child of an
-`audio-channel` with `loop: true`, because channel-schedule replay would bypass
-command ordering. A non-looping channel may retain either interruption mode;
-an outgoing `loopEnd` instance finishes as an event-detached tail.
+command-controlled sound cannot be a child of an `audio-channel` with
+`loop: true` or a channel that has its own `playback` command, because two
+transport owners would conflict. A non-looping uncontrolled channel may retain
+either interruption mode; an outgoing `loopEnd` instance finishes as an
+event-detached tail.
 
 Cross-state identity rules:
 
-| Object          | Continues when                                       | Replaced when                                        |
-| --------------- | ---------------------------------------------------- | ---------------------------------------------------- |
-| `audio-channel` | Its `id` exists as an `audio-channel` in both states | It is removed and later added                        |
-| `sound`         | Its `id` and all source identity fields match        | `src`, `startAt`, `endAt`, or `startDelayMs` changes |
+| Object          | Continues when                                | Replaced when                                        |
+| --------------- | --------------------------------------------- | ---------------------------------------------------- |
+| `audio-channel` | Its `id` and playback-control mode match      | It is removed and later added                        |
+| `sound`         | Its `id` and all source identity fields match | `src`, `startAt`, `endAt`, or `startDelayMs` changes |
 
 Changing an ID between `sound` and `audio-channel` is invalid rather than a
 replacement. Moving a continuing sound between channels reroutes it without

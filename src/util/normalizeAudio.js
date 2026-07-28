@@ -9,7 +9,9 @@ const AUDIO_PLAYBACK_OPERATIONS = new Set([
   "stop",
   "seek",
 ]);
+const AUDIO_CHANNEL_PLAYBACK_OPERATIONS = new Set(["pause", "resume"]);
 const AUDIO_PLAYBACK_POSITION_OPERATIONS = new Set(["play", "seek"]);
+const NO_AUDIO_PLAYBACK_POSITION_OPERATIONS = new Set();
 const AUDIO_PLAYBACK_KEYS = new Set(["commandId", "operation", "positionMs"]);
 const AUDIO_TRANSITION_TYPE = "audio-transition";
 const AUDIO_EFFECT_TYPES = new Set([AUDIO_TRANSITION_TYPE]);
@@ -103,7 +105,15 @@ const assertUniqueId = (ids, id, path) => {
   ids.add(id);
 };
 
-const normalizePlaybackCommand = (playback, path) => {
+const normalizePlaybackCommand = (
+  playback,
+  path,
+  {
+    operations = AUDIO_PLAYBACK_OPERATIONS,
+    operationList = "play, pause, resume, stop, seek",
+    positionOperations = AUDIO_PLAYBACK_POSITION_OPERATIONS,
+  } = {},
+) => {
   assertRecord(playback, path);
 
   for (const key of Object.keys(playback)) {
@@ -120,15 +130,13 @@ const normalizePlaybackCommand = (playback, path) => {
     );
   }
 
-  if (!AUDIO_PLAYBACK_OPERATIONS.has(playback.operation)) {
+  if (!operations.has(playback.operation)) {
     throw new Error(
-      `Input error: ${path}.operation must be one of play, pause, resume, stop, seek.`,
+      `Input error: ${path}.operation must be one of ${operationList}.`,
     );
   }
 
-  const requiresPosition = AUDIO_PLAYBACK_POSITION_OPERATIONS.has(
-    playback.operation,
-  );
+  const requiresPosition = positionOperations.has(playback.operation);
   if (requiresPosition) {
     if (
       typeof playback.positionMs !== "number" ||
@@ -230,6 +238,15 @@ const validateChannel = (
     throw new Error(`Input error: ${path}.children must be an array.`);
   }
 
+  const playback =
+    node.playback === undefined
+      ? undefined
+      : normalizePlaybackCommand(node.playback, `${path}.playback`, {
+          operations: AUDIO_CHANNEL_PLAYBACK_OPERATIONS,
+          operationList: "pause, resume",
+          positionOperations: NO_AUDIO_PLAYBACK_POSITION_OPERATIONS,
+        });
+
   flattenedChannels.push({
     id: node.id,
     type: "audio-channel",
@@ -238,6 +255,7 @@ const validateChannel = (
     pan: node.pan ?? 0,
     loop: node.loop ?? false,
     interruption,
+    ...(playback ? { playback } : {}),
   });
 
   for (const [index, child] of (node.children ?? []).entries()) {
@@ -263,6 +281,12 @@ const validateChannel = (
     if (node.loop === true && child.playback !== undefined) {
       throw new Error(
         `Input error: ${childPath}.playback is not allowed when ${path}.loop is true.`,
+      );
+    }
+
+    if (playback && child.playback !== undefined) {
+      throw new Error(
+        `Input error: ${childPath}.playback is not allowed when ${path}.playback is present.`,
       );
     }
 

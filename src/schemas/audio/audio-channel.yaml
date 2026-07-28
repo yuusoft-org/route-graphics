@@ -37,6 +37,23 @@ properties:
     enum: [immediate, loopEnd]
     description: How active channel playback stops when the channel is interrupted.
     default: immediate
+  playback:
+    type: object
+    description: Optional cursor-preserving channel transport instruction
+    additionalProperties: false
+    required:
+      - commandId
+      - operation
+    properties:
+      commandId:
+        type: integer
+        minimum: 0
+        maximum: 9007199254740991
+        description: Monotonically increasing command identity
+      operation:
+        type: string
+        enum: [pause, resume]
+        description: Channel transport operation
   children:
     type: array
     description: Sound nodes owned by this channel
