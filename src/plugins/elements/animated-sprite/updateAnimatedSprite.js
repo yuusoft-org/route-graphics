@@ -24,10 +24,12 @@ import {
   resolveAnimatedSpriteFrameTextures,
 } from "./animatedSpriteConfig.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import { getElementTransformTargetState } from "../util/transform.js";
 import {
-  applyElementTransform,
-  getElementTransformTargetState,
-} from "../util/transform.js";
+  applyAnimatedSpriteTransform,
+  refreshAnimatedSpritePivot,
+  setAnimatedSpriteTransformElement,
+} from "./animatedSpriteTransform.js";
 
 /**
  * Update spritesheet animation element
@@ -55,6 +57,7 @@ export const updateAnimatedSprite = async ({
   if (!animatedSpriteElement) return;
 
   animatedSpriteElement.zIndex = zIndex;
+  setAnimatedSpriteTransformElement(animatedSpriteElement, nextElement);
   const shouldForceBlur = hasBlurUpdateAnimation(animations, prevElement.id);
   if (shouldForceBlur) {
     syncBlurEffect(animatedSpriteElement, prevElement.blur, { force: true });
@@ -150,6 +153,7 @@ export const updateAnimatedSprite = async ({
         playback: nextPlayback,
       });
       animatedSpriteElement.textures = frameTextures;
+      refreshAnimatedSpritePivot(animatedSpriteElement);
       didSyncFrameResource = true;
 
       if (renderAfterSync && typeof app.render === "function") {
@@ -192,7 +196,7 @@ export const updateAnimatedSprite = async ({
     if (!isDeepEqual(prevElement, nextElement)) {
       animatedSpriteElement.width = Math.round(nextElement.width);
       animatedSpriteElement.height = Math.round(nextElement.height);
-      applyElementTransform(animatedSpriteElement, nextElement);
+      applyAnimatedSpriteTransform(animatedSpriteElement, nextElement);
       animatedSpriteElement.alpha = nextElement.alpha;
       syncBlurEffect(animatedSpriteElement, nextElement.blur, {
         force: shouldForceBlur,
@@ -239,6 +243,7 @@ export const updateAnimatedSprite = async ({
     animatedSpriteElement.height = Math.round(
       hasLiveAnimationTween("height") ? currentHeight : height,
     );
+    refreshAnimatedSpritePivot(animatedSpriteElement);
 
     if (typeof app.render === "function") {
       app.render();

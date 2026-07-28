@@ -4,6 +4,7 @@ import { DEFAULT_TEXT_STYLE } from "../../../types.js";
 import { resolveInteractiveTextStyle } from "./textLayout.js";
 import { setElementHitTestBounds } from "../elementRenderState.js";
 import {
+  applyElementPivot,
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
@@ -67,11 +68,14 @@ export const renderRichTextDisplayObject = (
   container,
   element,
   overrideStyle,
+  { preserveTransform = false } = {},
 ) => {
   destroyChildren(container);
 
   container.label = element.id;
-  container.alpha = element.alpha ?? 1;
+  if (!preserveTransform) {
+    container.alpha = element.alpha ?? 1;
+  }
 
   const layoutWidth = element.width ?? element.measuredWidth ?? 0;
 
@@ -117,7 +121,11 @@ export const renderRichTextDisplayObject = (
   const hitAreaWidth = Math.max(0, layoutWidth);
   const hitAreaHeight = Math.max(0, element.height ?? 0);
   container.hitArea = new Rectangle(0, 0, hitAreaWidth, hitAreaHeight);
-  applyElementTransform(container, element);
+  if (preserveTransform) {
+    applyElementPivot(container, element);
+  } else {
+    applyElementTransform(container, element);
+  }
   setElementHitTestBounds(container, (displayObject) =>
     getRichTextHitBounds(displayObject, hitAreaWidth, hitAreaHeight),
   );

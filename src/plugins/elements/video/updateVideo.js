@@ -23,10 +23,12 @@ import {
 import {
   registerManagedVideoSprite,
   requestManagedVideoTextureUpdate,
+  setManagedVideoSpriteResizeHandler,
   unregisterManagedVideoSprite,
 } from "./managedVideoTextureSizing.js";
 import { setElementRenderState } from "../elementRenderState.js";
 import {
+  applyElementPivot,
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
@@ -54,6 +56,9 @@ export const updateVideo = ({
   if (!videoElement) return;
 
   videoElement.zIndex = zIndex;
+  setManagedVideoSpriteResizeHandler(videoElement, () => {
+    applyElementPivot(videoElement, nextElement);
+  });
 
   const { width, height, alpha } = nextElement;
   const shouldForceBlur = hasBlurUpdateAnimation(animations, prevElement.id);
@@ -101,6 +106,7 @@ export const updateVideo = ({
 
       const newTexture = Texture.from(nextElement.src);
       videoElement.texture = newTexture;
+      applyElementPivot(videoElement, nextElement);
       unregisterManagedVideoSprite(videoElement, oldSource);
       registerManagedVideoSprite(videoElement);
       activeVideo = newTexture.source.resource;
@@ -161,6 +167,7 @@ export const updateVideo = ({
     videoElement.height = Math.round(
       hasLiveAnimationTween("height") ? currentHeight : height,
     );
+    applyElementPivot(videoElement, nextElement);
     didSyncResourceBeforeAnimation = true;
   }
 

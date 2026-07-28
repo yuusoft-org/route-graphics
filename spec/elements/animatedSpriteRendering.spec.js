@@ -177,6 +177,47 @@ describe("spritesheet animation rendering", () => {
     expect(sprite.rotation).toBeCloseTo((3 * Math.PI) / 4);
   });
 
+  it("keeps the pivot stable when differently sized frames change scale", async () => {
+    const parent = {
+      destroyed: false,
+      addChild: vi.fn(),
+    };
+
+    await addAnimatedSprite({
+      app: {
+        debug: false,
+        render: vi.fn(),
+      },
+      parent,
+      element: createAnimatedSpriteElement({
+        originX: 20,
+        originY: 30,
+        rotation: 45,
+      }),
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      renderContext: {},
+      zIndex: 3,
+      signal: undefined,
+    });
+
+    const sprite = parent.addChild.mock.calls[0][0];
+    sprite.x = 333;
+    sprite.y = 222;
+    sprite.rotation = 1.25;
+    sprite.scale.x = 0.5;
+    sprite.scale.y = 0.25;
+
+    sprite.onFrameChange(1);
+
+    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(20);
+    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(30);
+    expect(sprite.x).toBe(333);
+    expect(sprite.y).toBe(222);
+    expect(sprite.rotation).toBe(1.25);
+  });
+
   it("renders after asynchronously adding a spritesheet animation in debug/manual flows", async () => {
     const app = {
       debug: true,

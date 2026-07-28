@@ -86,6 +86,8 @@ export const updateTextRevealing = async ({
           playback: "resume",
           onLayoutMounted: commitMountedLayout,
         });
+      } else {
+        commitMountedLayout();
       }
 
       return;

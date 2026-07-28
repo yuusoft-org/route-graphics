@@ -53,7 +53,14 @@ export const applyTextDisplayStyle = (
   overrideStyle,
 ) => {
   if (isRichTextComputedNode(textComputedNode)) {
-    renderRichTextDisplayObject(displayObject, textComputedNode, overrideStyle);
+    renderRichTextDisplayObject(
+      displayObject,
+      textComputedNode,
+      overrideStyle,
+      {
+        preserveTransform: true,
+      },
+    );
     return;
   }
 

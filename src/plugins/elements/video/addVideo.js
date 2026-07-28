@@ -16,8 +16,10 @@ import {
 import {
   registerManagedVideoSprite,
   requestManagedVideoTextureUpdate,
+  setManagedVideoSpriteResizeHandler,
 } from "./managedVideoTextureSizing.js";
 import {
+  applyElementPivot,
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
@@ -56,6 +58,9 @@ export const addVideo = ({
   sprite.width = Math.round(width);
   sprite.height = Math.round(height);
   applyElementTransform(sprite, element);
+  setManagedVideoSpriteResizeHandler(sprite, () => {
+    applyElementPivot(sprite, element);
+  });
   registerManagedVideoSprite(sprite);
   sprite.alpha = alpha ?? 1;
   const shouldForceBlur = hasBlurUpdateAnimation(animations, id);

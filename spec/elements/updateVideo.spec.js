@@ -112,6 +112,119 @@ describe("updateVideo", () => {
     expect(videoElement.rotation).toBe(0);
   });
 
+  it("reapplies the pivot when a source swap changes texture scale", () => {
+    const currentVideo = createMockVideo();
+    const nextVideo = createMockVideo();
+    const oldTexture = {
+      source: {
+        width: 100,
+        height: 80,
+        resource: currentVideo,
+      },
+    };
+    const newTexture = {
+      source: {
+        width: 400,
+        height: 200,
+        resource: nextVideo,
+      },
+    };
+    textureFrom.mockReturnValue(newTexture);
+
+    let texture = oldTexture;
+    const videoElement = {
+      label: "video-1",
+      scale: { x: 1, y: 1 },
+      pivot: {
+        set(x, y) {
+          this.x = x;
+          this.y = y;
+        },
+      },
+      zIndex: 0,
+      x: 10,
+      y: 20,
+      alpha: 1,
+      _width: 100,
+      _height: 80,
+    };
+    Object.defineProperties(videoElement, {
+      texture: {
+        get() {
+          return texture;
+        },
+        set(value) {
+          texture = value;
+          this.scale.x = this._width / value.source.width;
+          this.scale.y = this._height / value.source.height;
+        },
+      },
+      width: {
+        get() {
+          return this._width;
+        },
+        set(value) {
+          this._width = value;
+          this.scale.x = value / this.texture.source.width;
+        },
+      },
+      height: {
+        get() {
+          return this._height;
+        },
+        set(value) {
+          this._height = value;
+          this.scale.y = value / this.texture.source.height;
+        },
+      },
+    });
+
+    const prevElement = {
+      id: "video-1",
+      src: "old-video.mp4",
+      loop: true,
+      volume: 50,
+      x: 10,
+      y: 20,
+      originX: 20,
+      originY: 10,
+      rotation: 30,
+      width: 100,
+      height: 80,
+      alpha: 1,
+    };
+    const nextElement = {
+      ...prevElement,
+      src: "new-video.mp4",
+      originX: 32,
+      originY: 9,
+      width: 160,
+      height: 90,
+    };
+
+    updateVideo({
+      app: {},
+      parent: {
+        children: [videoElement],
+      },
+      prevElement,
+      nextElement,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      eventHandler: vi.fn(),
+      completionTracker: {
+        getVersion: () => 0,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 3,
+    });
+
+    expect(videoElement.texture).toBe(newTexture);
+    expect(videoElement.pivot.x * videoElement.scale.x).toBeCloseTo(32);
+    expect(videoElement.pivot.y * videoElement.scale.y).toBeCloseTo(9);
+  });
+
   it("tracks completion when a playing video becomes non-looping without changing src", () => {
     const currentVideo = createMockVideo();
     const existingEndedListener = vi.fn();

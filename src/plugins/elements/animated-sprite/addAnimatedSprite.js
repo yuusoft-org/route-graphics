@@ -19,10 +19,8 @@ import {
   playbackFpsToAnimationSpeed,
   resolveAnimatedSpriteFrameTextures,
 } from "./animatedSpriteConfig.js";
-import {
-  applyElementTransform,
-  getElementTransformTargetState,
-} from "../util/transform.js";
+import { getElementTransformTargetState } from "../util/transform.js";
+import { applyAnimatedSpriteTransform } from "./animatedSpriteTransform.js";
 
 /**
  * Add spritesheet animation element to the stage
@@ -91,7 +89,7 @@ export const addAnimatedSprite = async ({
 
     animatedSprite.width = Math.round(width);
     animatedSprite.height = Math.round(height);
-    applyElementTransform(animatedSprite, element);
+    applyAnimatedSpriteTransform(animatedSprite, element);
     animatedSprite.alpha = alpha;
     const shouldForceBlur = hasBlurUpdateAnimation(animations, id);
     syncBlurEffect(animatedSprite, element.blur, { force: shouldForceBlur });

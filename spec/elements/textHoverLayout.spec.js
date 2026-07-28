@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { addText } from "../../src/plugins/elements/text/addText.js";
 import { parseText } from "../../src/plugins/elements/text/parseText.js";
 import { getTextLayoutPosition } from "../../src/plugins/elements/text/textLayout.js";
+import { updateText } from "../../src/plugins/elements/text/updateText.js";
 import { hitTestElementBounds } from "../../src/util/hitTestElementBounds.js";
+import { isDeepEqual } from "../../src/util/isDeepEqual.js";
 
 const createSharedParams = () => ({
   app: {
@@ -150,6 +152,100 @@ describe("text hover layout", () => {
 
     expect(getWorldPivotPosition(text).x).toBeCloseTo(beforeHoverAnchor.x, 4);
     expect(getWorldPivotPosition(text).y).toBeCloseTo(beforeHoverAnchor.y, 4);
+  });
+
+  it("preserves a live tweened rotation during interactive style changes", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+    const element = parseText({
+      state: {
+        id: "text-live-rotation",
+        type: "text",
+        x: 240,
+        y: 120,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        rotation: 15,
+        content: "Tweening",
+        hover: {
+          textStyle: {
+            fontSize: 36,
+          },
+        },
+      },
+    });
+
+    addText({
+      ...shared,
+      parent,
+      zIndex: 0,
+      element,
+    });
+
+    const text = parent.getChildByLabel("text-live-rotation");
+    text.rotation = 1.25;
+
+    text.emit("pointerover");
+    expect(text.rotation).toBe(1.25);
+
+    text.emit("pointerout");
+    expect(text.rotation).toBe(1.25);
+  });
+
+  it("diffs an explicit origin from an equal anchor-derived origin", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+    const state = {
+      id: "text-explicit-origin-diff",
+      type: "text",
+      x: 240,
+      y: 120,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      content: "Origin",
+      textStyle: {
+        fontSize: 24,
+      },
+      hover: {
+        textStyle: {
+          fontSize: 48,
+        },
+      },
+    };
+    const derivedElement = parseText({ state });
+    const explicitElement = parseText({
+      state: {
+        ...state,
+        originX: derivedElement.originX,
+        originY: derivedElement.originY,
+      },
+    });
+
+    expect(explicitElement.originX).toBe(derivedElement.originX);
+    expect(explicitElement.originY).toBe(derivedElement.originY);
+    expect(Object.keys(explicitElement)).toContain("__explicitOriginX");
+    expect(Object.keys(explicitElement)).toContain("__explicitOriginY");
+    expect(isDeepEqual(derivedElement, explicitElement)).toBe(false);
+
+    addText({
+      ...shared,
+      parent,
+      zIndex: 0,
+      element: derivedElement,
+    });
+    updateText({
+      ...shared,
+      parent,
+      prevElement: derivedElement,
+      nextElement: explicitElement,
+      zIndex: 0,
+    });
+
+    const text = parent.getChildByLabel("text-explicit-origin-diff");
+    text.emit("pointerover");
+
+    expect(text.pivot.x).toBeCloseTo(explicitElement.originX);
+    expect(text.pivot.y).toBeCloseTo(explicitElement.originY);
   });
 
   it("keeps hover and click textStyle states working together", () => {

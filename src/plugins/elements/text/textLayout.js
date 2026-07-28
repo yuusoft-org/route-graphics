@@ -4,7 +4,7 @@ import { DEFAULT_TEXT_STYLE } from "../../../types.js";
 import { mergeTextStyle } from "../../../util/mergeTextStyle.js";
 import { toPixiTextStyle } from "../../../util/toPixiTextStyle.js";
 import { setElementHitTestBounds } from "../elementRenderState.js";
-import { applyElementTransform } from "../util/transform.js";
+import { applyElementTransform, radiansToDegrees } from "../util/transform.js";
 
 const TEXT_ANCHOR_RATIOS = Symbol("routeGraphicsTextAnchorRatios");
 const TEXT_LAYOUT_STATE = Symbol("routeGraphicsTextLayoutState");
@@ -124,6 +124,7 @@ const applyTextElementTransform = (
     originY = textComputedNode.originY ?? 0,
     positionX,
     positionY,
+    rotation = textComputedNode.rotation,
   } = {},
 ) => {
   const offsetX = getHorizontalOffset(
@@ -137,6 +138,7 @@ const applyTextElementTransform = (
     y: positionY === undefined ? textComputedNode.y : positionY - originY,
     originX,
     originY,
+    rotation,
   };
 
   applyElementTransform(textElement, transformedElement, {
@@ -267,6 +269,7 @@ export const applyInteractiveTextStyle = (
   const transformState = textElement[TEXT_TRANSFORM_STATE];
   const transformPositionX = textElement.x;
   const transformPositionY = textElement.y;
+  const transformRotation = radiansToDegrees(textElement.rotation);
 
   applyTextStyle(textElement, resolvedStyle);
 
@@ -299,6 +302,7 @@ export const applyInteractiveTextStyle = (
       originY,
       positionX: transformPositionX,
       positionY: transformPositionY,
+      rotation: transformRotation,
     });
   }
 };

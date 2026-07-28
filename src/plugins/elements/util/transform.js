@@ -12,7 +12,7 @@ export const getElementTransformPosition = (element) => ({
   y: Math.round((element.y ?? 0) + (element.originY ?? 0)),
 });
 
-export const applyElementTransform = (
+export const applyElementPivot = (
   displayObject,
   element,
   { localOriginX, localOriginY } = {},
@@ -21,11 +21,23 @@ export const applyElementTransform = (
   const originY = element.originY ?? 0;
   const scaleX = getFiniteScale(displayObject.scale?.x);
   const scaleY = getFiniteScale(displayObject.scale?.y);
-  const position = getElementTransformPosition(element);
   const pivotX = localOriginX ?? originX;
   const pivotY = localOriginY ?? originY;
 
   displayObject.pivot?.set?.(pivotX / scaleX, pivotY / scaleY);
+};
+
+export const applyElementTransform = (
+  displayObject,
+  element,
+  { localOriginX, localOriginY } = {},
+) => {
+  const position = getElementTransformPosition(element);
+
+  applyElementPivot(displayObject, element, {
+    localOriginX,
+    localOriginY,
+  });
   displayObject.x = position.x;
   displayObject.y = position.y;
   displayObject.rotation = degreesToRadians(element.rotation ?? 0);
