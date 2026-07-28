@@ -3,6 +3,10 @@ import { toPixiTextStyle } from "../../../util/toPixiTextStyle.js";
 import { DEFAULT_TEXT_STYLE } from "../../../types.js";
 import { resolveInteractiveTextStyle } from "./textLayout.js";
 import { setElementHitTestBounds } from "../elementRenderState.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 const RICH_TEXT_DISPLAY = Symbol("routeGraphicsRichTextDisplay");
 
@@ -56,10 +60,8 @@ export const isRichTextComputedNode = (element) =>
 export const isRichTextDisplayObject = (displayObject) =>
   Boolean(displayObject?.[RICH_TEXT_DISPLAY]);
 
-export const getRichTextLayoutPosition = (element) => ({
-  x: element.x,
-  y: element.y,
-});
+export const getRichTextLayoutPosition = (element) =>
+  getElementTransformTargetState(element);
 
 export const renderRichTextDisplayObject = (
   container,
@@ -69,8 +71,6 @@ export const renderRichTextDisplayObject = (
   destroyChildren(container);
 
   container.label = element.id;
-  container.x = Math.round(element.x ?? 0);
-  container.y = Math.round(element.y ?? 0);
   container.alpha = element.alpha ?? 1;
 
   const layoutWidth = element.width ?? element.measuredWidth ?? 0;
@@ -117,6 +117,7 @@ export const renderRichTextDisplayObject = (
   const hitAreaWidth = Math.max(0, layoutWidth);
   const hitAreaHeight = Math.max(0, element.height ?? 0);
   container.hitArea = new Rectangle(0, 0, hitAreaWidth, hitAreaHeight);
+  applyElementTransform(container, element);
   setElementHitTestBounds(container, (displayObject) =>
     getRichTextHitBounds(displayObject, hitAreaWidth, hitAreaHeight),
   );

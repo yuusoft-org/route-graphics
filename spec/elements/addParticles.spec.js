@@ -40,6 +40,11 @@ describe("addParticle", () => {
       element: {
         id: "burst",
         type: "particles",
+        x: 40,
+        y: 60,
+        originX: 20,
+        originY: 15,
+        rotation: 30,
         width: 1280,
         height: 720,
         count: 6,
@@ -95,6 +100,11 @@ describe("addParticle", () => {
     const container = parent.getChildByLabel("burst");
     const emitter = container.emitter;
 
+    expect(container.x).toBe(60);
+    expect(container.y).toBe(75);
+    expect(container.pivot.x).toBe(20);
+    expect(container.pivot.y).toBe(15);
+    expect(container.rotation).toBeCloseTo(Math.PI / 6);
     expect(emitter.particleCount).toBe(6);
     expect(emitter.emit).toBe(false);
 

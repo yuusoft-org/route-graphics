@@ -156,6 +156,24 @@ properties:
   y:
     type: number
     description: Y position of the input
+  anchorX:
+    type: number
+    description: Horizontal anchor point where 0 is the left edge and 1 is the right edge.
+    default: 0
+  anchorY:
+    type: number
+    description: Vertical anchor point where 0 is the top edge and 1 is the bottom edge.
+    default: 0
+  originX:
+    type: number
+    description: Horizontal transform origin in pixels from the input's left edge. Defaults to the anchor-derived X origin.
+  originY:
+    type: number
+    description: Vertical transform origin in pixels from the input's top edge. Defaults to the anchor-derived Y origin.
+  rotation:
+    type: number
+    description: Rotation in degrees
+    default: 0
   width:
     type: number
     description: Width of the input field

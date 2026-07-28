@@ -1042,6 +1042,9 @@ out:
         emitterLifetime: 0.1
       x: 0
       "y": 0
+      originX: 0
+      originY: 0
+      rotation: 0
       alpha: 1
     - id: rect-1
       type: rect
@@ -1255,6 +1258,9 @@ out:
         recycleOnBounds: true
       x: 0
       "y": 0
+      originX: 0
+      originY: 0
+      rotation: 0
       alpha: 1
     - id: particles-fire
       type: particles
@@ -1318,6 +1324,9 @@ out:
         emitterLifetime: -1
       x: 0
       "y": 220
+      originX: 0
+      originY: 0
+      rotation: 0
       alpha: 1
 ---
 case: Test parsing container with hover, click, and rightClick events

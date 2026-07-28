@@ -24,6 +24,37 @@ const createSharedParams = () => ({
 });
 
 describe("text rich content", () => {
+  it("applies degree rotation around an explicit rich-text origin", () => {
+    const parent = new Container();
+    const element = parseText({
+      state: {
+        id: "rotated-rich-text",
+        type: "text",
+        x: 40,
+        y: 60,
+        originX: 14,
+        originY: 9,
+        rotation: -45,
+        content: [{ text: "Rich" }, { text: " rotation" }],
+      },
+    });
+
+    addText({
+      ...createSharedParams(),
+      parent,
+      element,
+      zIndex: 0,
+    });
+
+    const text = parent.getChildByLabel("rotated-rich-text");
+
+    expect(text.x).toBe(54);
+    expect(text.y).toBe(69);
+    expect(text.pivot.x).toBe(14);
+    expect(text.pivot.y).toBe(9);
+    expect(text.rotation).toBeCloseTo(-Math.PI / 4);
+  });
+
   it("renders array content as styled text segment objects", () => {
     const parent = new Container();
     const element = parseText({

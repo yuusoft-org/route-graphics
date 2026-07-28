@@ -5,6 +5,10 @@ import {
   runTextReveal,
   shouldRenderTextRevealImmediately,
 } from "./textRevealingRuntime.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * Add text-revealing element to the stage
@@ -27,8 +31,7 @@ export const addTextRevealing = async ({
   container.label = element.id;
   container.zIndex = zIndex;
 
-  if (element.x !== undefined) container.x = Math.round(element.x);
-  if (element.y !== undefined) container.y = Math.round(element.y);
+  applyElementTransform(container, element);
   if (element.alpha !== undefined) container.alpha = element.alpha;
   parent.addChild(container);
 
@@ -38,11 +41,9 @@ export const addTextRevealing = async ({
     animationBus,
     completionTracker,
     element: container,
-    targetState: {
-      x: element.x ?? container.x,
-      y: element.y ?? container.y,
+    targetState: getElementTransformTargetState(element, {
       alpha: element.alpha ?? container.alpha,
-    },
+    }),
     renderContext,
   });
 

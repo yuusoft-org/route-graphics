@@ -33,6 +33,73 @@ const createApp = () => {
 };
 
 describe("input plugin", () => {
+  it("applies and resets degree rotation around the configured origin", () => {
+    const parent = new Container();
+    const eventHandler = vi.fn();
+    const { app } = createApp();
+    const initialElement = parseInput({
+      state: {
+        id: "rotated-input",
+        type: "input",
+        x: 30,
+        y: 40,
+        width: 200,
+        height: 44,
+        originX: 24,
+        originY: 12,
+        rotation: 45,
+      },
+    });
+
+    addInput({
+      app,
+      parent,
+      element: initialElement,
+      eventHandler,
+      zIndex: 0,
+    });
+
+    const input = parent.getChildByLabel("rotated-input");
+
+    expect(input.x).toBe(54);
+    expect(input.y).toBe(52);
+    expect(input.pivot.x).toBe(24);
+    expect(input.pivot.y).toBe(12);
+    expect(input.rotation).toBeCloseTo(Math.PI / 4);
+
+    const nextElement = parseInput({
+      state: {
+        id: "rotated-input",
+        type: "input",
+        x: 80,
+        y: 70,
+        width: 200,
+        height: 44,
+        originX: 10,
+        originY: 8,
+        rotation: 0,
+      },
+    });
+
+    updateInput({
+      app,
+      parent,
+      prevElement: initialElement,
+      nextElement,
+      eventHandler,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      zIndex: 0,
+    });
+
+    expect(input.x).toBe(90);
+    expect(input.y).toBe(78);
+    expect(input.pivot.x).toBe(10);
+    expect(input.pivot.y).toBe(8);
+    expect(input.rotation).toBe(0);
+  });
+
   it("renders a field and preserves native-edited value across unchanged rerenders", () => {
     const parent = new Container();
     const eventHandler = vi.fn();

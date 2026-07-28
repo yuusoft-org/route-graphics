@@ -25,6 +25,43 @@ describe("addTextRevealing", () => {
     mocks.runTextReveal.mockClear();
   });
 
+  it("applies degree rotation around the configured origin", async () => {
+    const parent = new Container();
+
+    await addTextRevealing({
+      parent,
+      element: {
+        id: "rotated-line",
+        type: "text-revealing",
+        x: 80,
+        y: 50,
+        originX: 16,
+        originY: 10,
+        rotation: 60,
+        alpha: 1,
+        speed: 100,
+        revealEffect: "typewriter",
+        content: [],
+      },
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {
+        getVersion: () => 0,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 0,
+      signal: new AbortController().signal,
+    });
+
+    const text = parent.getChildByLabel("rotated-line");
+
+    expect(text.x).toBe(96);
+    expect(text.y).toBe(60);
+    expect(text.pivot.x).toBe(16);
+    expect(text.pivot.y).toBe(10);
+    expect(text.rotation).toBeCloseTo(Math.PI / 3);
+  });
+
   it("pauses reveal work during suppressed mounts and starts it after finalize", async () => {
     const parent = new Container();
     const renderContext = createRenderContext({ suppressAnimations: true });

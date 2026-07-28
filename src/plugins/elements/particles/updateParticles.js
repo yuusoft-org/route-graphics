@@ -12,6 +12,10 @@ import { addParticle } from "./addParticles.js";
 import { isDeepEqual } from "../../../util/isDeepEqual.js";
 import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * @typedef {import('../../../types.js').ParticlesComputedNode} ParticlesComputedNode
@@ -96,12 +100,7 @@ export const updateParticles = ({
       if (nextElement.alpha !== undefined) {
         container.alpha = nextElement.alpha;
       }
-      if (nextElement.x !== undefined) {
-        container.x = nextElement.x;
-      }
-      if (nextElement.y !== undefined) {
-        container.y = nextElement.y;
-      }
+      applyElementTransform(container, nextElement);
       setElementRenderState(container, nextElement);
       commitRenderState?.(container);
     };
@@ -112,11 +111,9 @@ export const updateParticles = ({
       animationBus,
       completionTracker,
       element: container,
-      targetState: {
-        x: nextElement.x ?? container.x,
-        y: nextElement.y ?? container.y,
+      targetState: getElementTransformTargetState(nextElement, {
         alpha: nextElement.alpha ?? container.alpha,
-      },
+      }),
       onComplete: updateElement,
     });
 

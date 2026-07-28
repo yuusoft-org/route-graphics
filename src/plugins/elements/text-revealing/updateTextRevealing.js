@@ -6,6 +6,10 @@ import {
 } from "./textRevealingRuntime.js";
 import { normalizeSoftWipeConfig } from "./softWipeConfig.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 const getRevealIdentity = (element = {}) =>
   JSON.stringify({
@@ -61,8 +65,7 @@ export const updateTextRevealing = async ({
   };
 
   const updateElement = async () => {
-    if (element.x !== undefined) textRevealingElement.x = element.x;
-    if (element.y !== undefined) textRevealingElement.y = element.y;
+    applyElementTransform(textRevealingElement, element);
     if (element.alpha !== undefined) {
       textRevealingElement.alpha = element.alpha;
     }
@@ -136,11 +139,9 @@ export const updateTextRevealing = async ({
     animationBus,
     completionTracker,
     element: textRevealingElement,
-    targetState: {
-      x: element.x ?? textRevealingElement.x,
-      y: element.y ?? textRevealingElement.y,
+    targetState: getElementTransformTargetState(element, {
       alpha: element.alpha ?? textRevealingElement.alpha,
-    },
+    }),
     onComplete: () => {
       void updateElement();
     },

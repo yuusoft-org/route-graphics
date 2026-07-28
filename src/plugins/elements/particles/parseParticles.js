@@ -8,6 +8,7 @@ import {
 } from "./util/validateParticles.js";
 import { validateParticleModules } from "./util/validateParticleModules.js";
 import { compileParticleModules } from "./compileParticleModules.js";
+import { parseCommonObject } from "../util/parseCommonObject.js";
 
 /**
  * @typedef {import('../../../types.js').BaseElement} BaseElement
@@ -17,10 +18,9 @@ import { compileParticleModules } from "./compileParticleModules.js";
 /**
  * Parse particles element.
  *
- * Note: Particles don't use parseCommonObject because:
- * - No anchor calculations needed (particles container has many small sprites)
- * - No scale calculations needed (particles use raw width/height for spawn bounds)
- * - Width/height must be raw values, not scaled
+ * Particle width and height stay unscaled because they define emitter bounds,
+ * while the common transform fields still provide anchors, origins, and
+ * element-level rotation for the emitter container.
  *
  * @param {Object} params
  * @param {BaseElement} params.state - The particles state to parse
@@ -44,6 +44,11 @@ export const parseParticles = ({ state }) => {
 
   // Reconcile count with emitter.maxParticles
   const count = state.emitter?.maxParticles ?? state.count ?? 100;
+  const computedObj = parseCommonObject({
+    ...state,
+    scaleX: undefined,
+    scaleY: undefined,
+  });
 
   // Build emitter config with count synced to maxParticles
   let emitter = state.emitter;
@@ -56,16 +61,10 @@ export const parseParticles = ({ state }) => {
   }
 
   return {
-    id: state.id,
-    type: state.type,
+    ...computedObj,
     count,
     texture: state.texture,
     behaviors: state.behaviors,
     emitter,
-    x: state.x ?? 0,
-    y: state.y ?? 0,
-    width: state.width,
-    height: state.height,
-    alpha: state.alpha ?? 1,
   };
 };

@@ -3,6 +3,10 @@ import { Emitter } from "./emitter/index.js";
 import { getTexture } from "./util/registries.js";
 import { queueDeferredParticlesStart } from "../renderContext.js";
 import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * @typedef {import('pixi.js').Application} Application
@@ -123,8 +127,7 @@ export const addParticle = ({
 
   const width = element.width;
   const height = element.height;
-  container.x = element.x ?? 0;
-  container.y = element.y ?? 0;
+  applyElementTransform(container, element);
 
   // Build emitter config from custom behaviors
   const emitterConfig = {
@@ -232,11 +235,9 @@ export const addParticle = ({
     animationBus,
     completionTracker,
     element: container,
-    targetState: {
-      x: element.x ?? 0,
-      y: element.y ?? 0,
+    targetState: getElementTransformTargetState(element, {
       alpha: element.alpha ?? container.alpha,
-    },
+    }),
     renderContext,
   });
 };

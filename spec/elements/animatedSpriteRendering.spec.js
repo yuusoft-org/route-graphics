@@ -17,6 +17,16 @@ const {
       this.loop = true;
       this.x = 0;
       this.y = 0;
+      this.pivot = {
+        x: 0,
+        y: 0,
+        set: (x, y) => {
+          this.pivot.x = x;
+          this.pivot.y = y;
+        },
+      };
+      this.scale = { x: 1, y: 1 };
+      this.rotation = 0;
       this.width = 0;
       this.height = 0;
       this.alpha = 1;
@@ -131,6 +141,42 @@ describe("spritesheet animation rendering", () => {
     window.document.body.innerHTML = "";
   });
 
+  it("applies degree rotation around the configured origin", async () => {
+    const parent = {
+      destroyed: false,
+      addChild: vi.fn(),
+    };
+
+    await addAnimatedSprite({
+      app: {
+        debug: false,
+        render: vi.fn(),
+      },
+      parent,
+      element: createAnimatedSpriteElement({
+        x: 120,
+        y: 90,
+        originX: 18,
+        originY: 12,
+        rotation: 135,
+      }),
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      renderContext: {},
+      zIndex: 3,
+      signal: undefined,
+    });
+
+    const sprite = parent.addChild.mock.calls[0][0];
+
+    expect(sprite.x).toBe(138);
+    expect(sprite.y).toBe(102);
+    expect(sprite.pivot.x).toBe(18);
+    expect(sprite.pivot.y).toBe(12);
+    expect(sprite.rotation).toBeCloseTo((3 * Math.PI) / 4);
+  });
+
   it("renders after asynchronously adding a spritesheet animation in debug/manual flows", async () => {
     const app = {
       debug: true,
@@ -174,7 +220,11 @@ describe("spritesheet animation rendering", () => {
     await addAnimatedSprite({
       app,
       parent,
-      element: createAnimatedSpriteElement(),
+      element: createAnimatedSpriteElement({
+        originX: 10,
+        originY: 5,
+        rotation: 45,
+      }),
       animations: [
         {
           id: "animated-sprite-enter",
@@ -204,8 +254,9 @@ describe("spritesheet animation rendering", () => {
         completionTracker,
         element: addedSprite,
         targetState: expect.objectContaining({
-          x: 200,
-          y: 150,
+          x: 210,
+          y: 155,
+          rotation: 45,
           width: 100,
           height: 100,
           alpha: 1,

@@ -38,6 +38,16 @@ properties:
     type: number
     description: Vertical anchor point where 0 is top edge, 1 is bottom edge (100% height). Values can extend beyond 0-1 range.
     default: 0
+  originX:
+    type: number
+    description: Horizontal transform origin in pixels from the video's left edge. Defaults to the anchor-derived X origin.
+  originY:
+    type: number
+    description: Vertical transform origin in pixels from the video's top edge. Defaults to the anchor-derived Y origin.
+  rotation:
+    type: number
+    description: Rotation in degrees
+    default: 0
   src:
     type: string
     description: Source URL of the video file

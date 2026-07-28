@@ -24,6 +24,10 @@ import {
   resolveAnimatedSpriteFrameTextures,
 } from "./animatedSpriteConfig.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * Update spritesheet animation element
@@ -186,10 +190,9 @@ export const updateAnimatedSprite = async ({
     if (signal?.aborted || animatedSpriteElement.destroyed) return;
 
     if (!isDeepEqual(prevElement, nextElement)) {
-      animatedSpriteElement.x = Math.round(nextElement.x);
-      animatedSpriteElement.y = Math.round(nextElement.y);
       animatedSpriteElement.width = Math.round(nextElement.width);
       animatedSpriteElement.height = Math.round(nextElement.height);
+      applyElementTransform(animatedSpriteElement, nextElement);
       animatedSpriteElement.alpha = nextElement.alpha;
       syncBlurEffect(animatedSpriteElement, nextElement.blur, {
         force: shouldForceBlur,
@@ -209,7 +212,7 @@ export const updateAnimatedSprite = async ({
     }
   };
 
-  const { x, y, width, height, alpha } = nextElement;
+  const { width, height, alpha } = nextElement;
   const liveAnimations = getLiveAnimations(animations, prevElement.id);
   const hasLiveAnimation = liveAnimations.length > 0;
   const hasLiveAnimationTween = (property) =>
@@ -251,8 +254,7 @@ export const updateAnimatedSprite = async ({
     completionTracker,
     element: animatedSpriteElement,
     targetState: {
-      x,
-      y,
+      ...getElementTransformTargetState(nextElement),
       width,
       height,
       alpha,

@@ -45,6 +45,73 @@ describe("updateVideo", () => {
     textureFrom.mockReset();
   });
 
+  it("applies and resets degree rotation around the configured origin", () => {
+    const currentVideo = createMockVideo();
+    const pivot = { set: vi.fn() };
+    const videoElement = {
+      label: "video-1",
+      texture: {
+        source: {
+          resource: currentVideo,
+        },
+      },
+      pivot,
+      scale: { x: 1, y: 1 },
+      rotation: Math.PI / 2,
+      zIndex: 0,
+      x: 20,
+      y: 30,
+      width: 100,
+      height: 80,
+      alpha: 1,
+    };
+    const prevElement = {
+      id: "video-1",
+      src: "video.mp4",
+      loop: true,
+      volume: 50,
+      x: 10,
+      y: 20,
+      originX: 10,
+      originY: 10,
+      rotation: 90,
+      width: 100,
+      height: 80,
+      alpha: 1,
+    };
+    const nextElement = {
+      ...prevElement,
+      x: 100,
+      y: 120,
+      originX: 16,
+      originY: 9,
+      rotation: 0,
+    };
+
+    updateVideo({
+      app: {},
+      parent: {
+        children: [videoElement],
+      },
+      prevElement,
+      nextElement,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      eventHandler: vi.fn(),
+      completionTracker: {
+        getVersion: () => 0,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 3,
+    });
+
+    expect(videoElement.x).toBe(116);
+    expect(videoElement.y).toBe(129);
+    expect(pivot.set).toHaveBeenCalledWith(16, 9);
+    expect(videoElement.rotation).toBe(0);
+  });
+
   it("tracks completion when a playing video becomes non-looping without changing src", () => {
     const currentVideo = createMockVideo();
     const existingEndedListener = vi.fn();

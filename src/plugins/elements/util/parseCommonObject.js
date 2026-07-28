@@ -75,6 +75,7 @@ export const parseCommonObject = (state) => {
     originX: Math.round(transformOriginX),
     originY: Math.round(transformOriginY),
     alpha: state.alpha ?? 1,
+    rotation: state.rotation ?? 0,
   };
 
   if (state.hover) {

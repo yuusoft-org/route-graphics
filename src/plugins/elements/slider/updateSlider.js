@@ -8,6 +8,10 @@ import {
   syncSliderRuntime,
 } from "./sliderRuntime.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * Update slider element
@@ -37,14 +41,9 @@ export const updateSlider = ({
   const updateElement = () => {
     if (!isDeepEqual(prevSliderComputedNode, nextSliderComputedNode)) {
       // Update container properties
-      sliderElement.x = nextSliderComputedNode.x;
-      sliderElement.y = nextSliderComputedNode.y;
       sliderElement.alpha = nextSliderComputedNode.alpha;
       sliderElement.label = nextSliderComputedNode.id;
-      sliderElement.pivot.set(
-        nextSliderComputedNode.originX,
-        nextSliderComputedNode.originY,
-      );
+      applyElementTransform(sliderElement, nextSliderComputedNode);
 
       renameSliderParts({
         sliderContainer: sliderElement,
@@ -92,7 +91,7 @@ export const updateSlider = ({
     commitRenderState?.(sliderElement);
   };
 
-  const { x, y, alpha } = nextSliderComputedNode;
+  const { alpha } = nextSliderComputedNode;
 
   const dispatched = dispatchLiveAnimations({
     animations,
@@ -100,7 +99,9 @@ export const updateSlider = ({
     animationBus,
     completionTracker,
     element: sliderElement,
-    targetState: { x, y, alpha },
+    targetState: getElementTransformTargetState(nextSliderComputedNode, {
+      alpha,
+    }),
     onComplete: updateElement,
   });
 

@@ -17,6 +17,10 @@ import {
   registerManagedVideoSprite,
   requestManagedVideoTextureUpdate,
 } from "./managedVideoTextureSizing.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * Add video element to the stage
@@ -31,7 +35,7 @@ export const addVideo = ({
   completionTracker,
   zIndex,
 }) => {
-  const { id, x, y, width, height, src, volume, loop, alpha } = element;
+  const { id, width, height, src, volume, loop, alpha } = element;
 
   const texture = Texture.from(src);
   const video = texture.source.resource;
@@ -49,10 +53,9 @@ export const addVideo = ({
   sprite._videoErrorListener = undefined;
   sprite._playbackStateVersion = null;
 
-  sprite.x = Math.round(x);
-  sprite.y = Math.round(y);
   sprite.width = Math.round(width);
   sprite.height = Math.round(height);
+  applyElementTransform(sprite, element);
   registerManagedVideoSprite(sprite);
   sprite.alpha = alpha ?? 1;
   const shouldForceBlur = hasBlurUpdateAnimation(animations, id);
@@ -85,8 +88,7 @@ export const addVideo = ({
     completionTracker,
     element: sprite,
     targetState: {
-      x,
-      y,
+      ...getElementTransformTargetState(element),
       width,
       height,
       alpha: alpha ?? 1,

@@ -9,6 +9,8 @@ required:
   - height
   - x
   - y
+  - originX
+  - originY
   - value
   - placeholder
   - multiline
@@ -28,6 +30,16 @@ properties:
     type: number
   y:
     type: number
+  originX:
+    type: number
+    description: Transform origin X in pixels
+  originY:
+    type: number
+    description: Transform origin Y in pixels
+  rotation:
+    type: number
+    description: Rotation in degrees
+    default: 0
   alpha:
     type: number
   value:

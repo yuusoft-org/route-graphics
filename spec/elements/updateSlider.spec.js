@@ -57,6 +57,55 @@ const createSliderElement = (overrides = {}) => ({
 });
 
 describe("updateSlider", () => {
+  it("applies and resets degree rotation around the configured origin", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+    const prevElement = createSliderElement({
+      originX: 20,
+      originY: 8,
+      rotation: 90,
+    });
+
+    addSlider({
+      ...shared,
+      parent,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+      element: prevElement,
+    });
+
+    const slider = parent.getChildByLabel("slider-1");
+
+    expect(slider.x).toBe(120);
+    expect(slider.y).toBe(108);
+    expect(slider.pivot.x).toBe(20);
+    expect(slider.pivot.y).toBe(8);
+    expect(slider.rotation).toBeCloseTo(Math.PI / 2);
+
+    const nextElement = createSliderElement({
+      x: 140,
+      y: 120,
+      originX: 10,
+      originY: 5,
+      rotation: 0,
+    });
+
+    updateSlider({
+      ...shared,
+      parent,
+      prevElement,
+      nextElement,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+
+    expect(slider.x).toBe(150);
+    expect(slider.y).toBe(125);
+    expect(slider.pivot.x).toBe(10);
+    expect(slider.pivot.y).toBe(5);
+    expect(slider.rotation).toBe(0);
+  });
+
   it("keeps dragging active when renders update the slider value", () => {
     const parent = new Container();
     const eventHandler = vi.fn();

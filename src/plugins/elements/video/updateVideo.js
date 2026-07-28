@@ -26,6 +26,10 @@ import {
   unregisterManagedVideoSprite,
 } from "./managedVideoTextureSizing.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * Update video element
@@ -51,7 +55,7 @@ export const updateVideo = ({
 
   videoElement.zIndex = zIndex;
 
-  const { x, y, width, height, alpha } = nextElement;
+  const { width, height, alpha } = nextElement;
   const shouldForceBlur = hasBlurUpdateAnimation(animations, prevElement.id);
   if (shouldForceBlur) {
     syncBlurEffect(videoElement, prevElement.blur, { force: true });
@@ -125,10 +129,9 @@ export const updateVideo = ({
 
   const updateElement = () => {
     if (!isDeepEqual(prevElement, nextElement)) {
-      videoElement.x = Math.round(x);
-      videoElement.y = Math.round(y);
       videoElement.width = Math.round(width);
       videoElement.height = Math.round(height);
+      applyElementTransform(videoElement, nextElement);
       videoElement.alpha = alpha ?? 1;
       syncBlurEffect(videoElement, nextElement.blur, {
         force: shouldForceBlur,
@@ -168,8 +171,7 @@ export const updateVideo = ({
     completionTracker,
     element: videoElement,
     targetState: {
-      x,
-      y,
+      ...getElementTransformTargetState(nextElement),
       width,
       height,
       alpha: alpha ?? 1,

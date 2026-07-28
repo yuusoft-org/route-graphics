@@ -240,6 +240,10 @@ properties:
   originY:
     type: number
     description: Calculated origin Y coordinate based on anchor
+  rotation:
+    type: number
+    description: Rotation in degrees
+    default: 0
   alpha:
     type: number
     description: Opacity/transparency of the text (0-1)

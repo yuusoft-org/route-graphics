@@ -4,9 +4,11 @@ import { DEFAULT_TEXT_STYLE } from "../../../types.js";
 import { mergeTextStyle } from "../../../util/mergeTextStyle.js";
 import { toPixiTextStyle } from "../../../util/toPixiTextStyle.js";
 import { setElementHitTestBounds } from "../elementRenderState.js";
+import { applyElementTransform } from "../util/transform.js";
 
 const TEXT_ANCHOR_RATIOS = Symbol("routeGraphicsTextAnchorRatios");
 const TEXT_LAYOUT_STATE = Symbol("routeGraphicsTextLayoutState");
+const TEXT_TRANSFORM_STATE = Symbol("routeGraphicsTextTransformState");
 
 const getAnchorRatio = (size, origin) => {
   if (typeof size !== "number" || size === 0) return 0;
@@ -111,6 +113,45 @@ const getHorizontalOffset = (layoutWidth, measuredWidth, align) => {
   return 0;
 };
 
+const applyTextElementTransform = (
+  textElement,
+  textComputedNode,
+  {
+    layoutWidth = getLayoutWidth(textElement),
+    measuredWidth = getMeasuredWidth(textElement),
+    measuredHeight = getMeasuredHeight(textElement),
+    originX = textComputedNode.originX ?? 0,
+    originY = textComputedNode.originY ?? 0,
+    positionX,
+    positionY,
+  } = {},
+) => {
+  const offsetX = getHorizontalOffset(
+    layoutWidth,
+    measuredWidth,
+    getTextAlign(textElement.style ?? textComputedNode.textStyle),
+  );
+  const transformedElement = {
+    ...textComputedNode,
+    x: positionX === undefined ? textComputedNode.x : positionX - originX,
+    y: positionY === undefined ? textComputedNode.y : positionY - originY,
+    originX,
+    originY,
+  };
+
+  applyElementTransform(textElement, transformedElement, {
+    localOriginX: originX - offsetX,
+    localOriginY: originY,
+  });
+
+  textElement[TEXT_TRANSFORM_STATE] = {
+    textComputedNode,
+    layoutWidth,
+    measuredWidth,
+    measuredHeight,
+  };
+};
+
 const getTextLayoutHitBounds = (textElement) => {
   const layoutState = textElement[TEXT_LAYOUT_STATE];
   if (!layoutState) return null;
@@ -169,6 +210,12 @@ export const syncTextAnchorRatios = (textElement, textComputedNode) => {
     y: anchorYRatio,
   };
   setTextLayoutState(textElement, textComputedNode, measurements);
+  textElement[TEXT_TRANSFORM_STATE] = {
+    textComputedNode,
+    layoutWidth: width,
+    measuredWidth: measurements.width,
+    measuredHeight: measurements.height,
+  };
   setElementHitTestBounds(textElement, getTextLayoutHitBounds);
 };
 
@@ -217,36 +264,43 @@ export const applyInteractiveTextStyle = (
     return;
   }
 
-  const currentOffsetX = getHorizontalOffset(
-    layoutWidth,
-    getMeasuredWidth(textElement),
-    getTextAlign(textElement.style),
-  );
-  const boxPositionX = textElement.x - currentOffsetX;
-  const anchorPositionX = boxPositionX + layoutWidth * anchorRatios.x;
-  const anchorPositionY =
-    textElement.y + getMeasuredHeight(textElement) * anchorRatios.y;
+  const transformState = textElement[TEXT_TRANSFORM_STATE];
+  const transformPositionX = textElement.x;
+  const transformPositionY = textElement.y;
 
   applyTextStyle(textElement, resolvedStyle);
 
   const nextMeasurements = getRuntimeTextLayout(textElement, resolvedStyle);
   const fixedWidth = textElement[TEXT_LAYOUT_STATE]?.fixedWidth === true;
   const nextLayoutWidth = fixedWidth ? layoutWidth : nextMeasurements.width;
-  const nextOffsetX = getHorizontalOffset(
-    nextLayoutWidth,
-    nextMeasurements.width,
-    getTextAlign(resolvedStyle),
-  );
-
-  textElement.x =
-    anchorPositionX - nextLayoutWidth * anchorRatios.x + nextOffsetX;
-  textElement.y = anchorPositionY - nextMeasurements.height * anchorRatios.y;
   textElement[TEXT_LAYOUT_STATE] = {
-    ...(textElement[TEXT_LAYOUT_STATE] ?? {}),
+    ...textElement[TEXT_LAYOUT_STATE],
     layoutWidth: nextLayoutWidth,
     measuredWidth: nextMeasurements.width,
     measuredHeight: nextMeasurements.height,
   };
+  const textComputedNode = transformState?.textComputedNode;
+
+  if (textComputedNode) {
+    const originX =
+      textComputedNode.__explicitOriginX === true
+        ? textComputedNode.originX
+        : nextLayoutWidth * anchorRatios.x;
+    const originY =
+      textComputedNode.__explicitOriginY === true
+        ? textComputedNode.originY
+        : nextMeasurements.height * anchorRatios.y;
+
+    applyTextElementTransform(textElement, textComputedNode, {
+      layoutWidth: nextLayoutWidth,
+      measuredWidth: nextMeasurements.width,
+      measuredHeight: nextMeasurements.height,
+      originX,
+      originY,
+      positionX: transformPositionX,
+      positionY: transformPositionY,
+    });
+  }
 };
 
 export const positionTextInLayoutBox = (textElement, textComputedNode) => {
@@ -254,16 +308,13 @@ export const positionTextInLayoutBox = (textElement, textComputedNode) => {
   const measuredWidth = usesTextShadow(textComputedNode.textStyle)
     ? (textComputedNode.measuredWidth ?? getMeasuredWidth(textElement))
     : getMeasuredWidth(textElement);
-  const nextPosition = getTextLayoutPosition({
-    ...textComputedNode,
-    measuredWidth,
-    width:
+  applyTextElementTransform(textElement, textComputedNode, {
+    layoutWidth:
       textComputedNode.__fixedWidth &&
       typeof textComputedNode.width === "number"
         ? textComputedNode.width
         : measuredWidth,
+    measuredWidth,
+    measuredHeight: getMeasuredHeight(textElement),
   });
-
-  textElement.x = nextPosition.x;
-  textElement.y = nextPosition.y;
 };

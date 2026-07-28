@@ -7,6 +7,10 @@ import {
   resizeSliderThumb,
   syncSliderRuntime,
 } from "./sliderRuntime.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * Add slider element to the stage
@@ -23,16 +27,14 @@ export const addSlider = ({
   renderContext,
   zIndex,
 }) => {
-  const { id, x, y, width, height, alpha, thumbSrc, barSrc } =
-    sliderComputedNode;
+  const { id, width, height, alpha, thumbSrc, barSrc } = sliderComputedNode;
 
   // Create container for the slider
   const sliderContainer = new Container();
   sliderContainer.label = id;
   sliderContainer.zIndex = zIndex;
-  sliderContainer.x = x;
-  sliderContainer.y = y;
   sliderContainer.alpha = alpha;
+  applyElementTransform(sliderContainer, sliderComputedNode);
   sliderContainer.sortableChildren = true;
   sliderContainer.eventMode = "static";
 
@@ -86,7 +88,7 @@ export const addSlider = ({
     animationBus,
     completionTracker,
     element: sliderContainer,
-    targetState: { x, y, alpha },
+    targetState: getElementTransformTargetState(sliderComputedNode, { alpha }),
     renderContext,
   });
 };

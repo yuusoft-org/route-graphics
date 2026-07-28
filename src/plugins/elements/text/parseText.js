@@ -106,6 +106,14 @@ export const parseText = ({ state }) => {
         value: typeof state.width === "number",
         enumerable: false,
       },
+      __explicitOriginX: {
+        value: typeof state.originX === "number",
+        enumerable: false,
+      },
+      __explicitOriginY: {
+        value: typeof state.originY === "number",
+        enumerable: false,
+      },
     });
 
     return computedText;
@@ -158,6 +166,14 @@ export const parseText = ({ state }) => {
     },
     __fixedWidth: {
       value: typeof state.width === "number",
+      enumerable: false,
+    },
+    __explicitOriginX: {
+      value: typeof state.originX === "number",
+      enumerable: false,
+    },
+    __explicitOriginY: {
+      value: typeof state.originY === "number",
       enumerable: false,
     },
   });

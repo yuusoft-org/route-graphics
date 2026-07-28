@@ -2,7 +2,6 @@ import { Text } from "pixi.js";
 import applyTextStyle from "../../../util/applyTextStyle.js";
 import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
 import {
-  getTextLayoutPosition,
   applyInteractiveTextStyle,
   positionTextInLayoutBox,
   syncTextAnchorRatios,
@@ -10,7 +9,6 @@ import {
 import { bindTextInteractions } from "./textInteractions.js";
 import {
   createRichTextDisplayObject,
-  getRichTextLayoutPosition,
   isRichTextComputedNode,
   renderRichTextDisplayObject,
 } from "./richTextDisplay.js";
@@ -19,11 +17,10 @@ import {
   hasShaderProgressUpdateAnimation,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
+import { getElementTransformTargetState } from "../util/transform.js";
 
 export const getTextAnimationTargetState = (textComputedNode) => ({
-  ...(isRichTextComputedNode(textComputedNode)
-    ? getRichTextLayoutPosition(textComputedNode)
-    : getTextLayoutPosition(textComputedNode)),
+  ...getElementTransformTargetState(textComputedNode),
   alpha: textComputedNode.alpha,
 });
 

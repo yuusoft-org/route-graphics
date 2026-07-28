@@ -58,6 +58,7 @@
  * @property {number} originY
  * @property {number} scaleX
  * @property {number} scaleY
+ * @property {number} rotation - Rotation in degrees
  */
 
 /**

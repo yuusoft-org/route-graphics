@@ -1,6 +1,7 @@
 /**
  * Compile structured particle modules into the legacy computed runtime shape.
  */
+import { parseCommonObject } from "../util/parseCommonObject.js";
 
 /**
  * @param {Object} state
@@ -27,19 +28,18 @@ export function compileParticleModules(state) {
 
   const texture = compileTexture(state.modules.appearance.texture);
   const count = emitter.maxParticles;
+  const computedObj = parseCommonObject({
+    ...state,
+    scaleX: undefined,
+    scaleY: undefined,
+  });
 
   return {
-    id: state.id,
-    type: state.type,
+    ...computedObj,
     count,
     texture,
     behaviors,
     emitter,
-    x: state.x ?? 0,
-    y: state.y ?? 0,
-    width: state.width,
-    height: state.height,
-    alpha: state.alpha ?? 1,
   };
 }
 
@@ -58,7 +58,7 @@ function compileEmission(state) {
       emission.duration === undefined || emission.duration === "infinite"
         ? -1
         : emission.duration,
-    seed: state.seed,
+    ...(state.seed !== undefined && { seed: state.seed }),
   };
 
   if (emission.mode === "continuous") {

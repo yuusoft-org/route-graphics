@@ -17,17 +17,22 @@ Need the exhaustive field reference? See `src/plugins/elements/particles/docs/SC
 
 ## Top-Level Fields
 
-| Field     | Type   | Required | Default | Notes                                              |
-| --------- | ------ | -------- | ------- | -------------------------------------------------- |
-| `id`      | string | Yes      | -       | Element id.                                        |
-| `type`    | string | Yes      | -       | Must be `particles`.                               |
-| `width`   | number | Yes      | -       | Effect area width.                                 |
-| `height`  | number | Yes      | -       | Effect area height.                                |
-| `modules` | object | Yes      | -       | Structured particle configuration.                 |
-| `x`       | number | No       | `0`     | Container x.                                       |
-| `y`       | number | No       | `0`     | Container y.                                       |
-| `alpha`   | number | No       | `1`     | Container alpha.                                   |
-| `seed`    | number | No       | -       | Deterministic randomness for testing and previews. |
+| Field      | Type   | Required | Default | Notes                                              |
+| ---------- | ------ | -------- | ------- | -------------------------------------------------- |
+| `id`       | string | Yes      | -       | Element id.                                        |
+| `type`     | string | Yes      | -       | Must be `particles`.                               |
+| `width`    | number | Yes      | -       | Effect area width.                                 |
+| `height`   | number | Yes      | -       | Effect area height.                                |
+| `modules`  | object | Yes      | -       | Structured particle configuration.                 |
+| `x`        | number | No       | `0`     | Container x.                                       |
+| `y`        | number | No       | `0`     | Container y.                                       |
+| `anchorX`  | number | No       | `0`     | Emitter-container anchor ratio on the X axis.      |
+| `anchorY`  | number | No       | `0`     | Emitter-container anchor ratio on the Y axis.      |
+| `originX`  | number | No       | anchor  | Element-level transform origin X in pixels.        |
+| `originY`  | number | No       | anchor  | Element-level transform origin Y in pixels.        |
+| `rotation` | number | No       | `0`     | Element-level rotation in degrees.                 |
+| `alpha`    | number | No       | `1`     | Container alpha.                                   |
+| `seed`     | number | No       | -       | Deterministic randomness for testing and previews. |
 
 ## Modules
 
