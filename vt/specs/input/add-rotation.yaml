@@ -1,0 +1,36 @@
+---
+title: Input Static Rotation
+description: A styled input rotating around its anchor-derived center.
+specs:
+  - input rotation should apply to the field chrome and text
+  - omitted origin should use the anchor-derived center
+---
+states:
+  - elements:
+      - id: rotated-input
+        type: input
+        x: 640
+        "y": 360
+        width: 300
+        height: 64
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        value: Rotated input
+        textStyle:
+          fontSize: 24
+          fill: "#1C1C1C"
+          fontFamily: Arial
+        fill: "#FFFFFF"
+        border:
+          width: 5
+          color: "#666666"
+      - id: input-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

@@ -1,0 +1,83 @@
+---
+title: Slider Update Rotation
+description: A horizontal slider sampled while rotating around its anchor-derived center.
+specs:
+  - slider rotation should animate from 0 to 90 degrees
+  - the bar and thumb should remain aligned during the tween
+  - auto rotation tween values should use degrees
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotating-slider
+        type: slider
+        direction: horizontal
+        thumbSrc: horizontal-idle-thumb
+        barSrc: horizontal-idle-bar
+        x: 640
+        "y": 360
+        width: 300
+        height: 24
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 0
+        min: 0
+        max: 100
+        step: 1
+        initialValue: 30
+      - id: slider-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+  - elements:
+      - id: rotating-slider
+        type: slider
+        direction: horizontal
+        thumbSrc: horizontal-idle-thumb
+        barSrc: horizontal-idle-bar
+        x: 640
+        "y": 360
+        width: 300
+        height: 24
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 90
+        min: 0
+        max: 100
+        step: 1
+        initialValue: 30
+      - id: slider-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+    animations:
+      - id: slider-rotate
+        targetId: rotating-slider
+        type: update
+        tween:
+          rotation:
+            auto:
+              duration: 1000
+              easing: linear

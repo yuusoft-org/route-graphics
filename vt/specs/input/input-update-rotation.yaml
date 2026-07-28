@@ -1,0 +1,87 @@
+---
+title: Input Update Rotation
+description: A styled input sampled while rotating around its anchor-derived center.
+specs:
+  - input rotation should animate from 0 to 90 degrees
+  - field chrome and text should remain aligned during the tween
+  - auto rotation tween values should use degrees
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotating-input
+        type: input
+        x: 640
+        "y": 360
+        width: 300
+        height: 64
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 0
+        value: Rotating input
+        textStyle:
+          fontSize: 24
+          fill: "#1C1C1C"
+          fontFamily: Arial
+        fill: "#FFFFFF"
+        border:
+          width: 5
+          color: "#666666"
+      - id: input-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+  - elements:
+      - id: rotating-input
+        type: input
+        x: 640
+        "y": 360
+        width: 300
+        height: 64
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 90
+        value: Rotating input
+        textStyle:
+          fontSize: 24
+          fill: "#1C1C1C"
+          fontFamily: Arial
+        fill: "#FFFFFF"
+        border:
+          width: 5
+          color: "#666666"
+      - id: input-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+    animations:
+      - id: input-rotate
+        targetId: rotating-input
+        type: update
+        tween:
+          rotation:
+            auto:
+              duration: 1000
+              easing: linear

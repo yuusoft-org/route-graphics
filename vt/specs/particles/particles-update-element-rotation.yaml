@@ -1,0 +1,127 @@
+---
+title: Particles Update Element Rotation
+description: A deterministic asymmetric particle field sampled while its emitter container rotates.
+specs:
+  - element-level particle rotation should animate from 0 to 90 degrees
+  - the existing particle field should remain attached to the rotating emitter container
+  - auto rotation tween values should use degrees
+skipInitialScreenshot: true
+steps:
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 32
+  - action: wait
+    ms: 50
+  - action: customEvent
+    name: "primeVtScreenshot"
+  - action: wait
+    ms: 50
+  - action: screenshot
+  - action: customEvent
+    name: "vtNextState"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotating-particles
+        type: particles
+        x: 640
+        "y": 360
+        width: 260
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 0
+        seed: 2468
+        modules:
+          emission:
+            mode: burst
+            burstCount: 48
+            maxActive: 48
+            duration: 0.1
+            particleLifetime: 10
+            source:
+              kind: rect
+              data:
+                x: 24
+                "y": 24
+                width: 190
+                height: 54
+          appearance:
+            texture:
+              shape: rect
+              width: 12
+              height: 6
+              color: "#FFFFFF"
+            rotation:
+              mode: none
+      - id: particles-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+  - elements:
+      - id: rotating-particles
+        type: particles
+        x: 640
+        "y": 360
+        width: 260
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 90
+        seed: 2468
+        modules:
+          emission:
+            mode: burst
+            burstCount: 48
+            maxActive: 48
+            duration: 0.1
+            particleLifetime: 10
+            source:
+              kind: rect
+              data:
+                x: 24
+                "y": 24
+                width: 190
+                height: 54
+          appearance:
+            texture:
+              shape: rect
+              width: 12
+              height: 6
+              color: "#FFFFFF"
+            rotation:
+              mode: none
+      - id: particles-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+    animations:
+      - id: particles-rotate
+        targetId: rotating-particles
+        type: update
+        tween:
+          rotation:
+            auto:
+              duration: 1000
+              easing: linear

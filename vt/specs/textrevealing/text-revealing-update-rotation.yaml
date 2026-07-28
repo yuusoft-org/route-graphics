@@ -1,0 +1,81 @@
+---
+title: Text Revealing Update Rotation
+description: Immediately revealed text sampled while rotating around its anchor-derived center.
+specs:
+  - text-revealing rotation should animate from 0 to 90 degrees
+  - mounted glyph layout should remain stable during the tween
+  - the completed reveal should commit its final transform
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotating-revealing-text
+        type: text-revealing
+        content:
+          - text: Rotating revealing text
+            textStyle:
+              fontSize: 30
+              fill: "#FFFFFF"
+              fontFamily: Arial
+        x: 640
+        "y": 360
+        width: 340
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 0
+        revealEffect: none
+      - id: text-revealing-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+  - elements:
+      - id: rotating-revealing-text
+        type: text-revealing
+        content:
+          - text: Rotating revealing text
+            textStyle:
+              fontSize: 30
+              fill: "#FFFFFF"
+              fontFamily: Arial
+        x: 640
+        "y": 360
+        width: 340
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 90
+        revealEffect: none
+      - id: text-revealing-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+    animations:
+      - id: text-revealing-rotate
+        targetId: rotating-revealing-text
+        type: update
+        tween:
+          rotation:
+            auto:
+              duration: 1000
+              easing: linear

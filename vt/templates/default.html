@@ -372,13 +372,18 @@
         },
       };
 
+      const isVtDebug =
+        window?.RTGL_VT_DEBUG === true || window?.RTGL_VT_DEBUG === "true";
+      const isVideoVisualTest =
+        isVtDebug && window.location.pathname.includes("/video/");
       const shouldLoadOptionalVideo =
-        !window?.RTGL_VT_DEBUG &&
-        (window?.RTGL_VT_INCLUDE_MEDIA === true ||
-          new URLSearchParams(window.location.search).get("media") === "1");
+        isVideoVisualTest ||
+        (!isVtDebug &&
+          (window?.RTGL_VT_INCLUDE_MEDIA === true ||
+            new URLSearchParams(window.location.search).get("media") === "1"));
 
-      // Keep video opt-in for manual browser runs so pages that do not use
-      // video do not block on video preload.
+      // Load video for its dedicated VT section while keeping it opt-in on
+      // unrelated debug pages and manual browser runs.
       if (shouldLoadOptionalVideo) {
         Object.assign(assetsObject, {
           "video-sample": {
@@ -842,7 +847,26 @@
         debug: window?.RTGL_VT_DEBUG ?? false,
       });
       window.__VT_ROUTE_GRAPHICS__ = app;
-      await app.loadAssets(assetBufferManager.getBufferMap());
+      const assetBufferMap = assetBufferManager.getBufferMap();
+      if (isVideoVisualTest) {
+        await Promise.all(
+          ["video-sample", "video-sample-2"].map(async (assetKey) => {
+            const asset = assetsObject[assetKey];
+            const response = await fetch(asset.url);
+            if (!response.ok) {
+              throw new Error(
+                `Could not load VT video asset "${assetKey}" (HTTP ${response.status}).`,
+              );
+            }
+            assetBufferMap[assetKey] = {
+              buffer: await response.arrayBuffer(),
+              type: asset.type,
+              source: "buffer",
+            };
+          }),
+        );
+      }
+      await app.loadAssets(assetBufferMap);
       if (hasAudioStates) {
         console.log("[VT audio] assets decoded", { audioAssetKeys });
       }
@@ -953,6 +977,101 @@
           try {
             await window.takeVtScreenshotBase64();
           } catch {}
+        });
+
+        window.addEventListener("snapShotVideoFrame", (event) => {
+          const videoElement = app.findElementByLabel(event.detail?.elementId);
+          const source = videoElement?.texture?.source;
+          const video = source?.resource;
+          if (!(video instanceof HTMLVideoElement)) {
+            return;
+          }
+
+          video.pause();
+          const commitVideoFrame = () => {
+            video.pause();
+            source.__routeGraphicsVideoTextureRuntime?.requestUpdate?.({
+              force: true,
+            });
+            source.update?.();
+            void app.extractBase64();
+          };
+          const playUntilVideoFrame = () => {
+            const requestedTime = Number(event.detail?.time ?? 0);
+            const targetTime = Number.isFinite(video.duration)
+              ? Math.min(
+                  Math.max(0, requestedTime),
+                  Math.max(0, video.duration - 0.05),
+                )
+              : requestedTime;
+
+            const waitForPresentedVideoFrame = () => {
+              if (typeof video.requestVideoFrameCallback === "function") {
+                video.requestVideoFrameCallback(commitVideoFrame);
+              } else {
+                requestAnimationFrame(commitVideoFrame);
+              }
+            };
+            const seekableEnd =
+              video.seekable.length > 0
+                ? video.seekable.end(video.seekable.length - 1)
+                : 0;
+            const seekToTargetTime = () => {
+              if (Math.abs(video.currentTime - targetTime) < 1 / 120) {
+                waitForPresentedVideoFrame();
+              } else {
+                video.addEventListener("seeked", waitForPresentedVideoFrame, {
+                  once: true,
+                });
+                video.currentTime = targetTime;
+              }
+            };
+            if (video.currentSrc.startsWith("blob:")) {
+              if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                seekToTargetTime();
+              } else {
+                video.addEventListener("loadeddata", seekToTargetTime, {
+                  once: true,
+                });
+              }
+              return;
+            }
+            if (seekableEnd + 1 / 120 >= targetTime) {
+              seekToTargetTime();
+              return;
+            }
+
+            if (typeof video.requestVideoFrameCallback === "function") {
+              const captureAtTargetTime = (_now, metadata) => {
+                if (metadata.mediaTime + 1 / 120 < targetTime && !video.ended) {
+                  video.requestVideoFrameCallback(captureAtTargetTime);
+                  return;
+                }
+                commitVideoFrame();
+              };
+              video.requestVideoFrameCallback(captureAtTargetTime);
+            } else {
+              const captureAtTargetTime = () => {
+                if (video.currentTime + 1 / 120 < targetTime && !video.ended) {
+                  return;
+                }
+                video.removeEventListener("timeupdate", captureAtTargetTime);
+                commitVideoFrame();
+              };
+              video.addEventListener("timeupdate", captureAtTargetTime);
+            }
+
+            video.muted = true;
+            void video.play().catch(commitVideoFrame);
+          };
+
+          if (video.readyState === 0) {
+            video.addEventListener("loadedmetadata", playUntilVideoFrame, {
+              once: true,
+            });
+          } else {
+            playUntilVideoFrame();
+          }
         });
 
         window.addEventListener("vtNextState", () => {

@@ -1,0 +1,34 @@
+---
+title: Slider Static Rotation
+description: A horizontal slider rotating around its anchor-derived center.
+specs:
+  - slider rotation should apply to the bar and thumb
+  - omitted origin should use the anchor-derived center
+---
+states:
+  - elements:
+      - id: rotated-slider
+        type: slider
+        direction: horizontal
+        thumbSrc: horizontal-idle-thumb
+        barSrc: horizontal-idle-bar
+        x: 640
+        "y": 360
+        width: 300
+        height: 24
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        min: 0
+        max: 100
+        step: 1
+        initialValue: 30
+      - id: slider-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

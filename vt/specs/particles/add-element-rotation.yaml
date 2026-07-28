@@ -1,0 +1,64 @@
+---
+title: Particles Static Element Rotation
+description: A deterministic asymmetric particle field rotating as one element around its anchor-derived center.
+specs:
+  - element-level particle rotation should rotate the emitter container
+  - element rotation should remain separate from per-particle appearance rotation
+  - omitted origin should use the anchor-derived center
+skipInitialScreenshot: true
+steps:
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 32
+  - action: wait
+    ms: 50
+  - action: customEvent
+    name: "primeVtScreenshot"
+  - action: wait
+    ms: 50
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotated-particles
+        type: particles
+        x: 640
+        "y": 360
+        width: 260
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        seed: 2468
+        modules:
+          emission:
+            mode: burst
+            burstCount: 48
+            maxActive: 48
+            duration: 0.1
+            particleLifetime: 10
+            source:
+              kind: rect
+              data:
+                x: 24
+                "y": 24
+                width: 190
+                height: 54
+          appearance:
+            texture:
+              shape: rect
+              width: 12
+              height: 6
+              color: "#FFFFFF"
+            rotation:
+              mode: none
+      - id: particles-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

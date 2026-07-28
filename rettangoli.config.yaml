@@ -124,6 +124,12 @@ vt:
         - title: "Animated Sprite Transitions"
           files: "animatedspritetransition"
           description: "Animated sprite transitions rendering test"
+    - title: "Video Group"
+      type: "groupLabel"
+      items:
+        - title: "Video"
+          files: "video"
+          description: "Video rendering and transition tests"
     - title: "Z Index Group"
       type: "groupLabel"
       items:
