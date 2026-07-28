@@ -161,6 +161,55 @@ describe("normalizeAudioRenderState", () => {
     ).toThrow("audio[0].interruption must be one of immediate, loopEnd");
   });
 
+  it("normalizes strict channel playback commands", () => {
+    const result = flattenAudioNodes([
+      {
+        id: "music",
+        type: "audio-channel",
+        loop: true,
+        playback: {
+          commandId: 42,
+          operation: "pause",
+        },
+        children: [{ id: "theme", type: "sound", src: "theme" }],
+      },
+    ]);
+
+    expect(result.channels[0].playback).toEqual({
+      commandId: 42,
+      operation: "pause",
+    });
+  });
+
+  it.each([
+    [
+      { commandId: -1, operation: "pause" },
+      "commandId must be a non-negative safe integer",
+    ],
+    [
+      { commandId: 1, operation: "play" },
+      "operation must be one of pause, resume",
+    ],
+    [
+      { commandId: 1, operation: "pause", positionMs: 0 },
+      "positionMs is not allowed for pause",
+    ],
+    [
+      { commandId: 1, operation: "pause", status: "paused" },
+      'unsupported playback field "status"',
+    ],
+  ])("rejects invalid channel playback command %#", (playback, message) => {
+    expect(() =>
+      flattenAudioNodes([
+        {
+          id: "music",
+          type: "audio-channel",
+          playback,
+        },
+      ]),
+    ).toThrow(message);
+  });
+
   it("normalizes strict playback commands", () => {
     const result = flattenAudioNodes([
       {
@@ -260,6 +309,35 @@ describe("normalizeAudioRenderState", () => {
       ]),
     ).toThrow(
       "audio[0].children[0].playback is not allowed when audio[0].loop is true",
+    );
+  });
+
+  it("rejects independent sound commands inside a controlled channel", () => {
+    expect(() =>
+      flattenAudioNodes([
+        {
+          id: "music",
+          type: "audio-channel",
+          playback: {
+            commandId: 1,
+            operation: "resume",
+          },
+          children: [
+            {
+              id: "track",
+              type: "sound",
+              src: "theme",
+              playback: {
+                commandId: 1,
+                operation: "play",
+                positionMs: 0,
+              },
+            },
+          ],
+        },
+      ]),
+    ).toThrow(
+      "audio[0].children[0].playback is not allowed when audio[0].playback is present",
     );
   });
 

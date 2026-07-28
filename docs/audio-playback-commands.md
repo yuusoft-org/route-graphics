@@ -1,8 +1,9 @@
 # Command-Controlled Sound Playback
 
-Status: implemented for the Route Graphics 1.31.0 release.
+Status: sound commands implemented in Route Graphics 1.31.0; channel
+pause/resume implemented in 1.31.1.
 
-Last updated: 2026-07-25
+Last updated: 2026-07-28
 
 ## Purpose
 
@@ -458,7 +459,48 @@ This allows a consumer to pause retained story BGM while starting another
 controlled music sound. Voice and sound effects may remain ordinary sounds
 without `playback`.
 
-### Audio-Channel Loop Restriction
+### Audio-Channel Pause and Resume
+
+An `audio-channel` may opt into cursor-preserving transport with a strict
+channel command:
+
+```yaml
+id: story-bgm
+type: audio-channel
+loop: true
+playback:
+  commandId: 42
+  operation: pause
+children:
+  - id: intro
+    type: sound
+    src: intro
+  - id: theme
+    type: sound
+    src: theme
+    startDelayMs: 500
+```
+
+Channel playback supports only `pause` and `resume`. `positionMs` and unknown
+fields are invalid. Higher `commandId` values execute once; repeated and lower
+IDs do nothing.
+
+`pause` captures each active child cursor and each pending child's remaining
+`startDelayMs`. A paused looping channel does not begin another schedule
+iteration. `resume` continues those exact cursors and delays; children that
+already ended remain ended. If the complete iteration had ended, resuming a
+looping channel begins its next iteration.
+
+Children added to a paused channel remain paused from their initial cursor.
+Continuing sounds moved into or out of a paused channel pause or resume without
+restarting. Mixer updates do not affect playback state.
+
+Channel playback is opt-in for the complete retained channel lifetime. Adding
+or removing `playback` while retaining the same channel ID is invalid. Channel
+commands emit no sound transport events because a channel has no single
+position or duration.
+
+### Audio-Channel Command Ownership
 
 A command-controlled sound may be a child of an `audio-channel` only when that
 channel has `loop: false`. A looping channel automatically restarts its complete
@@ -476,6 +518,10 @@ The render is rejected before audio reconciliation, leaving the previous
 channel and sound runtime unchanged. Use `loop: true` on the controlled sound
 itself when one command should authorize continuous looping, or keep the
 channel non-looping and issue higher playback commands explicitly.
+
+A channel with its own `playback` command cannot contain command-controlled
+sounds. Use channel commands to pause or resume the complete ordinary child
+schedule, or sound commands for independent child transport, but not both.
 
 ### Audio-Channel Interruption
 
@@ -815,9 +861,9 @@ Its behavior remains:
 
 No new command ID or events are required for legacy sounds.
 
-Audio channels require no new fields. Existing channel and sound volume, mute,
-pan, sound-loop, timing, and transition fields remain unchanged, subject to the
-restriction that a looping channel cannot contain a command-controlled sound.
+Audio channels remain ordinary declarative buses unless they opt into the
+`playback` field. Existing channel and sound volume, mute, pan, sound-loop,
+timing, and transition fields remain unchanged.
 
 ## Internal Implementation Requirements
 
@@ -885,6 +931,11 @@ Test coverage includes:
 - source replacement followed by decode, segment, position, or playback failure
 - full and remaining `startDelayMs` behavior for every transport operation
 - rejection of command-controlled children in looping channels
+- strict channel pause/resume validation and command ordering
+- active-cursor and remaining-delay continuity for multi-sound channels
+- paused looping-channel scheduling and child add/remove/reroute behavior
+- rejection of retained channel transitions into or out of controlled mode
+- rejection of independent sound commands inside a controlled channel
 - immediate and loop-end interruption of active, decoding, and delayed sounds
 - volume, mute, pan, and channel updates without restart
 - playback-rate-aware progress

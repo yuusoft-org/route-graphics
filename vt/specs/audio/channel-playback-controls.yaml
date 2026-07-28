@@ -1,0 +1,65 @@
+---
+title: Audio Manual - Channel Pause and Resume
+description: Browser fixture for cursor-preserving transport across a looping multi-sound channel.
+skipScreenshot: true
+specs:
+  - state 1 is silent so the first playback starts from a user gesture
+  - state 2 starts the looping channel with the second sound delayed by one second
+  - state 3 pauses both active cursors and any remaining delay
+  - remain paused for several seconds; no sound or new schedule iteration should start
+  - state 4 resumes from the captured cursors and remaining delay instead of restarting
+  - state 5 removes the complete channel
+---
+states:
+  - id: channel-playback-ready
+    audio: []
+  - id: channel-playback-playing
+    audio:
+      - id: channel-playback-music
+        type: audio-channel
+        loop: true
+        playback:
+          commandId: 1
+          operation: resume
+        children:
+          - id: channel-playback-first
+            type: sound
+            src: bgm-1
+          - id: channel-playback-second
+            type: sound
+            src: bgm-2
+            startDelayMs: 1000
+  - id: channel-playback-paused
+    audio:
+      - id: channel-playback-music
+        type: audio-channel
+        loop: true
+        playback:
+          commandId: 2
+          operation: pause
+        children:
+          - id: channel-playback-first
+            type: sound
+            src: bgm-1
+          - id: channel-playback-second
+            type: sound
+            src: bgm-2
+            startDelayMs: 1000
+  - id: channel-playback-resumed
+    audio:
+      - id: channel-playback-music
+        type: audio-channel
+        loop: true
+        playback:
+          commandId: 3
+          operation: resume
+        children:
+          - id: channel-playback-first
+            type: sound
+            src: bgm-1
+          - id: channel-playback-second
+            type: sound
+            src: bgm-2
+            startDelayMs: 1000
+  - id: channel-playback-stopped
+    audio: []
