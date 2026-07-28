@@ -525,6 +525,7 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     playbackPending: false,
     pendingTimeoutId: null,
     pendingDelayMs: 0,
+    pendingStartOffset: null,
     delayDeadlineMs: null,
     channelPauseState: null,
     cleanupTimeoutId: null,
@@ -640,6 +641,7 @@ const playSound = (
   }
   sound.delayDeadlineMs = null;
   sound.pendingDelayMs = Math.max(0, startDelayMs ?? 0);
+  sound.pendingStartOffset = startOffset;
   sound.channelPauseState = null;
 
   const context = getAudioContext();
@@ -671,6 +673,7 @@ const playSound = (
     const previousSource = sound.source;
     sound.source = createSourceForSound(sound, startOffset);
     sound.playbackPending = false;
+    sound.pendingStartOffset = null;
     if (previousSource && previousSource !== sound.source) {
       disconnect(previousSource);
     }
@@ -709,6 +712,7 @@ const stopSource = (sound, delayMs = 0) => {
   sound.playRequestId = (sound.playRequestId ?? 0) + 1;
   sound.playbackPending = false;
   sound.pendingDelayMs = 0;
+  sound.pendingStartOffset = null;
   sound.delayDeadlineMs = null;
 
   if (sound.pendingTimeoutId !== null) {
@@ -1784,17 +1788,29 @@ export const createAudioStage = () => {
     const absoluteOffset = startOffset + elapsedSourceSeconds;
 
     if (source.loop && Number.isFinite(segmentEnd)) {
-      const loopDuration = segmentEnd - segmentStart;
+      const loopStart = Math.max(0, toFiniteParamValue(source.loopStart, 0));
+      const configuredLoopEnd = toFiniteParamValue(source.loopEnd, 0);
+      const loopEnd =
+        configuredLoopEnd > loopStart ? configuredLoopEnd : segmentEnd;
+      const loopDuration = loopEnd - loopStart;
       if (loopDuration > 0) {
         const relativeOffset =
-          (((absoluteOffset - segmentStart) % loopDuration) + loopDuration) %
+          (((absoluteOffset - loopStart) % loopDuration) + loopDuration) %
           loopDuration;
-        return segmentStart + relativeOffset;
+        return loopStart + relativeOffset;
       }
-      return segmentStart;
+      return loopStart;
     }
 
     return Math.max(segmentStart, Math.min(absoluteOffset, segmentEnd));
+  };
+
+  const checkpointLegacyPlaybackOffset = (
+    sound,
+    context = getAudioContext(),
+  ) => {
+    sound.sourceStartOffset = getLegacyPlaybackOffset(sound, context);
+    sound.sourceStartedAt = context.currentTime;
   };
 
   const stopLegacySourceForChannelPause = (sound) => {
@@ -1802,6 +1818,7 @@ export const createAudioStage = () => {
     sound.playRequestId = (sound.playRequestId ?? 0) + 1;
     sound.playbackPending = false;
     sound.pendingDelayMs = 0;
+    sound.pendingStartOffset = null;
     sound.delayDeadlineMs = null;
     if (sound.pendingTimeoutId !== null) {
       clearTimeout(sound.pendingTimeoutId);
@@ -1825,6 +1842,18 @@ export const createAudioStage = () => {
       return;
     }
 
+    if (sound.playbackPending || sound.pendingTimeoutId !== null) {
+      const remainingDelayMs = getRemainingLegacyDelayMs(sound);
+      sound.channelPauseState = {
+        kind: "pending",
+        offset: sound.pendingStartOffset ?? sound.startAt,
+        remainingDelayMs,
+      };
+      stopLegacySourceForChannelPause(sound);
+      sound.sourceEnded = false;
+      return;
+    }
+
     if (sound.source && !sound.sourceEnded) {
       const offset = getLegacyPlaybackOffset(sound);
       sound.channelPauseState = {
@@ -1837,24 +1866,13 @@ export const createAudioStage = () => {
       return;
     }
 
-    if (sound.playbackPending || sound.pendingTimeoutId !== null) {
-      const remainingDelayMs = getRemainingLegacyDelayMs(sound);
-      sound.channelPauseState = {
-        kind: "pending",
-        offset: sound.startAt,
-        remainingDelayMs,
-      };
-      stopLegacySourceForChannelPause(sound);
-      sound.sourceEnded = false;
-      return;
-    }
-
     sound.channelPauseState = { kind: "ended" };
   };
 
   const stageSoundForPausedChannel = (sound) => {
     sound.sourceEnded = false;
     sound.playbackPending = false;
+    sound.pendingStartOffset = null;
     sound.channelPauseState = {
       kind: "pending",
       offset: sound.startAt,
@@ -1979,6 +1997,7 @@ export const createAudioStage = () => {
 
       sound.playRequestId = (sound.playRequestId ?? 0) + 1;
       sound.playbackPending = false;
+      sound.pendingStartOffset = null;
       sound.sourceEnded = true;
       if (sound.pendingTimeoutId !== null) {
         clearTimeout(sound.pendingTimeoutId);
@@ -2419,6 +2438,15 @@ export const createAudioStage = () => {
       (loopChanged || playbackRateChanged)
     ) {
       captureControlledPosition(instance);
+    }
+    if (
+      !instance.control &&
+      (loopChanged || playbackRateChanged) &&
+      instance.source &&
+      !instance.sourceEnded &&
+      !instance.playbackPending
+    ) {
+      checkpointLegacyPlaybackOffset(instance);
     }
 
     if (instance.channelId !== sound.channelId) {

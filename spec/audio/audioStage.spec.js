@@ -1963,6 +1963,114 @@ describe("AudioStage graph rendering", () => {
     expect(findCurrentSound(stage, "outro").pendingTimeoutId).not.toBeNull();
   });
 
+  it("preserves a delayed child's remaining delay after a channel loop restarts", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([
+        ["intro", { duration: 10 }],
+        ["outro", { duration: 10 }],
+      ]),
+    });
+    const channel = (commandId, operation) => [
+      {
+        id: "music",
+        type: "audio-channel",
+        loop: true,
+        playback: { commandId, operation },
+        children: [
+          { id: "intro", type: "sound", src: "intro" },
+          {
+            id: "outro",
+            type: "sound",
+            src: "outro",
+            startDelayMs: 100,
+          },
+        ],
+      },
+    ];
+    const playing = channel(1, "resume");
+    const paused = channel(2, "pause");
+    const resumed = channel(3, "resume");
+
+    stage.renderGraph({ nextAudio: playing });
+    context.sources[0].onended();
+    vi.advanceTimersByTime(100);
+    context.sources[1].onended();
+
+    expect(context.sources).toHaveLength(3);
+    vi.advanceTimersByTime(40);
+    context.currentTime = 10.04;
+    stage.renderGraph({ prevAudio: playing, nextAudio: paused });
+
+    expect(findCurrentSound(stage, "outro").channelPauseState).toEqual({
+      kind: "pending",
+      offset: 0,
+      remainingDelayMs: 60,
+    });
+
+    context.currentTime = 20;
+    stage.renderGraph({ prevAudio: paused, nextAudio: resumed });
+    vi.advanceTimersByTime(59);
+    expect(context.sources).toHaveLength(4);
+    vi.advanceTimersByTime(1);
+    expect(context.sources).toHaveLength(5);
+    expect(context.sources[4].start).toHaveBeenCalledWith(20, 0);
+  });
+
+  it("preserves a resumed cursor when a channel is paused before the audio context resumes", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 10 }]]),
+    });
+    const channel = (commandId, operation) => [
+      {
+        id: "music",
+        type: "audio-channel",
+        playback: { commandId, operation },
+        children: [{ id: "theme", type: "sound", src: "theme" }],
+      },
+    ];
+    const playing = channel(1, "resume");
+    const paused = channel(2, "pause");
+    const pendingResume = channel(3, "resume");
+    const pausedAgain = channel(4, "pause");
+    const resumed = channel(5, "resume");
+
+    stage.renderGraph({ nextAudio: playing });
+    context.currentTime = 10.5;
+    stage.renderGraph({ prevAudio: playing, nextAudio: paused });
+
+    let resolveResume;
+    context.state = "suspended";
+    context.resume.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveResume = () => {
+            context.state = "running";
+            resolve();
+          };
+        }),
+    );
+    stage.renderGraph({ prevAudio: paused, nextAudio: pendingResume });
+    stage.renderGraph({
+      prevAudio: pendingResume,
+      nextAudio: pausedAgain,
+    });
+
+    expect(findCurrentSound(stage, "theme").channelPauseState).toEqual({
+      kind: "pending",
+      offset: 0.5,
+      remainingDelayMs: 0,
+    });
+
+    resolveResume();
+    await flushPromises();
+    expect(context.sources).toHaveLength(1);
+
+    context.currentTime = 20;
+    stage.renderGraph({ prevAudio: pausedAgain, nextAudio: resumed });
+    expect(context.sources).toHaveLength(2);
+    expect(context.sources[1].start).toHaveBeenCalledWith(20, 0.5);
+  });
+
   it("starts children only after an initially paused channel resumes", async () => {
     const { stage, context, getAsset } = await setupAudioStage();
     const paused = [
@@ -2106,6 +2214,121 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({ prevAudio: paused, nextAudio: resumed });
 
     expect(context.sources[1].start).toHaveBeenCalledWith(20, 4.5, 3.5);
+  });
+
+  it("preserves playback-rate history when capturing a channel cursor", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 10 }]]),
+    });
+    const channel = (commandId, operation, playbackRate) => [
+      {
+        id: "music",
+        type: "audio-channel",
+        playback: { commandId, operation },
+        children: [
+          {
+            id: "theme",
+            type: "sound",
+            src: "theme",
+            playbackRate,
+          },
+        ],
+      },
+    ];
+    const playing = channel(1, "resume", 1);
+    const faster = channel(1, "resume", 2);
+    const paused = channel(2, "pause", 2);
+
+    stage.renderGraph({ nextAudio: playing });
+    context.currentTime = 12;
+    stage.renderGraph({ prevAudio: playing, nextAudio: faster });
+    context.currentTime = 13;
+    stage.renderGraph({ prevAudio: faster, nextAudio: paused });
+
+    expect(
+      findCurrentSound(stage, "theme").channelPauseState.offset,
+    ).toBeCloseTo(4);
+  });
+
+  it("uses the source's effective loop points when capturing a channel cursor", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 10 }]]),
+    });
+    const channel = (commandId, operation) => [
+      {
+        id: "music",
+        type: "audio-channel",
+        playback: { commandId, operation },
+        children: [
+          {
+            id: "theme",
+            type: "sound",
+            src: "theme",
+            loop: true,
+            startAt: 5,
+          },
+        ],
+      },
+    ];
+    const playing = channel(1, "resume");
+    const paused = channel(2, "pause");
+    const resumed = channel(3, "resume");
+
+    stage.renderGraph({ nextAudio: playing });
+    expect(context.sources[0].loopStart).toBe(0);
+    context.currentTime = 16;
+    stage.renderGraph({ prevAudio: playing, nextAudio: paused });
+
+    expect(
+      findCurrentSound(stage, "theme").channelPauseState.offset,
+    ).toBeCloseTo(1);
+
+    context.currentTime = 20;
+    stage.renderGraph({ prevAudio: paused, nextAudio: resumed });
+    expect(context.sources[1].start).toHaveBeenCalledTimes(1);
+    expect(context.sources[1].start.mock.calls[0][0]).toBe(20);
+    expect(context.sources[1].start.mock.calls[0][1]).toBeCloseTo(1);
+  });
+
+  it("preserves a wrapped channel cursor when child looping is disabled", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 10 }]]),
+    });
+    const channel = (commandId, operation, loop) => [
+      {
+        id: "music",
+        type: "audio-channel",
+        playback: { commandId, operation },
+        children: [
+          {
+            id: "theme",
+            type: "sound",
+            src: "theme",
+            loop,
+          },
+        ],
+      },
+    ];
+    const looping = channel(1, "resume", true);
+    const notLooping = channel(1, "resume", false);
+    const paused = channel(2, "pause", false);
+    const resumed = channel(3, "resume", false);
+
+    stage.renderGraph({ nextAudio: looping });
+    context.currentTime = 22;
+    stage.renderGraph({ prevAudio: looping, nextAudio: notLooping });
+    context.currentTime = 23;
+    stage.renderGraph({ prevAudio: notLooping, nextAudio: paused });
+
+    expect(
+      findCurrentSound(stage, "theme").channelPauseState.offset,
+    ).toBeCloseTo(3);
+
+    context.currentTime = 30;
+    stage.renderGraph({ prevAudio: paused, nextAudio: resumed });
+    expect(context.sources[1].start).toHaveBeenCalledTimes(1);
+    expect(context.sources[1].start.mock.calls[0][0]).toBe(30);
+    expect(context.sources[1].start.mock.calls[0][1]).toBeCloseTo(3);
   });
 
   it("keeps continuing sounds synchronized when they move across a paused channel", async () => {
