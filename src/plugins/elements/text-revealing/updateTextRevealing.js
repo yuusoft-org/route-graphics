@@ -57,10 +57,12 @@ export const updateTextRevealing = async ({
   );
   if (!textRevealingElement) return;
 
+  let didCommitMountedLayout = false;
   const commitMountedLayout = () => {
     if (!signal?.aborted && !textRevealingElement.destroyed) {
       setElementRenderState(textRevealingElement, element);
       commitRenderState?.(textRevealingElement);
+      didCommitMountedLayout = true;
     }
   };
 
@@ -86,6 +88,9 @@ export const updateTextRevealing = async ({
           playback: "resume",
           onLayoutMounted: commitMountedLayout,
         });
+        if (!didCommitMountedLayout) {
+          commitMountedLayout();
+        }
       } else {
         commitMountedLayout();
       }

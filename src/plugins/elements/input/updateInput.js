@@ -199,8 +199,15 @@ export const updateInput = ({
   } else {
     nextRuntimeElement.value = runtime.value;
   }
+  const adoptedExternalValue =
+    shouldAdoptExternalValue && runtime.composing !== true;
 
   const updateElement = () => {
+    if (adoptedExternalValue) {
+      runtime.value = nextElement.value;
+      runtime.lastExternalValue = nextElement.value;
+    }
+
     runtime.element = nextRuntimeElement;
     container.label = nextElement.id;
     container.cursor = nextElement.disabled ? "default" : "text";

@@ -56,8 +56,9 @@ export const updateVideo = ({
   if (!videoElement) return;
 
   videoElement.zIndex = zIndex;
+  let managedTransformElement = prevElement;
   setManagedVideoSpriteResizeHandler(videoElement, () => {
-    applyElementPivot(videoElement, nextElement);
+    applyElementPivot(videoElement, managedTransformElement);
   });
 
   const { width, height, alpha } = nextElement;
@@ -106,7 +107,7 @@ export const updateVideo = ({
 
       const newTexture = Texture.from(nextElement.src);
       videoElement.texture = newTexture;
-      applyElementPivot(videoElement, nextElement);
+      applyElementPivot(videoElement, managedTransformElement);
       unregisterManagedVideoSprite(videoElement, oldSource);
       registerManagedVideoSprite(videoElement);
       activeVideo = newTexture.source.resource;
@@ -134,6 +135,8 @@ export const updateVideo = ({
   };
 
   const updateElement = () => {
+    managedTransformElement = nextElement;
+
     if (!isDeepEqual(prevElement, nextElement)) {
       videoElement.width = Math.round(width);
       videoElement.height = Math.round(height);
@@ -167,7 +170,7 @@ export const updateVideo = ({
     videoElement.height = Math.round(
       hasLiveAnimationTween("height") ? currentHeight : height,
     );
-    applyElementPivot(videoElement, nextElement);
+    applyElementPivot(videoElement, managedTransformElement);
     didSyncResourceBeforeAnimation = true;
   }
 

@@ -57,7 +57,7 @@ export const updateAnimatedSprite = async ({
   if (!animatedSpriteElement) return;
 
   animatedSpriteElement.zIndex = zIndex;
-  setAnimatedSpriteTransformElement(animatedSpriteElement, nextElement);
+  setAnimatedSpriteTransformElement(animatedSpriteElement, prevElement);
   const shouldForceBlur = hasBlurUpdateAnimation(animations, prevElement.id);
   if (shouldForceBlur) {
     syncBlurEffect(animatedSpriteElement, prevElement.blur, { force: true });

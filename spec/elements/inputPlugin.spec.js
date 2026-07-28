@@ -420,6 +420,88 @@ describe("input plugin", () => {
     expect(rightClickEvent.stopPropagation).toHaveBeenCalledTimes(1);
   });
 
+  it("re-adopts an external value after input changes during an update tween", () => {
+    const parent = new Container();
+    const eventHandler = vi.fn();
+    const { app, bridgeState } = createApp();
+    const initialElement = parseInput({
+      state: {
+        id: "name",
+        type: "input",
+        x: 20,
+        y: 40,
+        width: 200,
+        height: 44,
+        value: "old value",
+      },
+    });
+    const nextElement = parseInput({
+      state: {
+        ...initialElement,
+        x: 120,
+        value: "external value",
+      },
+    });
+    const animationBus = { dispatch: vi.fn() };
+
+    addInput({
+      app,
+      parent,
+      element: initialElement,
+      eventHandler,
+      zIndex: 0,
+    });
+
+    bridgeState.mountArgs[1].callbacks.onFocus({
+      value: "old value",
+      selectionStart: 9,
+      selectionEnd: 9,
+      focused: true,
+      composing: false,
+    });
+
+    updateInput({
+      app,
+      parent,
+      prevElement: initialElement,
+      nextElement,
+      eventHandler,
+      animations: [
+        {
+          id: "input-update",
+          targetId: "name",
+          type: "update",
+          tween: {
+            x: {
+              auto: {
+                duration: 300,
+                easing: "linear",
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 0,
+    });
+
+    bridgeState.mountArgs[1].callbacks.onValueChange({
+      value: "typed during tween",
+      selectionStart: 18,
+      selectionEnd: 18,
+      focused: true,
+      composing: false,
+    });
+    animationBus.dispatch.mock.calls[0][0].payload.onComplete();
+
+    expect(bridgeState.updateArgs[1].value).toBe("external value");
+  });
+
   it("runs update animations before unmounting a deleted input", () => {
     const parent = new Container();
     const { app } = createApp();

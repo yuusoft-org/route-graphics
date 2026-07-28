@@ -218,6 +218,91 @@ describe("spritesheet animation rendering", () => {
     expect(sprite.rotation).toBe(1.25);
   });
 
+  it("keeps the previous origin during a live update tween", async () => {
+    const liveAnimations = [
+      {
+        id: "animated-sprite-update",
+        targetId: "animated-sprite-1",
+        type: "update",
+        tween: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+      },
+    ];
+    dispatchLiveAnimations.mockReturnValue(true);
+    getLiveAnimations.mockReturnValue(liveAnimations);
+
+    const app = {
+      debug: false,
+      render: vi.fn(),
+    };
+    const animatedSpriteElement = new MockAnimatedSprite([
+      { frameName: "old" },
+    ]);
+    animatedSpriteElement.label = "animated-sprite-1";
+    const prevElement = createAnimatedSpriteElement({
+      x: 20,
+      y: 30,
+      width: 64,
+      height: 48,
+      originX: 10,
+      originY: 5,
+    });
+    const nextElement = createAnimatedSpriteElement({
+      x: 200,
+      y: 160,
+      width: 64,
+      height: 48,
+      originX: 30,
+      originY: 12,
+    });
+    animatedSpriteElement.x = prevElement.x + prevElement.originX;
+    animatedSpriteElement.y = prevElement.y + prevElement.originY;
+
+    await updateAnimatedSprite({
+      app,
+      parent: {
+        children: [animatedSpriteElement],
+      },
+      prevElement,
+      nextElement,
+      animations: liveAnimations,
+      animationBus: {},
+      completionTracker: {},
+      zIndex: 4,
+      signal: undefined,
+    });
+
+    animatedSpriteElement.scale.x = 0.5;
+    animatedSpriteElement.scale.y = 0.25;
+    animatedSpriteElement.onFrameChange(1);
+
+    expect(
+      animatedSpriteElement.pivot.x * animatedSpriteElement.scale.x,
+    ).toBeCloseTo(10);
+    expect(
+      animatedSpriteElement.pivot.y * animatedSpriteElement.scale.y,
+    ).toBeCloseTo(5);
+    expect(animatedSpriteElement.x).toBe(30);
+    expect(animatedSpriteElement.y).toBe(35);
+
+    await dispatchLiveAnimations.mock.calls[0][0].onComplete();
+
+    expect(
+      animatedSpriteElement.pivot.x * animatedSpriteElement.scale.x,
+    ).toBeCloseTo(30);
+    expect(
+      animatedSpriteElement.pivot.y * animatedSpriteElement.scale.y,
+    ).toBeCloseTo(12);
+    expect(animatedSpriteElement.x).toBe(230);
+    expect(animatedSpriteElement.y).toBe(172);
+  });
+
   it("renders after asynchronously adding a spritesheet animation in debug/manual flows", async () => {
     const app = {
       debug: true,
