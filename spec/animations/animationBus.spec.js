@@ -73,6 +73,53 @@ describe("animationBus auto tween shorthand", () => {
     expect(animationBus.getState().activeCount).toBe(0);
   });
 
+  it("keeps a no-op auto loop active without completing", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const onBusComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+    animationBus.on("completed", onBusComplete);
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "auto-noop-loop",
+        loop: true,
+        element,
+        properties: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 20 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(600);
+
+    expect(element.x).toBe(20);
+    expect(animationBus.getState()).toMatchObject({
+      activeCount: 1,
+      animations: [
+        expect.objectContaining({
+          id: "auto-noop-loop",
+          duration: 300,
+          currentTime: 0,
+        }),
+      ],
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onBusComplete).not.toHaveBeenCalled();
+  });
+
   it("throws when auto tween cannot resolve a targetState value", () => {
     const animationBus = createAnimationBus();
 
@@ -225,6 +272,198 @@ describe("animationBus auto tween shorthand", () => {
     expect(() => animationBus.flush()).toThrow(
       'Animation "bad-speed" playback speed must be a finite number greater than 0.',
     );
+  });
+
+  it("loops ticked playback without completing and composes with speed", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const onBusComplete = vi.fn();
+    const element = {
+      x: 0,
+      scale: { x: 1, y: 1 },
+    };
+    animationBus.on("completed", onBusComplete);
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "looping-fast-x",
+        playbackSpeed: 2,
+        loop: true,
+        element,
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ duration: 1000, value: 100, easing: "linear" }],
+          },
+        },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(250);
+    expect(element.x).toBeCloseTo(50);
+
+    animationBus.tick(250);
+    expect(element.x).toBeCloseTo(0);
+
+    animationBus.tick(125);
+    expect(element.x).toBeCloseTo(25);
+    expect(animationBus.getState()).toMatchObject({
+      activeCount: 1,
+      animations: [
+        {
+          id: "looping-fast-x",
+          currentTime: 250,
+          duration: 1000,
+          playbackSpeed: 2,
+          progress: 0.25,
+        },
+      ],
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onBusComplete).not.toHaveBeenCalled();
+  });
+
+  it("loops manually sampled playback deterministically across large jumps", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 0,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "sampled-loop",
+        playbackSpeed: 2,
+        loop: true,
+        element,
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ duration: 1000, value: 100, easing: "linear" }],
+          },
+        },
+        onComplete,
+      },
+    });
+
+    animationBus.setTime(1625);
+
+    expect(element.x).toBeCloseTo(25);
+    expect(animationBus.getState()).toMatchObject({
+      activeCount: 1,
+      animations: [
+        expect.objectContaining({
+          id: "sampled-loop",
+          currentTime: 250,
+          progress: 0.25,
+        }),
+      ],
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+
+    animationBus.setTime(2000);
+    expect(element.x).toBeCloseTo(0);
+    expect(animationBus.getState().activeCount).toBe(1);
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("rejects looping animations without a positive finite duration", () => {
+    const animationBus = createAnimationBus();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "zero-duration-loop",
+        loop: true,
+        element: {
+          x: 0,
+          scale: { x: 1, y: 1 },
+        },
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ duration: 0, value: 100, easing: "linear" }],
+          },
+        },
+      },
+    });
+
+    expect(() => animationBus.flush()).toThrow(
+      'Animation "zero-duration-loop" must have a finite duration greater than 0 when playback loop is enabled.',
+    );
+  });
+
+  it("rejects non-boolean looping metadata at the animation bus boundary", () => {
+    const animationBus = createAnimationBus();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "invalid-loop",
+        loop: "forever",
+        element: {
+          x: 0,
+          scale: { x: 1, y: 1 },
+        },
+        properties: {
+          x: {
+            keyframes: [{ duration: 100, value: 100, easing: "linear" }],
+          },
+        },
+      },
+    });
+
+    expect(() => animationBus.flush()).toThrow(
+      'Animation "invalid-loop" playback loop must be a boolean.',
+    );
+  });
+
+  it("cancels a loop without emitting completion", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const onCancel = vi.fn();
+    const onBusComplete = vi.fn();
+    const element = {
+      x: 0,
+      scale: { x: 1, y: 1 },
+    };
+    animationBus.on("completed", onBusComplete);
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "cancelled-loop",
+        loop: true,
+        element,
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ duration: 1000, value: 100, easing: "linear" }],
+          },
+        },
+        targetState: { x: 100 },
+        onComplete,
+        onCancel,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(500);
+    expect(element.x).toBeCloseTo(50);
+
+    animationBus.dispatch({ type: "CANCEL", id: "cancelled-loop" });
+    animationBus.flush();
+
+    expect(element.x).toBeCloseTo(100);
+    expect(animationBus.getState().activeCount).toBe(0);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onBusComplete).not.toHaveBeenCalled();
   });
 
   it("applies property path mapping for auto scale tweens", () => {

@@ -71,4 +71,30 @@ describe("getAnimationContinuitySignature", () => {
       }),
     );
   });
+
+  it("includes playback loop in persistent signatures", () => {
+    const base = {
+      id: "pulse",
+      targetId: "portrait",
+      type: "update",
+      playback: {
+        continuity: "persistent",
+      },
+      tween: {
+        scaleX: {
+          keyframes: [{ duration: 1000, value: 1.1, easing: "linear" }],
+        },
+      },
+    };
+
+    expect(getAnimationContinuitySignature(base)).not.toBe(
+      getAnimationContinuitySignature({
+        ...base,
+        playback: {
+          continuity: "persistent",
+          loop: true,
+        },
+      }),
+    );
+  });
 });

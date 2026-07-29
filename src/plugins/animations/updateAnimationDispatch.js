@@ -5,8 +5,130 @@ import {
 import {
   applyAnimationProperty,
   createAnimationSubjectState,
+  getAnimationProperty,
   isTranslateAnimationProperty,
 } from "./animationPropertyUtils.js";
+
+const getLiveTweenProperty = (property) => {
+  if (property === "translateX") {
+    return "x";
+  }
+
+  if (property === "translateY") {
+    return "y";
+  }
+
+  return property;
+};
+
+const animationsUseTranslate = (animations) =>
+  animations.some((animation) =>
+    Object.keys(animation.tween ?? {}).some(isTranslateAnimationProperty),
+  );
+
+const createCurrentElementResolver = (element) => {
+  const parent = element?.parent;
+  const label = element?.label;
+
+  return () => {
+    if (!element?.destroyed || !parent || label == null) {
+      return element;
+    }
+
+    const labeledChild = parent.getChildByLabel?.(label);
+    const replacement =
+      labeledChild && labeledChild !== element && !labeledChild.destroyed
+        ? labeledChild
+        : parent.children?.find(
+            (child) =>
+              child !== element && !child.destroyed && child.label === label,
+          );
+
+    return replacement && !replacement.destroyed ? replacement : element;
+  };
+};
+
+const captureLiveTweenValues = (
+  element,
+  animations,
+  propertyPathMap = TRANSITION_PROPERTY_PATH_MAP,
+) => {
+  const values = new Map();
+
+  for (const animation of animations) {
+    for (const property of Object.keys(animation.tween)) {
+      const liveProperty = getLiveTweenProperty(property);
+      if (values.has(liveProperty)) {
+        continue;
+      }
+
+      const value = getAnimationProperty(
+        element,
+        liveProperty,
+        propertyPathMap,
+      );
+      if (value !== undefined) {
+        values.set(liveProperty, value);
+      }
+    }
+  }
+
+  return values;
+};
+
+const restoreLiveTweenValues = (
+  element,
+  values,
+  propertyPathMap = TRANSITION_PROPERTY_PATH_MAP,
+) => {
+  if (!element || element.destroyed) {
+    return;
+  }
+
+  for (const [property, value] of values) {
+    applyAnimationProperty({
+      object: element,
+      property,
+      propertyPathMap,
+      value,
+    });
+  }
+};
+
+const settleLoopingUpdateState = ({
+  animations,
+  element,
+  targetState,
+  onComplete,
+}) => {
+  const loopingAnimation = animations.find(
+    (animation) => animation.playback?.loop === true,
+  );
+  if (!loopingAnimation || targetState == null || !onComplete) {
+    return { didSettle: false, element };
+  }
+
+  const resolveCurrentElement = createCurrentElementResolver(element);
+  const liveTweenValues = captureLiveTweenValues(element, animations);
+  let currentElement = element;
+  const restore = () => {
+    currentElement = resolveCurrentElement();
+    restoreLiveTweenValues(currentElement, liveTweenValues);
+  };
+
+  let settlement;
+  try {
+    settlement = onComplete(loopingAnimation);
+  } finally {
+    restore();
+  }
+
+  if (settlement && typeof settlement.then === "function") {
+    settlement.then(restore, restore);
+  }
+
+  return { didSettle: true, element: currentElement };
+};
 
 export const applyInitialUpdateAnimationState = (
   element,
@@ -52,14 +174,13 @@ export const dispatchUpdateAnimationsNow = ({
   onComplete,
   animationBaseState,
 }) => {
-  for (const animation of animations) {
-    if (
-      typeof animationBus?.hasContext === "function" &&
-      animationBus.hasContext(animation.id)
-    ) {
-      continue;
-    }
+  const animationsToDispatch = animations.filter(
+    (animation) =>
+      typeof animationBus?.hasContext !== "function" ||
+      !animationBus.hasContext(animation.id),
+  );
 
+  for (const animation of animationsToDispatch) {
     for (const [property, config] of Object.entries(animation.tween)) {
       if (
         config.auto &&
@@ -71,8 +192,24 @@ export const dispatchUpdateAnimationsNow = ({
         );
       }
     }
+  }
 
-    const trackCompletion = animation.playback?.continuity !== "persistent";
+  const settlement = settleLoopingUpdateState({
+    animations: animationsToDispatch,
+    element,
+    targetState,
+    onComplete,
+  });
+  const dispatchElement = settlement.element;
+  const dispatchAnimationBaseState =
+    settlement.didSettle && animationsUseTranslate(animationsToDispatch)
+      ? createAnimationSubjectState(dispatchElement)
+      : animationBaseState;
+
+  for (const animation of animationsToDispatch) {
+    const trackCompletion =
+      animation.playback?.continuity !== "persistent" &&
+      animation.playback?.loop !== true;
     const stateVersion = trackCompletion
       ? completionTracker.getVersion()
       : null;
@@ -89,6 +226,7 @@ export const dispatchUpdateAnimationsNow = ({
         targetId: animation.targetId,
         continuity: animation.playback?.continuity ?? "render",
         playbackSpeed: animation.playback?.speed,
+        loop: animation.playback?.loop === true,
         signature:
           animation.signature ??
           JSON.stringify({
@@ -96,16 +234,18 @@ export const dispatchUpdateAnimationsNow = ({
             tween: animation.tween,
             playback: animation.playback ?? null,
           }),
-        element,
+        element: dispatchElement,
         properties: animation.tween,
         targetState,
-        animationBaseState,
+        animationBaseState: dispatchAnimationBaseState,
         onComplete: () => {
           if (trackCompletion) {
             completionTracker.complete(stateVersion);
           }
 
-          onComplete?.(animation);
+          if (!settlement.didSettle) {
+            onComplete?.(animation);
+          }
         },
       },
     });

@@ -4,6 +4,7 @@ import { addText } from "../../src/plugins/elements/text/addText.js";
 import { parseText } from "../../src/plugins/elements/text/parseText.js";
 import { updateText } from "../../src/plugins/elements/text/updateText.js";
 import { hitTestElementBounds } from "../../src/util/hitTestElementBounds.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 
 const createSharedParams = () => ({
   app: {
@@ -308,6 +309,73 @@ describe("text rich content", () => {
     expect(text.children[0].children[0].text).toBe("Rich");
     expect(text.children[0].children[1].text).toBe("Text");
     expect(text.children[0].children[1].style.fill).toBe("#A6A6A6");
+  });
+
+  it("moves a looping update onto a replacement rich-text display object", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+    const animationBus = createAnimationBus();
+    const prevElement = parseText({
+      state: {
+        id: "looping-replacement-text",
+        type: "text",
+        x: 20,
+        y: 30,
+        content: "Plain",
+      },
+    });
+    const nextElement = parseText({
+      state: {
+        id: "looping-replacement-text",
+        type: "text",
+        x: 120,
+        y: 30,
+        content: [{ text: "Rich" }, { text: " replacement" }],
+      },
+    });
+
+    addText({
+      ...shared,
+      parent,
+      element: prevElement,
+      zIndex: 0,
+    });
+    const previousDisplayObject = parent.getChildByLabel(
+      "looping-replacement-text",
+    );
+
+    updateText({
+      ...shared,
+      parent,
+      prevElement,
+      nextElement,
+      animations: [
+        {
+          id: "replacement-loop",
+          targetId: prevElement.id,
+          type: "update",
+          playback: { loop: true },
+          tween: {
+            x: {
+              initialValue: 20,
+              keyframes: [{ duration: 1000, value: 120, easing: "linear" }],
+            },
+          },
+        },
+      ],
+      animationBus,
+      zIndex: 0,
+    });
+
+    const replacement = parent.getChildByLabel("looping-replacement-text");
+    animationBus.flush();
+    animationBus.tick(500);
+
+    expect(previousDisplayObject.destroyed).toBe(true);
+    expect(replacement).not.toBe(previousDisplayObject);
+    expect(replacement.destroyed).toBe(false);
+    expect(replacement.x).toBeCloseTo(70);
+    expect(animationBus.getState().activeCount).toBe(1);
   });
 
   it("wraps rich content using textStyle.wordWrapWidth when width is omitted", () => {

@@ -1,6 +1,6 @@
 # Animation Model
 
-Last updated: 2026-04-23
+Last updated: 2026-07-29
 
 See also:
 
@@ -26,6 +26,8 @@ The runtime now exposes:
 - `tween` as the motion payload
 - `mask` only inside `transition`
 - optional `playback.continuity: render | persistent` on `update` and `transition`
+- optional positive `playback.speed` on `update` and `transition`
+- optional infinite `playback.loop` on `update`
 
 Current known runtime limitations are tracked in
 `docs/animation-implementation-plan.md`.
@@ -106,6 +108,8 @@ handoff, including masked reveals, dissolves, exits, and replacements.
 
 - `tween`
 - `playback.continuity`
+- `playback.speed`
+- `playback.loop`
 
 `update` does not support:
 
@@ -138,6 +142,7 @@ Use it for:
 - `next.tween`
 - `mask`
 - `playback.continuity`
+- `playback.speed`
 - `compositor`
 
 `transition` may define:
@@ -240,7 +245,7 @@ animations:
           easing: "easeOutQuad"
 ```
 
-## Playback Continuity
+## Playback
 
 ```yaml
 animations:
@@ -249,6 +254,8 @@ animations:
     type: "update"
     playback:
       continuity: "persistent"
+      speed: 1
+      loop: true
     tween:
       scaleX:
         keyframes:
@@ -275,8 +282,39 @@ animations:
 - `playback.continuity` currently supports two values:
   - `render`
   - `persistent`
+- `playback.speed` is an optional finite number greater than zero:
+  - `1` is authored speed
+  - `2` is twice as fast
+  - `0.5` is half speed
+- `playback.loop` is an optional boolean that defaults to `false`
+- `playback.loop: true` is valid only on `type: update`
 - `render` is explicit render-scoped behavior and is equivalent to omitting
   `playback`
+
+### Looping Updates
+
+`playback.loop: true` repeats the complete update timeline indefinitely. Speed
+is applied before the timeline wraps, so looping and playback speed compose
+deterministically.
+
+A looping update is ambient playback:
+
+- it is considered settled as soon as it starts
+- it never blocks the render's `renderComplete` event
+- it does not emit animation completion after an iteration
+- removing, replacing, or invalidating it cancels the loop without turning
+  cancellation into completion
+- changing its tween or playback configuration restarts it from the beginning
+
+Looping transitions are rejected. A transition owns a previous/next visual
+handoff and must settle into the next render state; repeating that handoff would
+leave ownership and completion ambiguous.
+
+A looping animation also cannot define `complete`. Infinite playback has no
+reachable completion point. A future finite repetition contract, if needed,
+must use a separate iteration count and complete only after its last iteration.
+
+Looping requires a finite authored duration greater than zero.
 
 ### Meaning For `update`
 
@@ -342,14 +380,16 @@ normal `transition`:
 
 ### Render Completion Rule
 
-Persistent continuity should not keep the current render open forever.
+Persistent and looping playback must not keep a render open indefinitely.
 
 So the contract is:
 
-- a persistent animation still starts as tracked work for the render that started it
-- if that animation finishes before any later render carries it forward, it completes normally and contributes to that render's `renderComplete`
-- if a later render reuses that in-flight animation through `playback.continuity: persistent`, that animation stops contributing to render completion from that point onward
-- after continuity has carried it into a later render, its eventual finish must not trigger `renderComplete` for either the old render or the newer render
+- finite render-scoped animations contribute to `renderComplete`
+- persistent animations do not contribute to `renderComplete`
+- looping animations do not contribute to `renderComplete`, regardless of
+  continuity mode
+- `renderComplete` fires after all other tracked work settles while ambient
+  animations continue independently
 
 ## Transition Examples
 
