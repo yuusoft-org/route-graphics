@@ -21,6 +21,33 @@ const getLiveTweenProperty = (property) => {
   return property;
 };
 
+const animationsUseTranslate = (animations) =>
+  animations.some((animation) =>
+    Object.keys(animation.tween ?? {}).some(isTranslateAnimationProperty),
+  );
+
+const createCurrentElementResolver = (element) => {
+  const parent = element?.parent;
+  const label = element?.label;
+
+  return () => {
+    if (!element?.destroyed || !parent || label == null) {
+      return element;
+    }
+
+    const labeledChild = parent.getChildByLabel?.(label);
+    const replacement =
+      labeledChild && labeledChild !== element && !labeledChild.destroyed
+        ? labeledChild
+        : parent.children?.find(
+            (child) =>
+              child !== element && !child.destroyed && child.label === label,
+          );
+
+    return replacement && !replacement.destroyed ? replacement : element;
+  };
+};
+
 const captureLiveTweenValues = (
   element,
   animations,
@@ -78,12 +105,15 @@ const settleLoopingUpdateState = ({
     (animation) => animation.playback?.loop === true,
   );
   if (!loopingAnimation || targetState == null || !onComplete) {
-    return;
+    return { didSettle: false, element };
   }
 
+  const resolveCurrentElement = createCurrentElementResolver(element);
   const liveTweenValues = captureLiveTweenValues(element, animations);
+  let currentElement = element;
   const restore = () => {
-    restoreLiveTweenValues(element, liveTweenValues);
+    currentElement = resolveCurrentElement();
+    restoreLiveTweenValues(currentElement, liveTweenValues);
   };
 
   let settlement;
@@ -96,6 +126,8 @@ const settleLoopingUpdateState = ({
   if (settlement && typeof settlement.then === "function") {
     settlement.then(restore, restore);
   }
+
+  return { didSettle: true, element: currentElement };
 };
 
 export const applyInitialUpdateAnimationState = (
@@ -162,12 +194,17 @@ export const dispatchUpdateAnimationsNow = ({
     }
   }
 
-  settleLoopingUpdateState({
+  const settlement = settleLoopingUpdateState({
     animations: animationsToDispatch,
     element,
     targetState,
     onComplete,
   });
+  const dispatchElement = settlement.element;
+  const dispatchAnimationBaseState =
+    settlement.didSettle && animationsUseTranslate(animationsToDispatch)
+      ? createAnimationSubjectState(dispatchElement)
+      : animationBaseState;
 
   for (const animation of animationsToDispatch) {
     const trackCompletion =
@@ -197,16 +234,18 @@ export const dispatchUpdateAnimationsNow = ({
             tween: animation.tween,
             playback: animation.playback ?? null,
           }),
-        element,
+        element: dispatchElement,
         properties: animation.tween,
         targetState,
-        animationBaseState,
+        animationBaseState: dispatchAnimationBaseState,
         onComplete: () => {
           if (trackCompletion) {
             completionTracker.complete(stateVersion);
           }
 
-          onComplete?.(animation);
+          if (!settlement.didSettle) {
+            onComplete?.(animation);
+          }
         },
       },
     });

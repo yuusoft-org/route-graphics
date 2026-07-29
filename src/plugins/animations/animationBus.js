@@ -40,6 +40,7 @@ const buildPropertyTimelines = (
   targetState,
   animationId,
   subjectState,
+  preserveNoopAuto,
 ) =>
   Object.entries(properties)
     .map(([property, config]) => {
@@ -64,7 +65,7 @@ const buildPropertyTimelines = (
           animationId,
         );
 
-        if (currentValue === targetValue) {
+        if (currentValue === targetValue && !preserveNoopAuto) {
           return null;
         }
 
@@ -234,6 +235,11 @@ export const createAnimationBus = () => {
       propertyPathMap = TRANSITION_PROPERTY_PATH_MAP,
       animationBaseState,
     } = payload;
+    const normalizedPayload = {
+      ...payload,
+      playbackSpeed: normalizePlaybackSpeed(payload.playbackSpeed, id),
+      loop: normalizePlaybackLoop(payload.loop, id),
+    };
     let subjectState =
       animationBaseState ??
       (hasTranslateProperties(properties)
@@ -255,6 +261,7 @@ export const createAnimationBus = () => {
       targetState,
       id,
       subjectState,
+      normalizedPayload.loop,
     );
 
     if (timelines.length === 0) {
@@ -321,7 +328,7 @@ export const createAnimationBus = () => {
       isValid: () => Boolean(element) && !element.destroyed,
     };
 
-    registerAnimation(attachAnimationMetadata(context, payload));
+    registerAnimation(attachAnimationMetadata(context, normalizedPayload));
   };
 
   const startCustomAnimation = (payload) => {

@@ -73,6 +73,53 @@ describe("animationBus auto tween shorthand", () => {
     expect(animationBus.getState().activeCount).toBe(0);
   });
 
+  it("keeps a no-op auto loop active without completing", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const onBusComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+    animationBus.on("completed", onBusComplete);
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "auto-noop-loop",
+        loop: true,
+        element,
+        properties: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 20 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(600);
+
+    expect(element.x).toBe(20);
+    expect(animationBus.getState()).toMatchObject({
+      activeCount: 1,
+      animations: [
+        expect.objectContaining({
+          id: "auto-noop-loop",
+          duration: 300,
+          currentTime: 0,
+        }),
+      ],
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onBusComplete).not.toHaveBeenCalled();
+  });
+
   it("throws when auto tween cannot resolve a targetState value", () => {
     const animationBus = createAnimationBus();
 

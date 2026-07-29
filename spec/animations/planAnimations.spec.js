@@ -9,6 +9,7 @@ import {
   createRenderContext,
   flushDeferredMountOperations,
 } from "../../src/plugins/elements/renderContext.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 
 describe("buildAnimationContinuityPlan", () => {
   it("continues a persistent update when the target is unchanged", () => {
@@ -620,6 +621,116 @@ describe("dispatchUpdateAnimations", () => {
         }),
       }),
     );
+  });
+
+  it("preserves a looped property when a finite sibling finishes", () => {
+    const animationBus = createAnimationBus();
+    const completionTracker = {
+      getVersion: vi.fn(() => 3),
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const element = {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      scale: { x: 1, y: 1 },
+    };
+    const onComplete = vi.fn(() => {
+      element.x = 100;
+      element.y = 200;
+    });
+
+    dispatchUpdateAnimations({
+      animations: groupAnimationsByTarget([
+        {
+          id: "looping-x",
+          targetId: "mixed",
+          type: "update",
+          playback: { loop: true },
+          tween: {
+            x: {
+              initialValue: 0,
+              keyframes: [{ duration: 1000, value: 100, easing: "linear" }],
+            },
+          },
+        },
+        {
+          id: "finite-y",
+          targetId: "mixed",
+          type: "update",
+          tween: {
+            y: {
+              initialValue: 0,
+              keyframes: [{ duration: 500, value: 200, easing: "linear" }],
+            },
+          },
+        },
+      ]),
+      targetId: "mixed",
+      animationBus,
+      completionTracker,
+      element,
+      targetState: { x: 100, y: 200 },
+      onComplete,
+    });
+
+    animationBus.setTime(500);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(element.x).toBeCloseTo(50);
+    expect(element.y).toBeCloseTo(200);
+    expect(completionTracker.track).toHaveBeenCalledTimes(1);
+    expect(completionTracker.complete).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(1);
+  });
+
+  it("recomputes translation geometry after loop state settlement", () => {
+    const animationBus = createAnimationBus();
+    const element = {
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 50,
+      scale: { x: 1, y: 1 },
+    };
+    const onComplete = vi.fn(() => {
+      element.width = 200;
+    });
+
+    dispatchUpdateAnimations({
+      animations: groupAnimationsByTarget([
+        {
+          id: "looping-translate",
+          targetId: "resized",
+          type: "update",
+          playback: { loop: true },
+          tween: {
+            translateX: {
+              initialValue: 0,
+              keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+            },
+          },
+        },
+      ]),
+      targetId: "resized",
+      animationBus,
+      completionTracker: {
+        getVersion: vi.fn(),
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      element,
+      targetState: { x: 10, y: 20 },
+      onComplete,
+    });
+
+    animationBus.setTime(500);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(element.width).toBe(200);
+    expect(element.x).toBeCloseTo(110);
   });
 
   it("does not settle looping animations used by deletion paths", () => {
