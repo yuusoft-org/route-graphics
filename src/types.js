@@ -784,6 +784,13 @@ export const AnimationType = {
 };
 
 /**
+ * @typedef {Object} AnimationPlayback
+ * @property {"render" | "persistent"} [continuity="render"] - Whether an in-flight animation may continue across compatible renders
+ * @property {number} [speed=1] - Positive finite playback speed multiplier
+ * @property {boolean} [loop=false] - Whether an update animation repeats indefinitely without blocking render completion
+ */
+
+/**
  * @readonly
  * @enum {string}
  */
@@ -831,6 +838,7 @@ export const DEFAULT_TEXT_STYLE = {
  * @property {string} id - Unique animation id
  * @property {string} targetId - ID of the element
  * @property {AnimationType[keyof AnimationType]} type - Animation structure
+ * @property {AnimationPlayback} [playback] - Playback behavior
  */
 
 /**

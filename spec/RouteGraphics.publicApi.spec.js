@@ -2022,6 +2022,238 @@ describe("RouteGraphics public API", () => {
     expect(eventHandler.mock.calls).toHaveLength(eventCountAfterRender);
   });
 
+  it("emits renderComplete immediately while a render-scoped update keeps looping", async () => {
+    const eventHandler = vi.fn();
+    const { app, pixiMock } = await setupRouteGraphics({
+      initOptions: {
+        eventHandler,
+      },
+      pluginsFactory: async () => {
+        const [{ rectPlugin }, { tweenPlugin }] = await Promise.all([
+          import("../src/plugins/elements/rect/index.js"),
+          import("../src/plugins/animations/tween/index.js"),
+        ]);
+
+        return {
+          elements: [rectPlugin],
+          animations: [tweenPlugin],
+          audio: [],
+        };
+      },
+    });
+
+    const frameTick = getAutoAnimationTick(pixiMock);
+
+    app.render({
+      id: "loop-baseline",
+      elements: [
+        {
+          id: "ambient",
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          fill: "#FFFFFF",
+        },
+      ],
+    });
+
+    eventHandler.mockClear();
+
+    app.render({
+      id: "loop-active",
+      elements: [
+        {
+          id: "ambient",
+          type: "rect",
+          x: 100,
+          y: 0,
+          width: 100,
+          height: 100,
+          fill: "#FFFFFF",
+        },
+      ],
+      animations: [
+        {
+          id: "ambient-drift",
+          targetId: "ambient",
+          type: "update",
+          playback: {
+            speed: 2,
+            loop: true,
+          },
+          tween: {
+            x: {
+              initialValue: 0,
+              keyframes: [{ duration: 1000, value: 100, easing: "linear" }],
+            },
+          },
+        },
+      ],
+    });
+
+    expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
+      id: "loop-active",
+      aborted: false,
+    });
+
+    const eventCountAfterRender = eventHandler.mock.calls.length;
+
+    frameTick({ deltaMS: 250 });
+    expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(50);
+
+    frameTick({ deltaMS: 250 });
+    expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(0);
+    expect(eventHandler.mock.calls).toHaveLength(eventCountAfterRender);
+
+    frameTick({ deltaMS: 125 });
+    expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(25);
+    expect(eventHandler.mock.calls).toHaveLength(eventCountAfterRender);
+  });
+
+  it("continues a persistent loop across unrelated renders and cancels it when omitted", async () => {
+    const eventHandler = vi.fn();
+    const { app, pixiMock } = await setupRouteGraphics({
+      initOptions: {
+        eventHandler,
+      },
+      pluginsFactory: async () => {
+        const [{ rectPlugin }, { tweenPlugin }] = await Promise.all([
+          import("../src/plugins/elements/rect/index.js"),
+          import("../src/plugins/animations/tween/index.js"),
+        ]);
+
+        return {
+          elements: [rectPlugin],
+          animations: [tweenPlugin],
+          audio: [],
+        };
+      },
+    });
+
+    const frameTick = getAutoAnimationTick(pixiMock);
+    const loopingAnimation = {
+      id: "persistent-loop",
+      targetId: "ambient",
+      type: "update",
+      playback: {
+        continuity: "persistent",
+        loop: true,
+      },
+      tween: {
+        x: {
+          initialValue: 0,
+          keyframes: [{ duration: 1000, value: 100, easing: "linear" }],
+        },
+      },
+    };
+
+    app.render({
+      id: "persistent-loop-baseline",
+      elements: [
+        {
+          id: "ambient",
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          fill: "#FFFFFF",
+        },
+        {
+          id: "sibling",
+          type: "rect",
+          x: 200,
+          y: 0,
+          width: 40,
+          height: 40,
+          fill: "#999999",
+        },
+      ],
+    });
+
+    app.render({
+      id: "persistent-loop-active",
+      elements: [
+        {
+          id: "ambient",
+          type: "rect",
+          x: 100,
+          y: 0,
+          width: 100,
+          height: 100,
+          fill: "#FFFFFF",
+        },
+        {
+          id: "sibling",
+          type: "rect",
+          x: 200,
+          y: 0,
+          width: 40,
+          height: 40,
+          fill: "#999999",
+        },
+      ],
+      animations: [loopingAnimation],
+    });
+
+    frameTick({ deltaMS: 750 });
+    expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(75);
+
+    app.render({
+      id: "persistent-loop-carried",
+      elements: [
+        {
+          id: "ambient",
+          type: "rect",
+          x: 100,
+          y: 0,
+          width: 100,
+          height: 100,
+          fill: "#FFFFFF",
+        },
+        {
+          id: "sibling",
+          type: "rect",
+          x: 240,
+          y: 0,
+          width: 40,
+          height: 40,
+          fill: "#999999",
+        },
+      ],
+      animations: [loopingAnimation],
+    });
+
+    expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(75);
+
+    frameTick({ deltaMS: 500 });
+    expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(25);
+
+    eventHandler.mockClear();
+    app.render({
+      id: "persistent-loop-stopped",
+      elements: [
+        {
+          id: "ambient",
+          type: "rect",
+          x: 100,
+          y: 0,
+          width: 100,
+          height: 100,
+          fill: "#FFFFFF",
+        },
+      ],
+    });
+
+    expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(100);
+    expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
+      id: "persistent-loop-stopped",
+      aborted: false,
+    });
+  });
+
   it("does not abort or re-complete persistent updates after a later render adopts them", async () => {
     const eventHandler = vi.fn();
     const { app, pixiMock } = await setupRouteGraphics({

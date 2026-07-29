@@ -15,6 +15,7 @@ import {
 } from "../../util/animationTimeline.js";
 
 const DEFAULT_PLAYBACK_SPEED = 1;
+const DEFAULT_PLAYBACK_LOOP = false;
 
 const hasTranslateProperties = (properties = {}) =>
   Object.keys(properties).some(isTranslateAnimationProperty);
@@ -107,14 +108,17 @@ export const createAnimationBus = () => {
     return Math.min(Math.max(time, 0), Math.max(duration ?? 0, 0));
   };
 
+  const wrapAnimationTime = (time, duration) =>
+    ((Math.max(time, 0) % duration) + duration) % duration;
+
   const applyTimeToContext = (context, timeMS) => {
-    const nextTime = clampAnimationTime(
-      timeMS * context.playbackSpeed,
-      context.duration,
-    );
+    const scaledTime = timeMS * context.playbackSpeed;
+    const nextTime = context.loop
+      ? wrapAnimationTime(scaledTime, context.duration)
+      : clampAnimationTime(scaledTime, context.duration);
     context.currentTime = nextTime;
     context.applyFrame(nextTime);
-    return nextTime >= context.duration;
+    return !context.loop && nextTime >= context.duration;
   };
 
   const normalizePlaybackSpeed = (value, animationId) => {
@@ -125,6 +129,20 @@ export const createAnimationBus = () => {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
       throw new Error(
         `Animation "${animationId}" playback speed must be a finite number greater than 0.`,
+      );
+    }
+
+    return value;
+  };
+
+  const normalizePlaybackLoop = (value, animationId) => {
+    if (value === undefined || value === null) {
+      return DEFAULT_PLAYBACK_LOOP;
+    }
+
+    if (typeof value !== "boolean") {
+      throw new Error(
+        `Animation "${animationId}" playback loop must be a boolean.`,
       );
     }
 
@@ -162,6 +180,10 @@ export const createAnimationBus = () => {
       metadata.playbackSpeed ?? context.playbackSpeed,
       context.id,
     );
+    context.loop = normalizePlaybackLoop(
+      metadata.loop ?? context.loop,
+      context.id,
+    );
     context.onContinuationUpdate =
       metadata.onContinuationUpdate ?? context.onContinuationUpdate;
     return context;
@@ -177,6 +199,15 @@ export const createAnimationBus = () => {
   });
 
   const registerAnimation = (context) => {
+    if (
+      context.loop &&
+      (!Number.isFinite(context.duration) || context.duration <= 0)
+    ) {
+      throw new Error(
+        `Animation "${context.id}" must have a finite duration greater than 0 when playback loop is enabled.`,
+      );
+    }
+
     context.applyFrame(0);
     pendingAnimations.delete(context.id);
     activeAnimations.set(context.id, context);
@@ -463,12 +494,12 @@ export const createAnimationBus = () => {
         continue;
       }
 
-      context.currentTime = clampAnimationTime(
-        context.currentTime + deltaMS * context.playbackSpeed,
-        context.duration,
-      );
+      const elapsedTime = context.currentTime + deltaMS * context.playbackSpeed;
+      context.currentTime = context.loop
+        ? wrapAnimationTime(elapsedTime, context.duration)
+        : clampAnimationTime(elapsedTime, context.duration);
 
-      if (context.currentTime >= context.duration) {
+      if (!context.loop && context.currentTime >= context.duration) {
         context.applyFrame(context.duration);
 
         if (
@@ -571,6 +602,7 @@ export const createAnimationBus = () => {
       signature: pendingContext.signature,
       continuity: pendingContext.continuity,
       playbackSpeed: pendingContext.playbackSpeed,
+      loop: payload.loop ?? pendingContext.loop,
       onContinuationUpdate:
         payload.onContinuationUpdate ?? pendingContext.onContinuationUpdate,
     });

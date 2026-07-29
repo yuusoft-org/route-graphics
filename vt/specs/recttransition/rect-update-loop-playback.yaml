@@ -1,0 +1,59 @@
+---
+title: Rect Update Loop Playback
+description: A looping update wraps deterministically at the configured speed while render completion remains non-blocking.
+specs:
+  - the loop should be halfway through its authored movement after 250ms at speed 2
+  - the loop should wrap to its initial position after 500ms at speed 2
+  - the loop should continue into the next iteration without another render
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 125
+  - action: screenshot
+---
+states:
+  - id: baseline
+    elements:
+      - id: loop-target
+        type: rect
+        x: 100
+        "y": 240
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+  - id: looping-update
+    elements:
+      - id: loop-target
+        type: rect
+        x: 900
+        "y": 240
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+    animations:
+      - id: horizontal-loop
+        targetId: loop-target
+        type: update
+        playback:
+          speed: 2
+          loop: true
+        tween:
+          x:
+            initialValue: 100
+            keyframes:
+              - duration: 1000
+                value: 900
+                easing: linear

@@ -482,6 +482,44 @@ out:
   audio: []
   audioEffects: []
 ---
+case: Normalize looping update animation playback
+in:
+  - id: state-2-loop-update
+    animations:
+      - id: anim-loop-update
+        targetId: portrait
+        type: update
+        playback:
+          continuity: persistent
+          speed: 2
+          loop: true
+        tween:
+          x:
+            initialValue: 0
+            keyframes:
+              - duration: 1000
+                value: 320
+out:
+  id: state-2-loop-update
+  elements: []
+  animations:
+    - id: anim-loop-update
+      targetId: portrait
+      type: update
+      playback:
+        continuity: persistent
+        speed: 2
+        loop: true
+      tween:
+        x:
+          initialValue: 0
+          keyframes:
+            - duration: 1000
+              value: 320
+              easing: linear
+  audio: []
+  audioEffects: []
+---
 case: Normalize default playback speed away
 in:
   - id: state-2-default-speed-update
@@ -807,6 +845,59 @@ in:
               - duration: 100
                 value: 20
 throws: animations[0].playback.speed must be a finite number greater than 0.
+---
+case: Throw when playback loop is not boolean
+in:
+  - id: state-3c-playback-loop-type
+    animations:
+      - id: anim-playback-loop-type
+        targetId: text-1
+        type: update
+        playback:
+          loop: forever
+        tween:
+          x:
+            keyframes:
+              - duration: 100
+                value: 20
+throws: animations[0].playback.loop must be a boolean.
+---
+case: Throw when transition playback loops
+in:
+  - id: state-3c-transition-loop
+    animations:
+      - id: anim-transition-loop
+        targetId: scene-root
+        type: transition
+        playback:
+          loop: true
+        next:
+          tween:
+            alpha:
+              initialValue: 0
+              keyframes:
+                - duration: 100
+                  value: 1
+throws: animations[0].playback.loop is only supported for type "update".
+---
+case: Throw when looping animation declares completion
+in:
+  - id: state-3c-loop-complete
+    animations:
+      - id: anim-loop-complete
+        targetId: text-1
+        type: update
+        complete:
+          payload:
+            action: unreachable
+        playback:
+          loop: true
+        tween:
+          x:
+            keyframes:
+              - duration: 100
+                value: 20
+throws: animations[0].complete is not allowed when playback.loop is true because a loop never completes.
 ---
 case: Throw when sequence mask uses legacy textures
 in:

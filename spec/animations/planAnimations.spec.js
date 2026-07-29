@@ -557,6 +557,59 @@ describe("dispatchUpdateAnimations", () => {
     );
   });
 
+  it("dispatches render-scoped loops without tracking render completion", () => {
+    const animationBus = { dispatch: vi.fn() };
+    const completionTracker = {
+      getVersion: vi.fn(),
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const element = {
+      x: 0,
+    };
+
+    const dispatched = dispatchUpdateAnimations({
+      animations: groupAnimationsByTarget([
+        {
+          id: "ambient-drift",
+          targetId: "bg",
+          type: "update",
+          playback: {
+            continuity: "render",
+            speed: 1.5,
+            loop: true,
+          },
+          tween: {
+            x: {
+              initialValue: 0,
+              keyframes: [{ duration: 300, value: 30, easing: "linear" }],
+            },
+          },
+        },
+      ]),
+      targetId: "bg",
+      animationBus,
+      completionTracker,
+      element,
+      targetState: { x: 0 },
+    });
+
+    expect(dispatched).toBe(true);
+    expect(completionTracker.getVersion).not.toHaveBeenCalled();
+    expect(completionTracker.track).not.toHaveBeenCalled();
+    expect(animationBus.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "START",
+        payload: expect.objectContaining({
+          id: "ambient-drift",
+          continuity: "render",
+          playbackSpeed: 1.5,
+          loop: true,
+        }),
+      }),
+    );
+  });
+
   it("defers update animations during suppressed mounts and applies initial values", () => {
     const animationBus = { dispatch: vi.fn() };
     const completionTracker = {

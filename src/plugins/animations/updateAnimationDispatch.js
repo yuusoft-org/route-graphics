@@ -72,7 +72,9 @@ export const dispatchUpdateAnimationsNow = ({
       }
     }
 
-    const trackCompletion = animation.playback?.continuity !== "persistent";
+    const trackCompletion =
+      animation.playback?.continuity !== "persistent" &&
+      animation.playback?.loop !== true;
     const stateVersion = trackCompletion
       ? completionTracker.getVersion()
       : null;
@@ -89,6 +91,7 @@ export const dispatchUpdateAnimationsNow = ({
         targetId: animation.targetId,
         continuity: animation.playback?.continuity ?? "render",
         playbackSpeed: animation.playback?.speed,
+        loop: animation.playback?.loop === true,
         signature:
           animation.signature ??
           JSON.stringify({

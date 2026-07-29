@@ -1,6 +1,6 @@
 # Animation Implementation Plan
 
-Last updated: 2026-04-23
+Last updated: 2026-07-29
 
 ## Goal
 
@@ -25,6 +25,8 @@ Current runtime shape:
 - transition supports `prev` and `next` tween composition with optional `mask`
 - transition supports shader `compositor` with top-level `tween.uProgress`
 - element shader filters are supported through `elements[].filters`
+- update playback supports positive speed multipliers and infinite,
+  non-blocking loops
 
 Primary files involved today:
 
@@ -98,6 +100,8 @@ Key rules:
   `translateX` / `translateY`
 - a single tween cannot combine `x` with `translateX`, or `y` with `translateY`
 - `update` and `transition` support optional `playback.continuity: persistent`
+- `update` and `transition` support optional positive `playback.speed`
+- `update` supports optional `playback.loop: true`
 - `transition` uses `prev`, `next`, and optional `mask`
 - `transition` may define:
   - `prev` only
@@ -234,8 +238,7 @@ animations:
 Implemented contract:
 
 - `playback` is optional on `update` and `transition`
-- `playback.continuity` currently supports one value:
-  - `persistent`
+- `playback.continuity` supports `render` and `persistent`
 - when omitted, `update` keeps current render-scoped behavior
 - when omitted, `transition` keeps current render-scoped behavior
 - when present on `update`, the same animation should continue across later
@@ -274,6 +277,48 @@ Primary runtime files:
 - `src/plugins/animations/planAnimations.js`
 - `src/plugins/animations/updateAnimationDispatch.js`
 - `src/util/diffElements.js`
+
+## Step 5B: Add Looping Update Playback
+
+Status:
+
+- complete
+
+Public interface:
+
+```yaml
+animations:
+  - id: "ambient-pulse"
+    targetId: "portrait"
+    type: "update"
+    playback:
+      continuity: "persistent"
+      speed: 1.5
+      loop: true
+    tween:
+      scaleX:
+        initialValue: 1
+        keyframes:
+          - duration: 600
+            value: 1.05
+            easing: "easeInOutSine"
+          - duration: 600
+            value: 1
+            easing: "easeInOutSine"
+```
+
+Implemented contract:
+
+- looping is valid only for `type: update`
+- the timeline wraps by its finite positive duration after applying playback
+  speed
+- ticked and manually sampled playback use the same deterministic phase
+- loops never enter render completion tracking
+- loops never emit animation completion
+- cancellation or omission stops a loop without synthesizing completion
+- looping transitions and loop-plus-`complete` configurations are rejected
+- persistent continuity may carry the same loop across compatible renders;
+  changed tween or playback configuration restarts it
 
 ## Step 6: Keep Mask Transition As The Reveal Primitive
 

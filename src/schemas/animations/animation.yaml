@@ -279,6 +279,10 @@ $defs:
         type: number
         exclusiveMinimum: 0
         description: Playback speed multiplier. 1 is authored speed, 2 is twice as fast, 0.5 is half speed.
+      loop:
+        type: boolean
+        default: false
+        description: Repeat an update animation indefinitely without blocking render completion. Not supported for transitions.
     additionalProperties: false
 properties:
   id:
@@ -331,3 +335,17 @@ allOf:
         - required: [prev]
         - required: [next]
         - required: [mask]
+  - if:
+      required: [playback]
+      properties:
+        playback:
+          required: [loop]
+          properties:
+            loop:
+              const: true
+    then:
+      properties:
+        type:
+          const: update
+      not:
+        required: [complete]

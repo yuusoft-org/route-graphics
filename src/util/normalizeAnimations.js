@@ -5,6 +5,7 @@ const ANIMATION_TYPES = new Set(["update", "transition"]);
 const CONTINUITY_MODES = new Set(["render", "persistent"]);
 const DEFAULT_PLAYBACK_CONTINUITY = "render";
 const DEFAULT_PLAYBACK_SPEED = 1;
+const DEFAULT_PLAYBACK_LOOP = false;
 const UPDATE_TWEEN_PROPERTIES = new Set([
   "alpha",
   "x",
@@ -75,6 +76,14 @@ const normalizePlayback = (playback, path) => {
     if (playback.speed !== DEFAULT_PLAYBACK_SPEED) {
       normalized.speed = playback.speed;
     }
+  }
+
+  const loop = playback.loop ?? DEFAULT_PLAYBACK_LOOP;
+  if (typeof loop !== "boolean") {
+    throw new Error(`${path}.loop must be a boolean.`);
+  }
+  if (loop) {
+    normalized.loop = true;
   }
 
   return normalized;
@@ -476,6 +485,19 @@ export const normalizeAnimations = (animations = []) => {
         animation.playback,
         `${path}.playback`,
       );
+    }
+
+    if (normalizedAnimation.playback?.loop === true) {
+      if (animation.type !== "update") {
+        throw new Error(
+          `${path}.playback.loop is only supported for type "update".`,
+        );
+      }
+      if (normalizedAnimation.complete !== undefined) {
+        throw new Error(
+          `${path}.complete is not allowed when playback.loop is true because a loop never completes.`,
+        );
+      }
     }
 
     assertLegacyFieldAbsent(
