@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 import {
   captureManagedVideoSpriteSizes,
   registerManagedVideoSprite,
@@ -75,5 +76,27 @@ describe("managed video texture sizing", () => {
     expect(sprite.x).toBe(120);
     expect(sprite.y).toBe(75);
     expect(sprite.rotation).toBeCloseTo(Math.PI / 6);
+
+    const animationBus = createAnimationBus();
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "video-scale",
+        element: sprite,
+        properties: {
+          scaleX: {
+            keyframes: [{ duration: 200, value: 1, easing: "linear" }],
+          },
+          scaleY: {
+            keyframes: [{ duration: 200, value: 0.75, easing: "linear" }],
+          },
+        },
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(100);
+
+    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(element.originX);
+    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(element.originY);
   });
 });

@@ -1,9 +1,10 @@
 ---
 title: Video Update Rotation
-description: A completed deterministic video frame sampled while rotating around its anchor-derived center; source colors are intentional for media coverage.
+description: A completed deterministic video frame sampled while rotating and scaling around its anchor-derived pixel origin; source colors are intentional for media coverage.
 specs:
   - video rotation should animate from 0 to 90 degrees
-  - metadata-driven dimensions and the rotation pivot should remain stable during the tween
+  - non-uniform scale should not move the configured pixel origin
+  - metadata-driven sizing should not invalidate the live scale-adjusted pivot
   - auto rotation tween values should use degrees
 skipInitialScreenshot: true
 steps:
@@ -86,3 +87,13 @@ states:
             auto:
               duration: 1000
               easing: linear
+          scaleX:
+            keyframes:
+              - duration: 1000
+                value: 0.25
+                easing: linear
+          scaleY:
+            keyframes:
+              - duration: 1000
+                value: 0.12
+                easing: linear

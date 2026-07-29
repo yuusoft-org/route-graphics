@@ -91,6 +91,7 @@ vi.mock("../../src/plugins/animations/planAnimations.js", () => ({
 
 import { addAnimatedSprite } from "../../src/plugins/elements/animated-sprite/addAnimatedSprite.js";
 import { updateAnimatedSprite } from "../../src/plugins/elements/animated-sprite/updateAnimatedSprite.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 import {
   cleanupDebugMode,
   setupDebugMode,
@@ -177,7 +178,7 @@ describe("spritesheet animation rendering", () => {
     expect(sprite.rotation).toBeCloseTo((3 * Math.PI) / 4);
   });
 
-  it("keeps the pivot stable when differently sized frames change scale", async () => {
+  it("keeps the pivot stable across frame changes and scale tweens", async () => {
     const parent = {
       destroyed: false,
       addChild: vi.fn(),
@@ -216,6 +217,37 @@ describe("spritesheet animation rendering", () => {
     expect(sprite.x).toBe(333);
     expect(sprite.y).toBe(222);
     expect(sprite.rotation).toBe(1.25);
+
+    const animationBus = createAnimationBus();
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "animated-sprite-scale",
+        element: sprite,
+        properties: {
+          scaleX: {
+            keyframes: [{ duration: 200, value: 1, easing: "linear" }],
+          },
+          scaleY: {
+            keyframes: [{ duration: 200, value: 0.75, easing: "linear" }],
+          },
+        },
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(100);
+
+    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(20);
+    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(30);
+
+    const pivotBeforeFrameChange = {
+      x: sprite.pivot.x,
+      y: sprite.pivot.y,
+    };
+    sprite.onFrameChange(2);
+
+    expect(sprite.pivot.x).toBeCloseTo(pivotBeforeFrameChange.x);
+    expect(sprite.pivot.y).toBeCloseTo(pivotBeforeFrameChange.y);
   });
 
   it("keeps the previous origin during a live update tween", async () => {

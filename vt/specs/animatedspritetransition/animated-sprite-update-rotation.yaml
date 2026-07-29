@@ -1,9 +1,10 @@
 ---
 title: Animated Sprite Update Rotation
-description: A deterministic spritesheet frame sampled while rotating around its anchor-derived center.
+description: A deterministic spritesheet frame sampled while rotating and scaling around its anchor-derived pixel origin.
 specs:
   - animated-sprite rotation should animate from 0 to 90 degrees
-  - frame dimensions and the rotation pivot should remain stable during the tween
+  - non-uniform scale should not move the configured pixel origin
+  - frame refreshes should not snap the scale-adjusted pivot
   - auto rotation tween values should use degrees
 steps:
   - action: keypress
@@ -117,3 +118,13 @@ states:
             auto:
               duration: 1000
               easing: linear
+          scaleX:
+            keyframes:
+              - duration: 1000
+                value: 1.2
+                easing: linear
+          scaleY:
+            keyframes:
+              - duration: 1000
+                value: 0.75
+                easing: linear
