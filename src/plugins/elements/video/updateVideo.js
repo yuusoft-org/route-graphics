@@ -23,9 +23,15 @@ import {
 import {
   registerManagedVideoSprite,
   requestManagedVideoTextureUpdate,
+  setManagedVideoSpriteResizeHandler,
   unregisterManagedVideoSprite,
 } from "./managedVideoTextureSizing.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import {
+  applyElementPivot,
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 /**
  * Update video element
@@ -50,8 +56,12 @@ export const updateVideo = ({
   if (!videoElement) return;
 
   videoElement.zIndex = zIndex;
+  let managedTransformElement = prevElement;
+  setManagedVideoSpriteResizeHandler(videoElement, () => {
+    applyElementPivot(videoElement, managedTransformElement);
+  });
 
-  const { x, y, width, height, alpha } = nextElement;
+  const { width, height, alpha } = nextElement;
   const shouldForceBlur = hasBlurUpdateAnimation(animations, prevElement.id);
   if (shouldForceBlur) {
     syncBlurEffect(videoElement, prevElement.blur, { force: true });
@@ -97,6 +107,7 @@ export const updateVideo = ({
 
       const newTexture = Texture.from(nextElement.src);
       videoElement.texture = newTexture;
+      applyElementPivot(videoElement, managedTransformElement);
       unregisterManagedVideoSprite(videoElement, oldSource);
       registerManagedVideoSprite(videoElement);
       activeVideo = newTexture.source.resource;
@@ -124,11 +135,12 @@ export const updateVideo = ({
   };
 
   const updateElement = () => {
+    managedTransformElement = nextElement;
+
     if (!isDeepEqual(prevElement, nextElement)) {
-      videoElement.x = Math.round(x);
-      videoElement.y = Math.round(y);
       videoElement.width = Math.round(width);
       videoElement.height = Math.round(height);
+      applyElementTransform(videoElement, nextElement);
       videoElement.alpha = alpha ?? 1;
       syncBlurEffect(videoElement, nextElement.blur, {
         force: shouldForceBlur,
@@ -158,6 +170,7 @@ export const updateVideo = ({
     videoElement.height = Math.round(
       hasLiveAnimationTween("height") ? currentHeight : height,
     );
+    applyElementPivot(videoElement, managedTransformElement);
     didSyncResourceBeforeAnimation = true;
   }
 
@@ -168,8 +181,7 @@ export const updateVideo = ({
     completionTracker,
     element: videoElement,
     targetState: {
-      x,
-      y,
+      ...getElementTransformTargetState(nextElement),
       width,
       height,
       alpha: alpha ?? 1,

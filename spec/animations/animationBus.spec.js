@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import { applyElementTransform } from "../../src/plugins/elements/util/transform.js";
 
 describe("animationBus auto tween shorthand", () => {
   it("animates to the targetState value for auto tween properties", () => {
@@ -270,6 +271,58 @@ describe("animationBus auto tween shorthand", () => {
     expect(element.scale.x).toBeCloseTo(1.5);
     expect(element.scale.y).toBeCloseTo(0.5);
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a pixel transform origin stable throughout scale tweens", () => {
+    const animationBus = createAnimationBus();
+    const element = {
+      x: 0,
+      y: 0,
+      scale: { x: 0.5, y: 0.25 },
+      pivot: {
+        set(x, y) {
+          this.x = x;
+          this.y = y;
+        },
+      },
+    };
+
+    applyElementTransform(element, {
+      x: 40,
+      y: 30,
+      originX: 20,
+      originY: 10,
+      rotation: 45,
+    });
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "scale-around-origin",
+        element,
+        properties: {
+          scaleX: {
+            keyframes: [{ duration: 200, value: 1.5, easing: "linear" }],
+          },
+          scaleY: {
+            keyframes: [{ duration: 200, value: 0.75, easing: "linear" }],
+          },
+        },
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(100);
+
+    expect(element.scale.x).toBeCloseTo(1);
+    expect(element.scale.y).toBeCloseTo(0.5);
+    expect(element.pivot.x * element.scale.x).toBeCloseTo(20);
+    expect(element.pivot.y * element.scale.y).toBeCloseTo(10);
+
+    animationBus.tick(100);
+
+    expect(element.pivot.x * element.scale.x).toBeCloseTo(20);
+    expect(element.pivot.y * element.scale.y).toBeCloseTo(10);
   });
 
   it("applies property path mapping for blur tweens", () => {

@@ -1,0 +1,52 @@
+---
+title: Animated Sprite Static Rotation
+description: A deterministic spritesheet frame rotating around its anchor-derived center.
+specs:
+  - animated-sprite rotation should apply to the selected frame
+  - omitted origin should use the anchor-derived center
+---
+states:
+  - elements:
+      - id: rotated-animated-sprite
+        type: spritesheet-animation
+        x: 640
+        "y": 360
+        width: 160
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        src: fighter-spritesheet
+        atlas:
+          frames:
+            fighter-pose:
+              frame:
+                x: 483
+                "y": 692
+                w: 169
+                h: 226
+              rotated: false
+              trimmed: true
+              spriteSourceSize:
+                x: 3
+                "y": 4
+                w: 169
+                h: 226
+              sourceSize:
+                w: 175
+                h: 240
+        playback:
+          frames:
+            - fighter-pose
+          fps: 1
+          loop: true
+          autoplay: false
+      - id: animated-sprite-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

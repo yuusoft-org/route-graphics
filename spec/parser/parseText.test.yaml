@@ -48,6 +48,7 @@ out:
   'y': 226
   originX: 225
   originY: 15
+  rotation: 0
   alpha: 1
   hover:
     soundSrc: sound-1
@@ -107,6 +108,7 @@ out:
   'y': 226
   originX: 100
   originY: 15
+  rotation: 0
   alpha: 1
   content: This text is wrap
   measuredWidth: 182
@@ -152,6 +154,7 @@ out:
   'y': 50
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:
@@ -232,6 +235,7 @@ out:
   'y': 230
   originX: 150
   originY: 10
+  rotation: 0
   alpha: 1
   content: This text is aligned to the top left corner
   measuredWidth: 300
@@ -265,6 +269,7 @@ out:
   'y': 230
   originX: 0
   originY: 10
+  rotation: 0
   alpha: 1
   content: ''
   measuredWidth: 0
@@ -301,6 +306,7 @@ out:
   'y': 50
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 0.5
   content: Semi-transparent text
   measuredWidth: 205
@@ -343,6 +349,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content: Fully styled text
   measuredWidth: 133
@@ -377,6 +384,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content: 'true'
   measuredWidth: 31
@@ -411,6 +419,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content: 'false'
   measuredWidth: 35
@@ -445,6 +454,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content: '42'
   measuredWidth: 18

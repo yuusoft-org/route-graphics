@@ -15,29 +15,34 @@ Try it in the [Playground](/playground/).
 
 ## Field Reference
 
-| Field           | Type             | Required | Default       | Notes                                      |
-| --------------- | ---------------- | -------- | ------------- | ------------------------------------------ |
-| `id`            | string           | Yes      | -             | Element id.                                |
-| `type`          | string           | Yes      | -             | Must be `input`.                           |
-| `x`             | number           | Yes      | -             | Position before anchor transform.          |
-| `y`             | number           | Yes      | -             | Position before anchor transform.          |
-| `width`         | number           | Yes      | -             | Field width.                               |
-| `height`        | number           | Yes      | -             | Field height.                              |
-| `value`         | string           | No       | `""`          | Initial value.                             |
-| `placeholder`   | string           | No       | `""`          | Placeholder text when value is empty.      |
-| `multiline`     | boolean          | No       | `false`       | Uses textarea-style editing.               |
-| `disabled`      | boolean          | No       | `false`       | Disables focus and editing.                |
-| `maxLength`     | number           | No       | -             | Maximum character count.                   |
-| `alpha`         | number           | No       | `1`           | Opacity `0..1`.                            |
-| `fill`          | string \| object | No       | `"#FFFFFF"`   | Field fill. Matches `rect.fill`.           |
-| `border`        | object           | No       | see below     | Field border. Matches `rect.border`.       |
-| `focusRing`     | object           | No       | see below     | Stroke drawn while focused.                |
-| `textStyle`     | object           | No       | default text  | Text style for value and placeholder; `fontFamily` accepts a string or ordered string array. |
-| `padding`       | number \| object | No       | `10 12 10 12` | Inner content padding.                     |
-| `change`        | object           | No       | -             | Change event config.                       |
-| `submit`        | object           | No       | -             | Submit event config.                       |
-| `focusEvent`    | object           | No       | -             | Focus event config.                        |
-| `blurEvent`     | object           | No       | -             | Blur event config.                         |
+| Field         | Type             | Required | Default       | Notes                                                                                        |
+| ------------- | ---------------- | -------- | ------------- | -------------------------------------------------------------------------------------------- |
+| `id`          | string           | Yes      | -             | Element id.                                                                                  |
+| `type`        | string           | Yes      | -             | Must be `input`.                                                                             |
+| `x`           | number           | Yes      | -             | Position before anchor transform.                                                            |
+| `y`           | number           | Yes      | -             | Position before anchor transform.                                                            |
+| `width`       | number           | Yes      | -             | Field width.                                                                                 |
+| `height`      | number           | Yes      | -             | Field height.                                                                                |
+| `anchorX`     | number           | No       | `0`           | Anchor offset ratio.                                                                         |
+| `anchorY`     | number           | No       | `0`           | Anchor offset ratio.                                                                         |
+| `originX`     | number           | No       | anchor        | Transform origin X in pixels.                                                                |
+| `originY`     | number           | No       | anchor        | Transform origin Y in pixels.                                                                |
+| `rotation`    | number           | No       | `0`           | Degrees.                                                                                     |
+| `value`       | string           | No       | `""`          | Initial value.                                                                               |
+| `placeholder` | string           | No       | `""`          | Placeholder text when value is empty.                                                        |
+| `multiline`   | boolean          | No       | `false`       | Uses textarea-style editing.                                                                 |
+| `disabled`    | boolean          | No       | `false`       | Disables focus and editing.                                                                  |
+| `maxLength`   | number           | No       | -             | Maximum character count.                                                                     |
+| `alpha`       | number           | No       | `1`           | Opacity `0..1`.                                                                              |
+| `fill`        | string \| object | No       | `"#FFFFFF"`   | Field fill. Matches `rect.fill`.                                                             |
+| `border`      | object           | No       | see below     | Field border. Matches `rect.border`.                                                         |
+| `focusRing`   | object           | No       | see below     | Stroke drawn while focused.                                                                  |
+| `textStyle`   | object           | No       | default text  | Text style for value and placeholder; `fontFamily` accepts a string or ordered string array. |
+| `padding`     | number \| object | No       | `10 12 10 12` | Inner content padding.                                                                       |
+| `change`      | object           | No       | -             | Change event config.                                                                         |
+| `submit`      | object           | No       | -             | Submit event config.                                                                         |
+| `focusEvent`  | object           | No       | -             | Focus event config.                                                                          |
+| `blurEvent`   | object           | No       | -             | Blur event config.                                                                           |
 
 ### `border`
 

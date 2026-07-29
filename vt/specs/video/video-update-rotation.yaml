@@ -1,0 +1,99 @@
+---
+title: Video Update Rotation
+description: A completed deterministic video frame sampled while rotating and scaling around its anchor-derived pixel origin; source colors are intentional for media coverage.
+specs:
+  - video rotation should animate from 0 to 90 degrees
+  - non-uniform scale should not move the configured pixel origin
+  - metadata-driven sizing should not invalidate the live scale-adjusted pivot
+  - auto rotation tween values should use degrees
+skipInitialScreenshot: true
+steps:
+  - action: customEvent
+    name: "snapShotVideoFrame"
+    detail:
+      elementId: rotating-video
+      time: 1
+  - action: wait
+    ms: 1500
+  - action: customEvent
+    name: "primeVtScreenshot"
+  - action: wait
+    ms: 50
+  - action: screenshot
+  - action: customEvent
+    name: "vtNextState"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotating-video
+        type: video
+        x: 640
+        "y": 360
+        width: 320
+        height: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 0
+        src: video-sample
+        volume: 0
+        loop: true
+      - id: video-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+  - elements:
+      - id: rotating-video
+        type: video
+        x: 640
+        "y": 360
+        width: 320
+        height: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 90
+        src: video-sample
+        volume: 0
+        loop: true
+      - id: video-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+    animations:
+      - id: video-rotate
+        targetId: rotating-video
+        type: update
+        tween:
+          rotation:
+            auto:
+              duration: 1000
+              easing: linear
+          scaleX:
+            keyframes:
+              - duration: 1000
+                value: 0.25
+                easing: linear
+          scaleY:
+            keyframes:
+              - duration: 1000
+                value: 0.12
+                easing: linear

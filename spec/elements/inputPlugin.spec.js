@@ -33,6 +33,88 @@ const createApp = () => {
 };
 
 describe("input plugin", () => {
+  it("applies and resets degree rotation around the configured origin", () => {
+    const parent = new Container();
+    const eventHandler = vi.fn();
+    const { app, bridgeState } = createApp();
+    const initialElement = parseInput({
+      state: {
+        id: "rotated-input",
+        type: "input",
+        x: 30,
+        y: 40,
+        width: 200,
+        height: 44,
+        originX: 24,
+        originY: 12,
+        rotation: 45,
+      },
+    });
+
+    addInput({
+      app,
+      parent,
+      element: initialElement,
+      eventHandler,
+      zIndex: 0,
+    });
+
+    const input = parent.getChildByLabel("rotated-input");
+
+    expect(input.x).toBe(54);
+    expect(input.y).toBe(52);
+    expect(input.pivot.x).toBe(24);
+    expect(input.pivot.y).toBe(12);
+    expect(input.rotation).toBeCloseTo(Math.PI / 4);
+
+    const initialBridgeOptions = bridgeState.mountArgs[1];
+    const initialGeometry = initialBridgeOptions.getGeometry();
+    const inputCenter = input.toGlobal({
+      x: initialElement.width / 2,
+      y: initialElement.height / 2,
+    });
+
+    expect(initialBridgeOptions.hitTest(inputCenter)).toBe(true);
+    expect(
+      initialBridgeOptions.hitTest({
+        x: initialGeometry.x + 1,
+        y: initialGeometry.y + 1,
+      }),
+    ).toBe(false);
+
+    const nextElement = parseInput({
+      state: {
+        id: "rotated-input",
+        type: "input",
+        x: 80,
+        y: 70,
+        width: 200,
+        height: 44,
+        originX: 10,
+        originY: 8,
+        rotation: 0,
+      },
+    });
+
+    updateInput({
+      app,
+      parent,
+      prevElement: initialElement,
+      nextElement,
+      eventHandler,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      zIndex: 0,
+    });
+
+    expect(input.x).toBe(90);
+    expect(input.y).toBe(78);
+    expect(input.pivot.x).toBe(10);
+    expect(input.pivot.y).toBe(8);
+    expect(input.rotation).toBe(0);
+  });
+
   it("renders a field and preserves native-edited value across unchanged rerenders", () => {
     const parent = new Container();
     const eventHandler = vi.fn();
@@ -351,6 +433,88 @@ describe("input plugin", () => {
     inputContainer.emit("rightclick", rightClickEvent);
 
     expect(rightClickEvent.stopPropagation).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-adopts an external value after input changes during an update tween", () => {
+    const parent = new Container();
+    const eventHandler = vi.fn();
+    const { app, bridgeState } = createApp();
+    const initialElement = parseInput({
+      state: {
+        id: "name",
+        type: "input",
+        x: 20,
+        y: 40,
+        width: 200,
+        height: 44,
+        value: "old value",
+      },
+    });
+    const nextElement = parseInput({
+      state: {
+        ...initialElement,
+        x: 120,
+        value: "external value",
+      },
+    });
+    const animationBus = { dispatch: vi.fn() };
+
+    addInput({
+      app,
+      parent,
+      element: initialElement,
+      eventHandler,
+      zIndex: 0,
+    });
+
+    bridgeState.mountArgs[1].callbacks.onFocus({
+      value: "old value",
+      selectionStart: 9,
+      selectionEnd: 9,
+      focused: true,
+      composing: false,
+    });
+
+    updateInput({
+      app,
+      parent,
+      prevElement: initialElement,
+      nextElement,
+      eventHandler,
+      animations: [
+        {
+          id: "input-update",
+          targetId: "name",
+          type: "update",
+          tween: {
+            x: {
+              auto: {
+                duration: 300,
+                easing: "linear",
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 0,
+    });
+
+    bridgeState.mountArgs[1].callbacks.onValueChange({
+      value: "typed during tween",
+      selectionStart: 18,
+      selectionEnd: 18,
+      focused: true,
+      composing: false,
+    });
+    animationBus.dispatch.mock.calls[0][0].payload.onComplete();
+
+    expect(bridgeState.updateArgs[1].value).toBe("external value");
   });
 
   it("runs update animations before unmounting a deleted input", () => {

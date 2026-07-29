@@ -2,9 +2,15 @@ import { isDeepEqual } from "../../../util/isDeepEqual.js";
 import {
   INPUT_RUNTIME,
   getInputGeometry,
+  hitTestInput,
   syncInputView,
 } from "./inputShared.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 const emitInputEvent = ({
   eventHandler,
@@ -157,7 +163,12 @@ export const updateInput = ({
   prevElement,
   nextElement,
   eventHandler,
+  animations,
+  animationBus,
+  completionTracker,
   zIndex,
+  deferRenderStateCommit,
+  commitRenderState,
 }) => {
   const container = parent.children.find(
     (child) => child.label === prevElement.id,
@@ -189,33 +200,61 @@ export const updateInput = ({
   } else {
     nextRuntimeElement.value = runtime.value;
   }
+  const adoptedExternalValue =
+    shouldAdoptExternalValue && runtime.composing !== true;
 
-  runtime.element = nextRuntimeElement;
-  container.label = nextElement.id;
-  container.cursor = nextElement.disabled ? "default" : "text";
-  container.x = Math.round(nextElement.x);
-  container.y = Math.round(nextElement.y);
-  container.alpha = nextElement.alpha;
+  const updateElement = () => {
+    if (adoptedExternalValue) {
+      runtime.value = nextElement.value;
+      runtime.lastExternalValue = nextElement.value;
+    }
 
-  if (nextElement.disabled === true) {
-    runtime.draggingSelection = false;
-  }
+    runtime.element = nextRuntimeElement;
+    container.label = nextElement.id;
+    container.cursor = nextElement.disabled ? "default" : "text";
+    container.alpha = nextElement.alpha;
+    applyElementTransform(container, nextElement);
 
-  if (!isDeepEqual(prevElement, nextElement) || shouldAdoptExternalValue) {
-    syncInputView(runtime, nextRuntimeElement);
-  }
+    if (nextElement.disabled === true) {
+      runtime.draggingSelection = false;
+    }
 
-  app.inputDomBridge.update(nextElement.id, {
-    ...nextRuntimeElement,
-    value: runtime.value,
-    callbacks: createCallbacks({
-      element: nextRuntimeElement,
-      runtime,
-      eventHandler,
+    if (!isDeepEqual(prevElement, nextElement) || shouldAdoptExternalValue) {
+      syncInputView(runtime, nextRuntimeElement);
+    }
+
+    app.inputDomBridge.update(nextElement.id, {
+      ...nextRuntimeElement,
+      value: runtime.value,
+      callbacks: createCallbacks({
+        element: nextRuntimeElement,
+        runtime,
+        eventHandler,
+      }),
+      getGeometry: () => getInputGeometry(app, container, nextRuntimeElement),
+      hitTest: (point) => hitTestInput(container, nextRuntimeElement, point),
+    });
+    setElementRenderState(container, nextElement);
+    commitRenderState?.(container);
+  };
+
+  const dispatched = dispatchLiveAnimations({
+    animations,
+    targetId: prevElement.id,
+    animationBus,
+    completionTracker,
+    element: container,
+    targetState: getElementTransformTargetState(nextElement, {
+      alpha: nextElement.alpha,
     }),
-    getGeometry: () => getInputGeometry(app, container, nextRuntimeElement),
+    onComplete: updateElement,
   });
-  setElementRenderState(container, nextElement);
+
+  if (!dispatched) {
+    updateElement();
+  } else {
+    deferRenderStateCommit?.();
+  }
 };
 
 export default updateInput;

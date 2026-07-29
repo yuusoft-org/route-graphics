@@ -50,6 +50,7 @@ out:
   "y": 150
   originX: 0
   originY: 0
+  rotation: 0
   src: fighter-spritesheet
   atlas:
     frames:
@@ -157,6 +158,7 @@ out:
   "y": 180
   originX: 0
   originY: 0
+  rotation: 0
   src: fighter-spritesheet
   atlas:
     frames:
@@ -262,6 +264,7 @@ out:
   "y": 240
   originX: 0
   originY: 0
+  rotation: 0
   src: fighter-spritesheet
   atlas:
     frames:

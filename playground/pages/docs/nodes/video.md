@@ -15,21 +15,24 @@ Try it in the [Playground](/playground/?template=video-demo).
 
 ## Field Reference
 
-| Field     | Type    | Required            | Default        | Notes                             |
-| --------- | ------- | ------------------- | -------------- | --------------------------------- |
-| `id`      | string  | Yes                 | -              | Element id.                       |
-| `type`    | string  | Yes                 | -              | Must be `video`.                  |
-| `x`       | number  | Yes (public schema) | `0` at runtime | Position before anchor transform. |
-| `y`       | number  | Yes (public schema) | `0` at runtime | Position before anchor transform. |
-| `width`   | number  | Yes                 | -              | Render width.                     |
-| `height`  | number  | Yes                 | -              | Render height.                    |
-| `src`     | string  | Yes                 | -              | Video source alias/URL.           |
-| `anchorX` | number  | No                  | `0`            | Anchor offset ratio.              |
-| `anchorY` | number  | No                  | `0`            | Anchor offset ratio.              |
-| `alpha`   | number  | No                  | `1`            | Opacity `0..1`.                   |
-| `volume`  | number  | No                  | `100`          | Runtime uses `volume / 100`.      |
-| `loop`    | boolean | No                  | `false`        | Replay video on end.              |
-| `blur`    | object  | No                  | -              | Directional Gaussian blur.        |
+| Field      | Type    | Required            | Default        | Notes                             |
+| ---------- | ------- | ------------------- | -------------- | --------------------------------- |
+| `id`       | string  | Yes                 | -              | Element id.                       |
+| `type`     | string  | Yes                 | -              | Must be `video`.                  |
+| `x`        | number  | Yes (public schema) | `0` at runtime | Position before anchor transform. |
+| `y`        | number  | Yes (public schema) | `0` at runtime | Position before anchor transform. |
+| `width`    | number  | Yes                 | -              | Render width.                     |
+| `height`   | number  | Yes                 | -              | Render height.                    |
+| `src`      | string  | Yes                 | -              | Video source alias/URL.           |
+| `anchorX`  | number  | No                  | `0`            | Anchor offset ratio.              |
+| `anchorY`  | number  | No                  | `0`            | Anchor offset ratio.              |
+| `originX`  | number  | No                  | anchor         | Transform origin X in pixels.     |
+| `originY`  | number  | No                  | anchor         | Transform origin Y in pixels.     |
+| `rotation` | number  | No                  | `0`            | Degrees.                          |
+| `alpha`    | number  | No                  | `1`            | Opacity `0..1`.                   |
+| `volume`   | number  | No                  | `100`          | Runtime uses `volume / 100`.      |
+| `loop`     | boolean | No                  | `false`        | Replay video on end.              |
+| `blur`     | object  | No                  | -              | Directional Gaussian blur.        |
 
 ## Blur
 

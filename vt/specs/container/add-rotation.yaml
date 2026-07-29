@@ -1,0 +1,54 @@
+---
+title: Container Static Rotation
+description: An asymmetric container rotating around its anchor-derived center.
+specs:
+  - container rotation should apply to the container and all of its children
+  - omitted origin should use the anchor-derived center
+---
+states:
+  - elements:
+      - id: rotated-container
+        type: container
+        x: 640
+        "y": 360
+        width: 300
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        children:
+          - id: container-background
+            type: rect
+            x: 0
+            "y": 0
+            width: 300
+            height: 120
+            fill: "#FFFFFF"
+            border:
+              width: 6
+              color: "#666666"
+          - id: container-accent
+            type: rect
+            x: 18
+            "y": 18
+            width: 72
+            height: 84
+            fill: "#666666"
+          - id: container-label
+            type: text
+            content: Rotated container
+            x: 112
+            "y": 42
+            textStyle:
+              fontSize: 24
+              fill: "#1C1C1C"
+              fontFamily: Arial
+      - id: container-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

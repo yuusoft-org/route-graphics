@@ -25,6 +25,9 @@ Try it in the [Playground](/playground/?template=interactive-elements).
 | `width`      | number          | No                  | auto            | Fixed layout box width. Also enables wrapping (`wordWrapWidth = width`).         |
 | `anchorX`    | number          | No                  | `0`             | Can be outside `0..1`.                                                           |
 | `anchorY`    | number          | No                  | `0`             | Can be outside `0..1`.                                                           |
+| `originX`    | number          | No                  | anchor          | Transform origin X in pixels from the layout box.                                |
+| `originY`    | number          | No                  | anchor          | Transform origin Y in pixels from the layout box.                                |
+| `rotation`   | number          | No                  | `0`             | Degrees.                                                                         |
 | `alpha`      | number          | No                  | `1`             | Opacity `0..1`.                                                                  |
 | `textStyle`  | object          | No                  | engine defaults | See table below.                                                                 |
 | `hover`      | object          | No                  | -               | Hover style, cursor, sound, payload.                                             |

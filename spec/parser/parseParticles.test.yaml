@@ -63,6 +63,9 @@ out:
   height: 720
   x: 0
   "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 1
   texture: snowflake
   behaviors:
@@ -243,6 +246,9 @@ out:
   height: 300
   x: 0
   "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 1
   texture:
     shape: rect
@@ -363,6 +369,9 @@ out:
   height: 240
   x: 0
   "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 1
   texture:
     mode: cycle
@@ -452,6 +461,9 @@ out:
   height: 360
   x: 0
   "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 1
   texture:
     mode: random
@@ -511,6 +523,9 @@ out:
   height: 360
   x: 0
   "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 1
   texture: particle-snow-soft
   behaviors:
@@ -572,6 +587,9 @@ out:
   height: 200
   x: 0
   "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 1
   texture: spark-a
   behaviors:
@@ -635,6 +653,9 @@ out:
   height: 720
   x: 100
   "y": 50
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 0.8
   texture:
     shape: circle
@@ -678,6 +699,9 @@ out:
   height: 600
   x: 0
   "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
   alpha: 1
   texture: circle
   behaviors:

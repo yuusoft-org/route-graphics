@@ -1,0 +1,123 @@
+---
+title: Container Update Rotation
+description: An asymmetric container sampled while rotating around its anchor-derived center.
+specs:
+  - container rotation should animate from 0 to 90 degrees
+  - child layout should remain attached to the rotating container
+  - auto rotation tween values should use degrees
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotating-container
+        type: container
+        x: 640
+        "y": 360
+        width: 300
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 0
+        children:
+          - id: container-background
+            type: rect
+            x: 0
+            "y": 0
+            width: 300
+            height: 120
+            fill: "#FFFFFF"
+            border:
+              width: 6
+              color: "#666666"
+          - id: container-accent
+            type: rect
+            x: 18
+            "y": 18
+            width: 72
+            height: 84
+            fill: "#666666"
+          - id: container-label
+            type: text
+            content: Rotating container
+            x: 112
+            "y": 42
+            textStyle:
+              fontSize: 24
+              fill: "#1C1C1C"
+              fontFamily: Arial
+      - id: container-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+  - elements:
+      - id: rotating-container
+        type: container
+        x: 640
+        "y": 360
+        width: 300
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 90
+        children:
+          - id: container-background
+            type: rect
+            x: 0
+            "y": 0
+            width: 300
+            height: 120
+            fill: "#FFFFFF"
+            border:
+              width: 6
+              color: "#666666"
+          - id: container-accent
+            type: rect
+            x: 18
+            "y": 18
+            width: 72
+            height: 84
+            fill: "#666666"
+          - id: container-label
+            type: text
+            content: Rotating container
+            x: 112
+            "y": 42
+            textStyle:
+              fontSize: 24
+              fill: "#1C1C1C"
+              fontFamily: Arial
+      - id: container-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+    animations:
+      - id: container-rotate
+        targetId: rotating-container
+        type: update
+        tween:
+          rotation:
+            auto:
+              duration: 1000
+              easing: linear

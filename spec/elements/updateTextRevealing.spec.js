@@ -414,6 +414,130 @@ describe("updateTextRevealing", () => {
     expect(mocks.runTextReveal).toHaveBeenCalledTimes(1);
   });
 
+  it("commits transform-only animated updates for immediate reveals", async () => {
+    const parent = new Container();
+    const child = new Container();
+    child.label = "line-1";
+    parent.addChild(child);
+    const previous = createElement({
+      revealEffect: "none",
+      rotation: 0,
+    });
+    const next = createElement({
+      revealEffect: "none",
+      rotation: 90,
+    });
+    const animationBus = { dispatch: vi.fn() };
+    const deferRenderStateCommit = vi.fn();
+    const commitRenderState = vi.fn();
+    setElementRenderState(child, previous);
+
+    await updateTextRevealing({
+      parent,
+      prevElement: previous,
+      nextElement: next,
+      animations: [
+        {
+          id: "line-rotation",
+          targetId: "line-1",
+          type: "update",
+          tween: {
+            rotation: {
+              auto: {
+                duration: 300,
+                easing: "linear",
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      renderContext: createRenderContext(),
+      completionTracker: createCompletionTracker(),
+      zIndex: 0,
+      signal: new AbortController().signal,
+      deferRenderStateCommit,
+      commitRenderState,
+    });
+
+    expect(deferRenderStateCommit).toHaveBeenCalledTimes(1);
+    expect(commitRenderState).not.toHaveBeenCalled();
+    expect(mocks.runTextReveal).not.toHaveBeenCalled();
+
+    animationBus.dispatch.mock.calls[0][0].payload.onComplete();
+
+    expect(child.rotation).toBeCloseTo(Math.PI / 2);
+    expect(getElementRenderState(child)).toBe(next);
+    expect(commitRenderState).toHaveBeenCalledWith(child);
+    expect(mocks.runTextReveal).not.toHaveBeenCalled();
+  });
+
+  it.each(["typewriter", "softWipe"])(
+    "commits an animated transform when a completed %s reveal cannot resume",
+    async (revealEffect) => {
+      mocks.runTextReveal.mockImplementationOnce(() => Promise.resolve());
+      const parent = new Container();
+      const child = new Container();
+      child.label = "line-1";
+      parent.addChild(child);
+      const previous = createElement({
+        revealEffect,
+        rotation: 0,
+      });
+      const next = createElement({
+        revealEffect,
+        rotation: 90,
+      });
+      const animationBus = { dispatch: vi.fn() };
+      const deferRenderStateCommit = vi.fn();
+      const commitRenderState = vi.fn();
+      setElementRenderState(child, previous);
+
+      await updateTextRevealing({
+        parent,
+        prevElement: previous,
+        nextElement: next,
+        animations: [
+          {
+            id: "line-rotation",
+            targetId: "line-1",
+            type: "update",
+            tween: {
+              rotation: {
+                auto: {
+                  duration: 300,
+                  easing: "linear",
+                },
+              },
+            },
+          },
+        ],
+        animationBus,
+        renderContext: createRenderContext(),
+        completionTracker: createCompletionTracker(),
+        zIndex: 0,
+        signal: new AbortController().signal,
+        deferRenderStateCommit,
+        commitRenderState,
+      });
+
+      expect(deferRenderStateCommit).toHaveBeenCalledTimes(1);
+      expect(commitRenderState).not.toHaveBeenCalled();
+
+      animationBus.dispatch.mock.calls[0][0].payload.onComplete();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mocks.runTextReveal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playback: "resume",
+        }),
+      );
+      expect(getElementRenderState(child)).toBe(next);
+      expect(commitRenderState).toHaveBeenCalledWith(child);
+    },
+  );
+
   it("resumes an unchanged in-flight reveal instead of leaving it frozen", async () => {
     const parent = new Container();
     const child = new Container();

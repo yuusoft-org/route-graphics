@@ -1,0 +1,44 @@
+---
+title: Video Static Rotation
+description: A completed deterministic video frame rotating around its anchor-derived center; source colors are intentional for media coverage.
+specs:
+  - video rotation should apply after metadata-driven source sizing
+  - omitted origin should use the anchor-derived center
+skipInitialScreenshot: true
+steps:
+  - action: customEvent
+    name: "snapShotVideoFrame"
+    detail:
+      elementId: rotated-video
+      time: 1
+  - action: wait
+    ms: 1500
+  - action: customEvent
+    name: "primeVtScreenshot"
+  - action: wait
+    ms: 50
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotated-video
+        type: video
+        x: 640
+        "y": 360
+        width: 320
+        height: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        src: video-sample
+        volume: 0
+        loop: true
+      - id: video-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

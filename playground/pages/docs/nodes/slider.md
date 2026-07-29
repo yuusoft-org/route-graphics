@@ -33,6 +33,9 @@ Try it in the [Playground](/playground/?template=slider-demo).
 | `step`           | number                     | No            | `1`          | If `> 0`, value snaps by step.                                                   |
 | `anchorX`        | number                     | No            | `0`          | Anchor offset ratio.                                                             |
 | `anchorY`        | number                     | No            | `0`          | Anchor offset ratio.                                                             |
+| `originX`        | number                     | No            | anchor       | Transform origin X in pixels.                                                    |
+| `originY`        | number                     | No            | anchor       | Transform origin Y in pixels.                                                    |
+| `rotation`       | number                     | No            | `0`          | Degrees.                                                                         |
 | `alpha`          | number                     | No            | `1`          | Opacity `0..1`.                                                                  |
 | `hover`          | object                     | No            | -            | Hover textures/sound/cursor.                                                     |
 | `change`         | object                     | No            | -            | Event payload on value changes.                                                  |

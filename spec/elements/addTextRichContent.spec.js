@@ -24,6 +24,37 @@ const createSharedParams = () => ({
 });
 
 describe("text rich content", () => {
+  it("applies degree rotation around an explicit rich-text origin", () => {
+    const parent = new Container();
+    const element = parseText({
+      state: {
+        id: "rotated-rich-text",
+        type: "text",
+        x: 40,
+        y: 60,
+        originX: 14,
+        originY: 9,
+        rotation: -45,
+        content: [{ text: "Rich" }, { text: " rotation" }],
+      },
+    });
+
+    addText({
+      ...createSharedParams(),
+      parent,
+      element,
+      zIndex: 0,
+    });
+
+    const text = parent.getChildByLabel("rotated-rich-text");
+
+    expect(text.x).toBe(54);
+    expect(text.y).toBe(69);
+    expect(text.pivot.x).toBe(14);
+    expect(text.pivot.y).toBe(9);
+    expect(text.rotation).toBeCloseTo(-Math.PI / 4);
+  });
+
   it("renders array content as styled text segment objects", () => {
     const parent = new Container();
     const element = parseText({
@@ -125,6 +156,51 @@ describe("text rich content", () => {
     expect(getTextPart().style.fontWeight).toBe("700");
     expect(getTextPart().style.lineHeight).toBe(54);
     expect(text.y).toBe(initialY);
+  });
+
+  it("preserves a live tweened transform during rich-text style changes", () => {
+    const parent = new Container();
+    const element = parseText({
+      state: {
+        id: "rich-text-live-transform",
+        type: "text",
+        x: 240,
+        y: 120,
+        rotation: 15,
+        alpha: 0.8,
+        content: [{ text: "Tweening" }],
+        hover: {
+          textStyle: {
+            fontSize: 48,
+          },
+        },
+      },
+    });
+
+    addText({
+      ...createSharedParams(),
+      parent,
+      element,
+      zIndex: 0,
+    });
+
+    const text = parent.getChildByLabel("rich-text-live-transform");
+    text.x = 333;
+    text.y = 222;
+    text.rotation = 1.25;
+    text.alpha = 0.4;
+
+    text.emit("pointerover");
+    expect(text.x).toBe(333);
+    expect(text.y).toBe(222);
+    expect(text.rotation).toBe(1.25);
+    expect(text.alpha).toBe(0.4);
+
+    text.emit("pointerout");
+    expect(text.x).toBe(333);
+    expect(text.y).toBe(222);
+    expect(text.rotation).toBe(1.25);
+    expect(text.alpha).toBe(0.4);
   });
 
   it("hit-tests rich text using live interactive glyph bounds", () => {

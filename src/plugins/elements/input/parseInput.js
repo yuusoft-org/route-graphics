@@ -13,9 +13,6 @@ export const parseInput = ({ state }) => {
   const value = String(state.value ?? "");
   const placeholder = String(state.placeholder ?? "");
 
-  delete computedObj.originX;
-  delete computedObj.originY;
-
   return {
     ...computedObj,
     value,

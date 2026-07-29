@@ -17,6 +17,16 @@ const {
       this.loop = true;
       this.x = 0;
       this.y = 0;
+      this.pivot = {
+        x: 0,
+        y: 0,
+        set: (x, y) => {
+          this.pivot.x = x;
+          this.pivot.y = y;
+        },
+      };
+      this.scale = { x: 1, y: 1 };
+      this.rotation = 0;
       this.width = 0;
       this.height = 0;
       this.alpha = 1;
@@ -81,6 +91,7 @@ vi.mock("../../src/plugins/animations/planAnimations.js", () => ({
 
 import { addAnimatedSprite } from "../../src/plugins/elements/animated-sprite/addAnimatedSprite.js";
 import { updateAnimatedSprite } from "../../src/plugins/elements/animated-sprite/updateAnimatedSprite.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 import {
   cleanupDebugMode,
   setupDebugMode,
@@ -131,6 +142,199 @@ describe("spritesheet animation rendering", () => {
     window.document.body.innerHTML = "";
   });
 
+  it("applies degree rotation around the configured origin", async () => {
+    const parent = {
+      destroyed: false,
+      addChild: vi.fn(),
+    };
+
+    await addAnimatedSprite({
+      app: {
+        debug: false,
+        render: vi.fn(),
+      },
+      parent,
+      element: createAnimatedSpriteElement({
+        x: 120,
+        y: 90,
+        originX: 18,
+        originY: 12,
+        rotation: 135,
+      }),
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      renderContext: {},
+      zIndex: 3,
+      signal: undefined,
+    });
+
+    const sprite = parent.addChild.mock.calls[0][0];
+
+    expect(sprite.x).toBe(138);
+    expect(sprite.y).toBe(102);
+    expect(sprite.pivot.x).toBe(18);
+    expect(sprite.pivot.y).toBe(12);
+    expect(sprite.rotation).toBeCloseTo((3 * Math.PI) / 4);
+  });
+
+  it("keeps the pivot stable across frame changes and scale tweens", async () => {
+    const parent = {
+      destroyed: false,
+      addChild: vi.fn(),
+    };
+
+    await addAnimatedSprite({
+      app: {
+        debug: false,
+        render: vi.fn(),
+      },
+      parent,
+      element: createAnimatedSpriteElement({
+        originX: 20,
+        originY: 30,
+        rotation: 45,
+      }),
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      renderContext: {},
+      zIndex: 3,
+      signal: undefined,
+    });
+
+    const sprite = parent.addChild.mock.calls[0][0];
+    sprite.x = 333;
+    sprite.y = 222;
+    sprite.rotation = 1.25;
+    sprite.scale.x = 0.5;
+    sprite.scale.y = 0.25;
+
+    sprite.onFrameChange(1);
+
+    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(20);
+    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(30);
+    expect(sprite.x).toBe(333);
+    expect(sprite.y).toBe(222);
+    expect(sprite.rotation).toBe(1.25);
+
+    const animationBus = createAnimationBus();
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "animated-sprite-scale",
+        element: sprite,
+        properties: {
+          scaleX: {
+            keyframes: [{ duration: 200, value: 1, easing: "linear" }],
+          },
+          scaleY: {
+            keyframes: [{ duration: 200, value: 0.75, easing: "linear" }],
+          },
+        },
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(100);
+
+    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(20);
+    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(30);
+
+    const pivotBeforeFrameChange = {
+      x: sprite.pivot.x,
+      y: sprite.pivot.y,
+    };
+    sprite.onFrameChange(2);
+
+    expect(sprite.pivot.x).toBeCloseTo(pivotBeforeFrameChange.x);
+    expect(sprite.pivot.y).toBeCloseTo(pivotBeforeFrameChange.y);
+  });
+
+  it("keeps the previous origin during a live update tween", async () => {
+    const liveAnimations = [
+      {
+        id: "animated-sprite-update",
+        targetId: "animated-sprite-1",
+        type: "update",
+        tween: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+      },
+    ];
+    dispatchLiveAnimations.mockReturnValue(true);
+    getLiveAnimations.mockReturnValue(liveAnimations);
+
+    const app = {
+      debug: false,
+      render: vi.fn(),
+    };
+    const animatedSpriteElement = new MockAnimatedSprite([
+      { frameName: "old" },
+    ]);
+    animatedSpriteElement.label = "animated-sprite-1";
+    const prevElement = createAnimatedSpriteElement({
+      x: 20,
+      y: 30,
+      width: 64,
+      height: 48,
+      originX: 10,
+      originY: 5,
+    });
+    const nextElement = createAnimatedSpriteElement({
+      x: 200,
+      y: 160,
+      width: 64,
+      height: 48,
+      originX: 30,
+      originY: 12,
+    });
+    animatedSpriteElement.x = prevElement.x + prevElement.originX;
+    animatedSpriteElement.y = prevElement.y + prevElement.originY;
+
+    await updateAnimatedSprite({
+      app,
+      parent: {
+        children: [animatedSpriteElement],
+      },
+      prevElement,
+      nextElement,
+      animations: liveAnimations,
+      animationBus: {},
+      completionTracker: {},
+      zIndex: 4,
+      signal: undefined,
+    });
+
+    animatedSpriteElement.scale.x = 0.5;
+    animatedSpriteElement.scale.y = 0.25;
+    animatedSpriteElement.onFrameChange(1);
+
+    expect(
+      animatedSpriteElement.pivot.x * animatedSpriteElement.scale.x,
+    ).toBeCloseTo(10);
+    expect(
+      animatedSpriteElement.pivot.y * animatedSpriteElement.scale.y,
+    ).toBeCloseTo(5);
+    expect(animatedSpriteElement.x).toBe(30);
+    expect(animatedSpriteElement.y).toBe(35);
+
+    await dispatchLiveAnimations.mock.calls[0][0].onComplete();
+
+    expect(
+      animatedSpriteElement.pivot.x * animatedSpriteElement.scale.x,
+    ).toBeCloseTo(30);
+    expect(
+      animatedSpriteElement.pivot.y * animatedSpriteElement.scale.y,
+    ).toBeCloseTo(12);
+    expect(animatedSpriteElement.x).toBe(230);
+    expect(animatedSpriteElement.y).toBe(172);
+  });
+
   it("renders after asynchronously adding a spritesheet animation in debug/manual flows", async () => {
     const app = {
       debug: true,
@@ -174,7 +378,11 @@ describe("spritesheet animation rendering", () => {
     await addAnimatedSprite({
       app,
       parent,
-      element: createAnimatedSpriteElement(),
+      element: createAnimatedSpriteElement({
+        originX: 10,
+        originY: 5,
+        rotation: 45,
+      }),
       animations: [
         {
           id: "animated-sprite-enter",
@@ -204,8 +412,9 @@ describe("spritesheet animation rendering", () => {
         completionTracker,
         element: addedSprite,
         targetState: expect.objectContaining({
-          x: 200,
-          y: 150,
+          x: 210,
+          y: 155,
+          rotation: 45,
           width: 100,
           height: 100,
           alpha: 1,

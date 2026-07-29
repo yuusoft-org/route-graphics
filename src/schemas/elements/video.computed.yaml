@@ -42,6 +42,10 @@ properties:
   originY:
     type: number
     description: Y origin point
+  rotation:
+    type: number
+    description: Rotation in degrees
+    default: 0
   scaleX:
     type: number
     description: X scale factor

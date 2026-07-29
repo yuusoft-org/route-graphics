@@ -1,4 +1,5 @@
 const MANAGED_VIDEO_SPRITES_KEY = "__routeGraphicsManagedVideoSprites";
+const managedVideoSpriteResizeHandlers = new WeakMap();
 
 const getManagedVideoSpriteSet = (source) => {
   if (!source) {
@@ -26,6 +27,18 @@ export const registerManagedVideoSprite = (sprite) => {
     sprite.once("destroyed", () => {
       source?.[MANAGED_VIDEO_SPRITES_KEY]?.delete(sprite);
     });
+  }
+};
+
+export const setManagedVideoSpriteResizeHandler = (sprite, handler) => {
+  if (!sprite) {
+    return;
+  }
+
+  if (typeof handler === "function") {
+    managedVideoSpriteResizeHandlers.set(sprite, handler);
+  } else {
+    managedVideoSpriteResizeHandlers.delete(sprite);
   }
 };
 
@@ -97,5 +110,7 @@ export const restoreManagedVideoSpriteSizes = (sizes) => {
     if (Number.isFinite(size.height)) {
       sprite.height = size.height;
     }
+
+    managedVideoSpriteResizeHandlers.get(sprite)?.();
   }
 };

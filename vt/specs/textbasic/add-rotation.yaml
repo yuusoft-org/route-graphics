@@ -1,0 +1,31 @@
+---
+title: Text Static Rotation
+description: Fixed-width text rotating around its anchor-derived center.
+specs:
+  - text rotation should apply to the rendered glyph layout
+  - omitted origin should use the anchor-derived center
+---
+states:
+  - elements:
+      - id: rotated-text
+        type: text
+        content: Rotated text layout
+        x: 640
+        "y": 360
+        width: 320
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        textStyle:
+          fontSize: 30
+          fill: "#FFFFFF"
+          fontFamily: Arial
+      - id: text-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

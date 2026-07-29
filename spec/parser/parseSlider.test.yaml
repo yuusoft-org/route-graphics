@@ -50,6 +50,7 @@ out:
   "y": 200
   originX: 48
   originY: 40
+  rotation: 0
   alpha: 0.8
   barSrc: file:slider-bar
   inactiveBarSrc: file:slider-track
@@ -135,6 +136,7 @@ out:
   "y": 75
   originX: 0
   originY: 0
+  rotation: 0
 ---
 case: Test parsing split slider without hover
 in:
@@ -168,6 +170,7 @@ out:
   "y": 20
   originX: 0
   originY: 0
+  rotation: 0
 ---
 case: Test parsing slider throws when initialValue is missing
 in:
@@ -215,6 +218,7 @@ out:
   "y": 75
   originX: 0
   originY: 0
+  rotation: 0
 ---
 case: Test parsing slider clamps initialValue below min
 in:
@@ -248,3 +252,4 @@ out:
   "y": 75
   originX: 0
   originY: 0
+  rotation: 0

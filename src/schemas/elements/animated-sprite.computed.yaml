@@ -41,6 +41,10 @@ properties:
   originY:
     type: number
     description: Calculated origin Y coordinate based on anchor
+  rotation:
+    type: number
+    description: Rotation in degrees
+    default: 0
   src:
     type: string
     description: Alias or URL of the spritesheet image asset

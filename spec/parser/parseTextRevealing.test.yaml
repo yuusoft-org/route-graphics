@@ -29,6 +29,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:
@@ -81,6 +82,7 @@ out:
   'y': 120
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:
@@ -146,6 +148,7 @@ out:
   'y': 200
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:
@@ -251,6 +254,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   indicator:
     revealing:
@@ -320,6 +324,7 @@ out:
   'y': 50
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   indicator:
     revealing:
@@ -391,6 +396,7 @@ out:
   'y': 50
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:
@@ -458,6 +464,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:
@@ -511,6 +518,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:
@@ -564,6 +572,7 @@ out:
   'y': 100
   originX: 0
   originY: 0
+  rotation: 0
   alpha: 1
   content:
     - lineParts:

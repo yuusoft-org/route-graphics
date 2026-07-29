@@ -6,8 +6,13 @@ import {
   createInputDisplay,
   getInputGeometry,
   getInputIndexFromLocalPoint,
+  hitTestInput,
   syncInputView,
 } from "./inputShared.js";
+import {
+  applyElementTransform,
+  getElementTransformTargetState,
+} from "../util/transform.js";
 
 const emitInputEvent = ({
   eventHandler,
@@ -183,9 +188,8 @@ export const addInput = ({
   container.sortableChildren = true;
   container.eventMode = "static";
   container.cursor = element.disabled ? "default" : "text";
-  container.x = Math.round(element.x);
-  container.y = Math.round(element.y);
   container.alpha = element.alpha;
+  applyElementTransform(container, element);
 
   const display = createInputDisplay(element);
   const runtime = buildInputRuntime({
@@ -335,6 +339,7 @@ export const addInput = ({
       eventHandler,
     }),
     getGeometry: () => getInputGeometry(app, container, element),
+    hitTest: (point) => hitTestInput(container, element, point),
   });
 
   parent.addChild(container);
@@ -345,11 +350,9 @@ export const addInput = ({
     animationBus,
     completionTracker,
     element: container,
-    targetState: {
-      x: element.x,
-      y: element.y,
+    targetState: getElementTransformTargetState(element, {
       alpha: element.alpha,
-    },
+    }),
     renderContext,
   });
 };

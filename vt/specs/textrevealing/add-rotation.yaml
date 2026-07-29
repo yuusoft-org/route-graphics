@@ -1,0 +1,33 @@
+---
+title: Text Revealing Static Rotation
+description: Immediately revealed text rotating around its anchor-derived center.
+specs:
+  - text-revealing rotation should apply to the mounted text layout
+  - omitted origin should use the anchor-derived center
+---
+states:
+  - elements:
+      - id: rotated-revealing-text
+        type: text-revealing
+        content:
+          - text: Rotated revealing text
+            textStyle:
+              fontSize: 30
+              fill: "#FFFFFF"
+              fontFamily: Arial
+        x: 640
+        "y": 360
+        width: 340
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 35
+        revealEffect: none
+      - id: text-revealing-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"

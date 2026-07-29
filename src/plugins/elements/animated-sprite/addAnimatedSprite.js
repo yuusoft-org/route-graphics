@@ -19,6 +19,8 @@ import {
   playbackFpsToAnimationSpeed,
   resolveAnimatedSpriteFrameTextures,
 } from "./animatedSpriteConfig.js";
+import { getElementTransformTargetState } from "../util/transform.js";
+import { applyAnimatedSpriteTransform } from "./animatedSpriteTransform.js";
 
 /**
  * Add spritesheet animation element to the stage
@@ -37,8 +39,7 @@ export const addAnimatedSprite = async ({
 }) => {
   if (signal?.aborted) return;
 
-  const { id, x, y, width, height, src, atlas, clips, playback, alpha } =
-    element;
+  const { id, width, height, src, atlas, clips, playback, alpha } = element;
 
   const normalizedAtlas = normalizeAnimatedSpriteAtlas(atlas);
   const normalizedClips = normalizeAnimatedSpriteClips(
@@ -86,10 +87,9 @@ export const addAnimatedSprite = async ({
       queueDeferredAnimatedSpritePlay(renderContext, animatedSprite);
     }
 
-    animatedSprite.x = Math.round(x);
-    animatedSprite.y = Math.round(y);
     animatedSprite.width = Math.round(width);
     animatedSprite.height = Math.round(height);
+    applyAnimatedSpriteTransform(animatedSprite, element);
     animatedSprite.alpha = alpha;
     const shouldForceBlur = hasBlurUpdateAnimation(animations, id);
     syncBlurEffect(animatedSprite, element.blur, { force: shouldForceBlur });
@@ -112,8 +112,7 @@ export const addAnimatedSprite = async ({
       completionTracker,
       element: animatedSprite,
       targetState: {
-        x,
-        y,
+        ...getElementTransformTargetState(element),
         width,
         height,
         alpha,

@@ -31,6 +31,9 @@ Try it in the [Playground](/playground/?template=spritesheet-animation-demo).
 | `playback` | object | Yes      | -       | Playback settings (see below).     |
 | `anchorX`  | number | No       | `0`     | Anchor offset ratio.               |
 | `anchorY`  | number | No       | `0`     | Anchor offset ratio.               |
+| `originX`  | number | No       | anchor  | Transform origin X in pixels.      |
+| `originY`  | number | No       | anchor  | Transform origin Y in pixels.      |
+| `rotation` | number | No       | `0`     | Degrees.                           |
 | `alpha`    | number | No       | `1`     | Opacity `0..1`.                    |
 | `blur`     | object | No       | -       | Directional Gaussian blur.         |
 

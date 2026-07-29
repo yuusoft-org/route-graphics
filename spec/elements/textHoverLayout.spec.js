@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { addText } from "../../src/plugins/elements/text/addText.js";
 import { parseText } from "../../src/plugins/elements/text/parseText.js";
 import { getTextLayoutPosition } from "../../src/plugins/elements/text/textLayout.js";
+import { updateText } from "../../src/plugins/elements/text/updateText.js";
 import { hitTestElementBounds } from "../../src/util/hitTestElementBounds.js";
+import { isDeepEqual } from "../../src/util/isDeepEqual.js";
 
 const createSharedParams = () => ({
   app: {
@@ -22,21 +24,44 @@ const createSharedParams = () => ({
   },
 });
 
-const getHorizontalOffset = (layoutWidth, measuredWidth, align) => {
-  const remainingWidth = Math.max(0, layoutWidth - measuredWidth);
+const getWorldPosition = (displayObject, localPosition = { x: 0, y: 0 }) =>
+  displayObject.toGlobal(localPosition);
 
-  if (align === "center") {
-    return remainingWidth / 2;
-  }
-
-  if (align === "right") {
-    return remainingWidth;
-  }
-
-  return 0;
-};
+const getWorldPivotPosition = (displayObject) =>
+  getWorldPosition(displayObject, displayObject.pivot);
 
 describe("text hover layout", () => {
+  it("applies degree rotation around an explicit text origin", () => {
+    const parent = new Container();
+    const element = parseText({
+      state: {
+        id: "rotated-text",
+        type: "text",
+        x: 120,
+        y: 80,
+        originX: 18,
+        originY: 12,
+        rotation: 30,
+        content: "Rotated",
+      },
+    });
+
+    addText({
+      ...createSharedParams(),
+      parent,
+      zIndex: 0,
+      element,
+    });
+
+    const text = parent.getChildByLabel("rotated-text");
+
+    expect(text.x).toBe(138);
+    expect(text.y).toBe(92);
+    expect(text.pivot.x).toBe(18);
+    expect(text.pivot.y).toBe(12);
+    expect(text.rotation).toBeCloseTo(Math.PI / 6);
+  });
+
   it("applies configured text texture padding", () => {
     const parent = new Container();
     const shared = createSharedParams();
@@ -116,18 +141,111 @@ describe("text hover layout", () => {
     });
 
     const text = parent.getChildByLabel("text-hover-layout");
-    const beforeHoverAnchorX = text.x + text.width * 0.5;
-    const beforeHoverAnchorY = text.y + text.height * 0.5;
+    const beforeHoverAnchor = getWorldPivotPosition(text);
 
     text.emit("pointerover");
 
-    expect(text.x + text.width * 0.5).toBeCloseTo(beforeHoverAnchorX, 4);
-    expect(text.y + text.height * 0.5).toBeCloseTo(beforeHoverAnchorY, 4);
+    expect(getWorldPivotPosition(text).x).toBeCloseTo(beforeHoverAnchor.x, 4);
+    expect(getWorldPivotPosition(text).y).toBeCloseTo(beforeHoverAnchor.y, 4);
 
     text.emit("pointerout");
 
-    expect(text.x + text.width * 0.5).toBeCloseTo(beforeHoverAnchorX, 4);
-    expect(text.y + text.height * 0.5).toBeCloseTo(beforeHoverAnchorY, 4);
+    expect(getWorldPivotPosition(text).x).toBeCloseTo(beforeHoverAnchor.x, 4);
+    expect(getWorldPivotPosition(text).y).toBeCloseTo(beforeHoverAnchor.y, 4);
+  });
+
+  it("preserves a live tweened rotation during interactive style changes", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+    const element = parseText({
+      state: {
+        id: "text-live-rotation",
+        type: "text",
+        x: 240,
+        y: 120,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        rotation: 15,
+        content: "Tweening",
+        hover: {
+          textStyle: {
+            fontSize: 36,
+          },
+        },
+      },
+    });
+
+    addText({
+      ...shared,
+      parent,
+      zIndex: 0,
+      element,
+    });
+
+    const text = parent.getChildByLabel("text-live-rotation");
+    text.rotation = 1.25;
+
+    text.emit("pointerover");
+    expect(text.rotation).toBe(1.25);
+
+    text.emit("pointerout");
+    expect(text.rotation).toBe(1.25);
+  });
+
+  it("diffs an explicit origin from an equal anchor-derived origin", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+    const state = {
+      id: "text-explicit-origin-diff",
+      type: "text",
+      x: 240,
+      y: 120,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      content: "Origin",
+      textStyle: {
+        fontSize: 24,
+      },
+      hover: {
+        textStyle: {
+          fontSize: 48,
+        },
+      },
+    };
+    const derivedElement = parseText({ state });
+    const explicitElement = parseText({
+      state: {
+        ...state,
+        originX: derivedElement.originX,
+        originY: derivedElement.originY,
+      },
+    });
+
+    expect(explicitElement.originX).toBe(derivedElement.originX);
+    expect(explicitElement.originY).toBe(derivedElement.originY);
+    expect(Object.keys(explicitElement)).toContain("__explicitOriginX");
+    expect(Object.keys(explicitElement)).toContain("__explicitOriginY");
+    expect(isDeepEqual(derivedElement, explicitElement)).toBe(false);
+
+    addText({
+      ...shared,
+      parent,
+      zIndex: 0,
+      element: derivedElement,
+    });
+    updateText({
+      ...shared,
+      parent,
+      prevElement: derivedElement,
+      nextElement: explicitElement,
+      zIndex: 0,
+    });
+
+    const text = parent.getChildByLabel("text-explicit-origin-diff");
+    text.emit("pointerover");
+
+    expect(text.pivot.x).toBeCloseTo(explicitElement.originX);
+    expect(text.pivot.y).toBeCloseTo(explicitElement.originY);
   });
 
   it("keeps hover and click textStyle states working together", () => {
@@ -480,8 +598,13 @@ describe("text hover layout", () => {
     });
 
     const text = parent.getChildByLabel("text-fixed-center");
-    expect(text.x).toBeCloseTo(element.x + (element.width - text.width) / 2, 4);
-    expect(text.y).toBe(element.y);
+    const glyphPosition = getWorldPosition(text);
+
+    expect(glyphPosition.x).toBeCloseTo(
+      element.x + (element.width - text.width) / 2,
+      4,
+    );
+    expect(glyphPosition.y).toBe(element.y);
   });
 
   it("positions centered fixed-width text with shadows by glyph width", () => {
@@ -519,10 +642,11 @@ describe("text hover layout", () => {
 
     const text = parent.getChildByLabel("text-fixed-center-shadow");
     const targetPosition = getTextLayoutPosition(element);
+    const glyphPosition = getWorldPosition(text);
 
     expect(text.width).toBeGreaterThan(element.measuredWidth);
-    expect(text.x).toBeCloseTo(targetPosition.x, 4);
-    expect(text.x).toBeCloseTo(
+    expect(glyphPosition.x).toBeCloseTo(targetPosition.x, 4);
+    expect(glyphPosition.x).toBeCloseTo(
       element.x + (element.width - element.measuredWidth) / 2,
       4,
     );
@@ -556,8 +680,13 @@ describe("text hover layout", () => {
     });
 
     const text = parent.getChildByLabel("text-fixed-right");
-    expect(text.x).toBeCloseTo(element.x + element.width - text.width, 4);
-    expect(text.y).toBe(element.y);
+    const glyphPosition = getWorldPosition(text);
+
+    expect(glyphPosition.x).toBeCloseTo(
+      element.x + element.width - text.width,
+      4,
+    );
+    expect(glyphPosition.y).toBe(element.y);
   });
 
   it("positions right-aligned fixed-width text with shadows by glyph width", () => {
@@ -595,10 +724,11 @@ describe("text hover layout", () => {
 
     const text = parent.getChildByLabel("text-fixed-right-shadow");
     const targetPosition = getTextLayoutPosition(element);
+    const glyphPosition = getWorldPosition(text);
 
     expect(text.width).toBeGreaterThan(element.measuredWidth);
-    expect(text.x).toBeCloseTo(targetPosition.x, 4);
-    expect(text.x).toBeCloseTo(
+    expect(glyphPosition.x).toBeCloseTo(targetPosition.x, 4);
+    expect(glyphPosition.x).toBeCloseTo(
       element.x + element.width - element.measuredWidth,
       4,
     );
@@ -643,29 +773,19 @@ describe("text hover layout", () => {
     });
 
     const text = parent.getChildByLabel("text-fixed-width-hover-layout");
-    const getBoxCenter = () => {
-      const offset = getHorizontalOffset(
-        element.width,
-        text.width,
-        text.style.align,
-      );
-      return {
-        x: text.x - offset + element.width * 0.5,
-        y: text.y + text.height * 0.5,
-      };
-    };
+    const getBoxAnchor = () => getWorldPivotPosition(text);
 
-    const beforeHoverAnchor = getBoxCenter();
+    const beforeHoverAnchor = getBoxAnchor();
 
     text.emit("pointerover");
 
-    expect(getBoxCenter().x).toBeCloseTo(beforeHoverAnchor.x, 4);
-    expect(getBoxCenter().y).toBeCloseTo(beforeHoverAnchor.y, 4);
+    expect(getBoxAnchor().x).toBeCloseTo(beforeHoverAnchor.x, 4);
+    expect(getBoxAnchor().y).toBeCloseTo(beforeHoverAnchor.y, 4);
 
     text.emit("pointerout");
 
-    expect(getBoxCenter().x).toBeCloseTo(beforeHoverAnchor.x, 4);
-    expect(getBoxCenter().y).toBeCloseTo(beforeHoverAnchor.y, 4);
+    expect(getBoxAnchor().x).toBeCloseTo(beforeHoverAnchor.x, 4);
+    expect(getBoxAnchor().y).toBeCloseTo(beforeHoverAnchor.y, 4);
   });
 
   it("keeps fixed-width aligned text stable when only shadow metrics change", () => {

@@ -1,6 +1,7 @@
 import {
   degreesToRadians,
   radiansToDegrees,
+  refreshElementPivot,
 } from "../elements/util/transform.js";
 
 export const isTranslateAnimationProperty = (property) =>
@@ -127,5 +128,11 @@ export const applyAnimationProperty = ({
     return object;
   }
 
-  return setAnimationProperty(object, property, propertyPathMap, value);
+  const result = setAnimationProperty(object, property, propertyPathMap, value);
+
+  if (property === "scaleX" || property === "scaleY") {
+    refreshElementPivot(object);
+  }
+
+  return result;
 };

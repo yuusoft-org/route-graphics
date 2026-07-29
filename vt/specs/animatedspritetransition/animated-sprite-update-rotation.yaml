@@ -1,0 +1,130 @@
+---
+title: Animated Sprite Update Rotation
+description: A deterministic spritesheet frame sampled while rotating and scaling around its anchor-derived pixel origin.
+specs:
+  - animated-sprite rotation should animate from 0 to 90 degrees
+  - non-uniform scale should not move the configured pixel origin
+  - frame refreshes should not snap the scale-adjusted pivot
+  - auto rotation tween values should use degrees
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: rotating-animated-sprite
+        type: spritesheet-animation
+        x: 640
+        "y": 360
+        width: 160
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 0
+        src: fighter-spritesheet
+        atlas:
+          frames:
+            fighter-pose:
+              frame:
+                x: 483
+                "y": 692
+                w: 169
+                h: 226
+              rotated: false
+              trimmed: true
+              spriteSourceSize:
+                x: 3
+                "y": 4
+                w: 169
+                h: 226
+              sourceSize:
+                w: 175
+                h: 240
+        playback:
+          frames:
+            - fighter-pose
+          fps: 1
+          loop: true
+          autoplay: false
+      - id: animated-sprite-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+  - elements:
+      - id: rotating-animated-sprite
+        type: spritesheet-animation
+        x: 640
+        "y": 360
+        width: 160
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        rotation: 90
+        src: fighter-spritesheet
+        atlas:
+          frames:
+            fighter-pose:
+              frame:
+                x: 483
+                "y": 692
+                w: 169
+                h: 226
+              rotated: false
+              trimmed: true
+              spriteSourceSize:
+                x: 3
+                "y": 4
+                w: 169
+                h: 226
+              sourceSize:
+                w: 175
+                h: 240
+        playback:
+          frames:
+            - fighter-pose
+          fps: 1
+          loop: true
+          autoplay: false
+      - id: animated-sprite-origin-marker
+        type: rect
+        x: 640
+        "y": 360
+        width: 10
+        height: 10
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FF3355"
+    animations:
+      - id: animated-sprite-rotate
+        targetId: rotating-animated-sprite
+        type: update
+        tween:
+          rotation:
+            auto:
+              duration: 1000
+              easing: linear
+          scaleX:
+            keyframes:
+              - duration: 1000
+                value: 1.2
+                easing: linear
+          scaleY:
+            keyframes:
+              - duration: 1000
+                value: 0.75
+                easing: linear

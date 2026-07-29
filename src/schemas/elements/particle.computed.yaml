@@ -10,6 +10,8 @@ required:
   - emitter
   - width
   - height
+  - originX
+  - originY
 properties:
   id:
     type: string
@@ -76,6 +78,19 @@ properties:
 
   y:
     type: number
+    default: 0
+
+  originX:
+    type: number
+    description: Transform origin X in pixels
+
+  originY:
+    type: number
+    description: Transform origin Y in pixels
+
+  rotation:
+    type: number
+    description: Element-level emitter container rotation in degrees
     default: 0
 
   width:

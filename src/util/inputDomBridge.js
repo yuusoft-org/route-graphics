@@ -83,21 +83,55 @@ const getClientGeometryRect = ({ app, geometry }) => {
   };
 };
 
+const getRendererPoint = ({ app, clientX, clientY }) => {
+  const canvas = app.canvas;
+
+  if (!canvas || !Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+    return null;
+  }
+
+  const canvasRect = canvas.getBoundingClientRect();
+  const rendererWidth = app.renderer?.width || canvasRect.width || 1;
+  const rendererHeight = app.renderer?.height || canvasRect.height || 1;
+  const scaleX = canvasRect.width / rendererWidth;
+  const scaleY = canvasRect.height / rendererHeight;
+
+  if (scaleX <= 0 || scaleY <= 0) {
+    return null;
+  }
+
+  return {
+    x: (clientX - canvasRect.left) / scaleX,
+    y: (clientY - canvasRect.top) / scaleY,
+  };
+};
+
 const isPointerWithinEntryGeometry = ({ app, entry, event }) => {
   const geometry = entry.options.getGeometry?.();
   const visibleRect = getClientGeometryRect({ app, geometry });
   const clientX = event.clientX;
   const clientY = event.clientY;
 
-  return (
+  const isWithinVisibleRect =
     Boolean(visibleRect) &&
     Number.isFinite(clientX) &&
     Number.isFinite(clientY) &&
     clientX >= visibleRect.left &&
     clientX <= visibleRect.right &&
     clientY >= visibleRect.top &&
-    clientY <= visibleRect.bottom
-  );
+    clientY <= visibleRect.bottom;
+
+  if (!isWithinVisibleRect) {
+    return false;
+  }
+
+  if (typeof entry.options.hitTest !== "function") {
+    return true;
+  }
+
+  const rendererPoint = getRendererPoint({ app, clientX, clientY });
+
+  return Boolean(rendererPoint && entry.options.hitTest(rendererPoint));
 };
 
 export const createInputDomBridge = ({ app }) => {

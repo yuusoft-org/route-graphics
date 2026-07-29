@@ -20,6 +20,9 @@ out:
   type: input
   x: 120
   "y": 80
+  originX: 0
+  originY: 0
+  rotation: 0
   width: 240
   height: 44
   alpha: 1
@@ -107,6 +110,9 @@ out:
   type: input
   x: 200
   "y": 100
+  originX: 0
+  originY: 0
+  rotation: 0
   width: 180
   height: 40
   alpha: 1
@@ -175,6 +181,9 @@ out:
   type: input
   x: 24
   "y": 32
+  originX: 0
+  originY: 0
+  rotation: 0
   width: 320
   height: 64
   alpha: 1
@@ -237,6 +246,9 @@ out:
   type: input
   x: 10
   "y": 20
+  originX: 0
+  originY: 0
+  rotation: 0
   width: 120
   height: 32
   alpha: 1

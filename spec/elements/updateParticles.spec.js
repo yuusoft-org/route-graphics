@@ -1,15 +1,13 @@
 import { Container } from "pixi.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  addParticle,
-  deleteParticles,
-  dispatchLiveAnimations,
-} = vi.hoisted(() => ({
-  addParticle: vi.fn(),
-  deleteParticles: vi.fn(),
-  dispatchLiveAnimations: vi.fn(() => false),
-}));
+const { addParticle, deleteParticles, dispatchLiveAnimations } = vi.hoisted(
+  () => ({
+    addParticle: vi.fn(),
+    deleteParticles: vi.fn(),
+    dispatchLiveAnimations: vi.fn(() => false),
+  }),
+);
 
 vi.mock("../../src/plugins/elements/particles/addParticles.js", () => ({
   addParticle,
@@ -145,5 +143,46 @@ describe("updateParticles", () => {
         zIndex: 4,
       }),
     );
+  });
+
+  it("updates and resets the emitter container rotation without recreation", () => {
+    const parent = new Container();
+    const existingContainer = new Container();
+    existingContainer.label = "snow-effect";
+    existingContainer.rotation = Math.PI / 2;
+    parent.addChild(existingContainer);
+
+    const prevElement = createParticleNode({
+      originX: 30,
+      originY: 20,
+      rotation: 90,
+    });
+    const nextElement = createParticleNode({
+      x: 50,
+      y: 70,
+      originX: 12,
+      originY: 8,
+      rotation: 0,
+    });
+
+    updateParticles({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations,
+      animationBus,
+      completionTracker,
+      renderContext,
+      zIndex: 5,
+    });
+
+    expect(deleteParticles).not.toHaveBeenCalled();
+    expect(addParticle).not.toHaveBeenCalled();
+    expect(existingContainer.x).toBe(62);
+    expect(existingContainer.y).toBe(78);
+    expect(existingContainer.pivot.x).toBe(12);
+    expect(existingContainer.pivot.y).toBe(8);
+    expect(existingContainer.rotation).toBe(0);
   });
 });
