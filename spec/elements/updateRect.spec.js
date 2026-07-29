@@ -2,6 +2,7 @@ import { Container, Graphics } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 import { updateRect } from "../../src/plugins/elements/rect/updateRect.js";
 import { parseRect } from "../../src/plugins/elements/rect/parseRect.js";
+import { getElementRenderState } from "../../src/plugins/elements/elementRenderState.js";
 
 describe("updateRect", () => {
   it("resets transient rect scale when returning to an unscaled state", () => {
@@ -226,6 +227,85 @@ describe("updateRect", () => {
     expect(rectElement.scale.y).toBe(1);
     expect(rectElement.width).toBe(nextElement.width);
     expect(rectElement.height).toBe(nextElement.height);
+  });
+
+  it("settles non-tween state once while preserving a looping property", () => {
+    const parent = new Container();
+    const rectElement = new Graphics();
+    rectElement.label = "rect-1";
+    rectElement.x = 100;
+    rectElement.y = 200;
+    rectElement.rect(0, 0, 160, 160).fill("#FFFFFF");
+    parent.addChild(rectElement);
+
+    const animationBus = { dispatch: vi.fn() };
+    const completionTracker = {
+      getVersion: vi.fn(),
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const commitRenderState = vi.fn();
+    const deferRenderStateCommit = vi.fn();
+    const prevElement = parseRect({
+      state: {
+        id: "rect-1",
+        type: "rect",
+        x: 100,
+        y: 200,
+        width: 160,
+        height: 160,
+        fill: "#FFFFFF",
+      },
+    });
+    const nextElement = parseRect({
+      state: {
+        id: "rect-1",
+        type: "rect",
+        x: 900,
+        y: 320,
+        width: 220,
+        height: 80,
+        fill: "#FF3355",
+      },
+    });
+
+    updateRect({
+      app: {
+        audioStage: { add: vi.fn() },
+      },
+      parent,
+      prevElement,
+      nextElement,
+      animations: [
+        {
+          id: "rect-loop",
+          targetId: "rect-1",
+          type: "update",
+          playback: { loop: true },
+          tween: {
+            x: {
+              initialValue: 100,
+              keyframes: [{ duration: 1000, value: 900, easing: "linear" }],
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+      commitRenderState,
+      deferRenderStateCommit,
+    });
+
+    expect(rectElement.x).toBe(100);
+    expect(rectElement.y).toBe(320);
+    expect(rectElement.width).toBe(220);
+    expect(rectElement.height).toBe(80);
+    expect(getElementRenderState(rectElement)).toBe(nextElement);
+    expect(commitRenderState).toHaveBeenCalledTimes(1);
+    expect(deferRenderStateCommit).toHaveBeenCalledTimes(1);
+    expect(completionTracker.track).not.toHaveBeenCalled();
   });
 
   it("applies updated rotation around the computed anchor origin", () => {

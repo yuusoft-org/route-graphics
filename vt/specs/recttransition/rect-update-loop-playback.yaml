@@ -1,10 +1,11 @@
 ---
 title: Rect Update Loop Playback
-description: A looping update wraps deterministically at the configured speed while render completion remains non-blocking.
+description: A looping update wraps deterministically while the target's non-tween state settles immediately.
 specs:
   - the loop should be halfway through its authored movement after 250ms at speed 2
   - the loop should wrap to its initial position after 500ms at speed 2
   - the loop should continue into the next iteration without another render
+  - non-tween position, dimensions, and fill should update when the loop starts
 steps:
   - action: keypress
     key: "n"
@@ -39,10 +40,10 @@ states:
       - id: loop-target
         type: rect
         x: 900
-        "y": 240
-        width: 160
-        height: 160
-        fill: "#FFFFFF"
+        "y": 320
+        width: 220
+        height: 80
+        fill: "#FF3355"
     animations:
       - id: horizontal-loop
         targetId: loop-target

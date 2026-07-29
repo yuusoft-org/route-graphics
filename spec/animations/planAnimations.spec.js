@@ -565,8 +565,13 @@ describe("dispatchUpdateAnimations", () => {
       complete: vi.fn(),
     };
     const element = {
-      x: 0,
+      x: 10,
+      y: 20,
     };
+    const onComplete = vi.fn(() => {
+      element.x = 30;
+      element.y = 40;
+    });
 
     const dispatched = dispatchUpdateAnimations({
       animations: groupAnimationsByTarget([
@@ -591,10 +596,17 @@ describe("dispatchUpdateAnimations", () => {
       animationBus,
       completionTracker,
       element,
-      targetState: { x: 0 },
+      targetState: { x: 30, y: 40 },
+      onComplete,
     });
 
     expect(dispatched).toBe(true);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "ambient-drift" }),
+    );
+    expect(element.x).toBe(10);
+    expect(element.y).toBe(40);
     expect(completionTracker.getVersion).not.toHaveBeenCalled();
     expect(completionTracker.track).not.toHaveBeenCalled();
     expect(animationBus.dispatch).toHaveBeenCalledWith(
@@ -608,6 +620,49 @@ describe("dispatchUpdateAnimations", () => {
         }),
       }),
     );
+  });
+
+  it("does not settle looping animations used by deletion paths", () => {
+    const animationBus = { dispatch: vi.fn() };
+    const completionTracker = {
+      getVersion: vi.fn(),
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const element = {
+      destroyed: false,
+    };
+    const onComplete = vi.fn(() => {
+      element.destroyed = true;
+    });
+
+    const dispatched = dispatchUpdateAnimations({
+      animations: groupAnimationsByTarget([
+        {
+          id: "looping-exit",
+          targetId: "bg",
+          type: "update",
+          playback: { loop: true },
+          tween: {
+            alpha: {
+              initialValue: 1,
+              keyframes: [{ duration: 300, value: 0, easing: "linear" }],
+            },
+          },
+        },
+      ]),
+      targetId: "bg",
+      animationBus,
+      completionTracker,
+      element,
+      targetState: null,
+      onComplete,
+    });
+
+    expect(dispatched).toBe(true);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(element.destroyed).toBe(false);
+    expect(animationBus.dispatch).toHaveBeenCalledTimes(1);
   });
 
   it("defers update animations during suppressed mounts and applies initial values", () => {
