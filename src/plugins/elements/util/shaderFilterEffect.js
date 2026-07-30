@@ -211,6 +211,8 @@ const createTextureResources = (shader) => {
     });
 
     resources[texture.symbol] = resource;
+    resources[texture.samplerSymbol ?? `${texture.symbol}Sampler`] =
+      resource.style;
 
     if (resource !== textureSource) {
       ownedTextureSources.push(resource);

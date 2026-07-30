@@ -1249,6 +1249,7 @@ const createCompositorOverlay = ({
   prevSubject,
   nextSubject,
   zIndex,
+  getShaderTime,
 }) => {
   const prevController = createSubjectController(
     prevSubject,
@@ -1313,6 +1314,7 @@ const createCompositorOverlay = ({
     width: unionBounds.width,
     height: unionBounds.height,
     progress: getValueAtTime(progressTimeline, 0),
+    time: getShaderTime(),
     nextTextureSource: nextTexture.source,
     name: `route-graphics-transition-compositor-${animation.id}`,
   });
@@ -1489,7 +1491,7 @@ const createCompositorOverlay = ({
         compositorEffect,
         getValueAtTime(progressTimeline, time),
       );
-      setShaderEffectTime(compositorEffect, time / 1000);
+      setShaderEffectTime(compositorEffect, getShaderTime());
       for (const { parameter, timeline } of parameterTimelines) {
         setShaderEffectParameter(
           compositorEffect,
@@ -1690,6 +1692,7 @@ const createReplaceOverlay = ({
   prevSubject,
   nextSubject,
   zIndex,
+  getShaderTime,
 }) => {
   let replaceOverlay;
 
@@ -1700,6 +1703,7 @@ const createReplaceOverlay = ({
       prevSubject,
       nextSubject,
       zIndex,
+      getShaderTime,
     });
   } else if (animation.mask) {
     replaceOverlay = createMaskedOverlay({
@@ -1740,6 +1744,7 @@ const instantiateNextLiveElement = ({
   zIndex,
   signal,
   shaderTime,
+  getShaderTime,
 }) => {
   if (!nextElement) {
     return null;
@@ -1758,6 +1763,7 @@ const instantiateNextLiveElement = ({
     zIndex,
     signal,
     shaderTime,
+    getShaderTime,
   });
 
   if (result && typeof result.then === "function") {
@@ -1817,6 +1823,7 @@ export const runReplaceAnimation = ({
   zIndex,
   signal,
   shaderTime = 0,
+  getShaderTime,
 }) => {
   if (!prevElement && !nextElement) {
     throw new Error(
@@ -1854,6 +1861,8 @@ export const runReplaceAnimation = ({
 
     return parent.destroyed ? null : parent;
   };
+  const resolveShaderTime = () =>
+    typeof getShaderTime === "function" ? getShaderTime() : shaderTime;
 
   const transitionMountParent = new Container();
   const hiddenMountContext = createRenderContext({
@@ -2068,7 +2077,7 @@ export const runReplaceAnimation = ({
     }
 
     if (nextDisplayObject) {
-      setShaderTimeInTree(nextDisplayObject, shaderTime);
+      setShaderTimeInTree(nextDisplayObject, resolveShaderTime());
     }
 
     const useLivePlainOverlay =
@@ -2141,6 +2150,7 @@ export const runReplaceAnimation = ({
         prevSubject: overlaySubjects.prevSubject,
         nextSubject: overlaySubjects.nextSubject,
         zIndex: currentZIndex,
+        getShaderTime: resolveShaderTime,
       });
       replaceOverlayRef.value = replaceOverlay;
       nextDisplayObjectRef.value = nextDisplayObject;
@@ -2275,6 +2285,7 @@ export const runReplaceAnimation = ({
         zIndex,
         signal: transitionSignal,
         shaderTime,
+        getShaderTime,
       })
     : null;
 

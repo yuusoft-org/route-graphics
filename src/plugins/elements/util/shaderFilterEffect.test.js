@@ -3,6 +3,7 @@ import { Cache, Texture } from "pixi.js";
 import {
   createShaderEffect,
   createShaderFilter,
+  destroyShaderEffect,
   getShaderFilterAnimationTarget,
   installShaderProgressProperty,
   prepareShaderFilterAnimationTargets,
@@ -46,6 +47,63 @@ const shaderSource = {
         return vec4<f32>(uv, 0.0, 1.0);
       }
     `,
+  },
+};
+
+const customTextureShaderSource = {
+  webgl: {
+    fragment: `
+      in vec2 vTextureCoord;
+      out vec4 finalColor;
+      uniform sampler2D uTexture;
+      uniform sampler2D uNoiseTexture;
+      void main() {
+        finalColor = texture(uTexture, vTextureCoord)
+          * texture(uNoiseTexture, vTextureCoord);
+      }
+    `,
+  },
+  webgpu: {
+    source: `
+      struct ShaderUniforms {
+        uProgress: f32,
+        uResolution: vec2<f32>,
+      };
+      struct VSOutput {
+        @builtin(position) position: vec4<f32>,
+        @location(0) uv: vec2<f32>,
+      };
+
+      @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
+      @group(1) @binding(1) var uNoiseTexture: texture_2d<f32>;
+      @group(1) @binding(2) var uNoiseTextureSampler: sampler;
+
+      @vertex fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput {
+        return VSOutput(vec4<f32>(aPosition, 0.0, 1.0), aPosition);
+      }
+
+      @fragment fn mainFragment(
+        @location(0) uv: vec2<f32>,
+      ) -> @location(0) vec4<f32> {
+        return textureSample(uNoiseTexture, uNoiseTextureSampler, uv);
+      }
+    `,
+  },
+};
+
+const customCompositorTextureShaderSource = {
+  ...customTextureShaderSource,
+  webgpu: {
+    source: customTextureShaderSource.webgpu.source
+      .replace(
+        "@group(1) @binding(1) var uNoiseTexture: texture_2d<f32>;",
+        `@group(1) @binding(1) var uNextTexture: texture_2d<f32>;
+      @group(1) @binding(2) var uNoiseTexture: texture_2d<f32>;`,
+      )
+      .replace(
+        "@group(1) @binding(2) var uNoiseTextureSampler: sampler;",
+        "@group(1) @binding(3) var uNoiseTextureSampler: sampler;",
+      ),
   },
 };
 
@@ -1095,6 +1153,7 @@ describe("shader filter resources", () => {
 
     const repeatFilter = createShaderFilter({
       shader: createTestShader({
+        source: customTextureShaderSource,
         textures: [{ symbol: "uNoiseTexture", src: TEST_TEXTURE_ALIAS }],
         pipeline: {
           blend: "normal",
@@ -1107,6 +1166,7 @@ describe("shader filter resources", () => {
     });
     const clampFilter = createShaderFilter({
       shader: createTestShader({
+        source: customTextureShaderSource,
         textures: [{ symbol: "uNoiseTexture", src: TEST_TEXTURE_ALIAS }],
         pipeline: {
           blend: "normal",
@@ -1120,6 +1180,8 @@ describe("shader filter resources", () => {
 
     const repeatSource = repeatFilter.resources.uNoiseTexture;
     const clampSource = clampFilter.resources.uNoiseTexture;
+    const repeatSampler = repeatFilter.resources.uNoiseTextureSampler;
+    const clampSampler = clampFilter.resources.uNoiseTextureSampler;
 
     expect(cachedSource.addressMode).toBe(originalAddressMode);
     expect(cachedSource.autoGenerateMipmaps).toBe(originalAutoGenerateMipmaps);
@@ -1127,6 +1189,13 @@ describe("shader filter resources", () => {
     expect(repeatSource).not.toBe(cachedSource);
     expect(clampSource).not.toBe(cachedSource);
     expect(repeatSource).not.toBe(clampSource);
+    expect(repeatSampler).toBe(repeatSource.style);
+    expect(clampSampler).toBe(clampSource.style);
+    expect(repeatSampler).not.toBe(clampSampler);
+    expect(repeatFilter._uniformBindMap[1][1]).toBe("uNoiseTexture");
+    expect(repeatFilter._uniformBindMap[1][2]).toBe("uNoiseTextureSampler");
+    expect(clampFilter._uniformBindMap[1][1]).toBe("uNoiseTexture");
+    expect(clampFilter._uniformBindMap[1][2]).toBe("uNoiseTextureSampler");
     expect(repeatSource.addressMode).toBe("repeat");
     expect(repeatSource.autoGenerateMipmaps).toBe(true);
     expect(repeatSource.mipmapFilter).toBe("linear");
@@ -1140,6 +1209,42 @@ describe("shader filter resources", () => {
     expect(repeatSource.destroyed).toBe(true);
     expect(clampSource.destroyed).toBe(true);
     expect(cachedSource.destroyed).toBe(false);
+  });
+
+  it("binds compositor custom textures after uNextTexture with their own WebGPU sampler", () => {
+    Cache.set(TEST_TEXTURE_ALIAS, Texture.WHITE);
+    const effect = createShaderEffect({
+      effect: createTestShader({
+        source: customCompositorTextureShaderSource,
+        textures: [
+          {
+            symbol: "uNoiseTexture",
+            samplerSymbol: "uNoiseTextureSampler",
+            src: TEST_TEXTURE_ALIAS,
+          },
+        ],
+        pipeline: {
+          blend: "normal",
+          textureWrap: "repeat",
+          mipmap: true,
+        },
+      }),
+      width: 32,
+      height: 32,
+      nextTextureSource: Texture.EMPTY.source,
+    });
+    const [filter] = effect.filters;
+
+    expect(filter._uniformBindMap[1][1]).toBe("uNextTexture");
+    expect(filter._uniformBindMap[1][2]).toBe("uNoiseTexture");
+    expect(filter._uniformBindMap[1][3]).toBe("uNoiseTextureSampler");
+    expect(filter.resources.uNoiseTextureSampler).toBe(
+      filter.resources.uNoiseTexture.style,
+    );
+    expect(filter.resources.uNoiseTexture.addressMode).toBe("repeat");
+    expect(filter.resources.uNoiseTexture.autoGenerateMipmaps).toBe(true);
+
+    destroyShaderEffect(effect);
   });
 
   it("uses the loop index when locating the previous non-skipped mesh filter stack entry", () => {

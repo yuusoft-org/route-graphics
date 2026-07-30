@@ -372,8 +372,8 @@ Time is opt-in to preserve the WGSL uniform layout of existing shaders.
 Texture names map to symbols ending in `Texture`:
 
 ```txt
-noise           -> uNoiseTexture
-displacementMap -> uDisplacementMapTexture
+noise           -> uNoiseTexture, uNoiseTextureSampler
+displacementMap -> uDisplacementMapTexture, uDisplacementMapTextureSampler
 ```
 
 Use an asset alias/URL directly or override sampling:
@@ -434,9 +434,20 @@ Declare `ShaderUniforms` fields in this exact order:
 5. compositor-only `uNextTextureClamp: vec4<f32>`
 6. parameters and pass-local uniforms sorted by their authored key
 
-Filter custom textures start at `@group(1) @binding(1)` in lexical key order.
-For compositors, `uNextTexture` uses binding 1, so custom textures start at
-binding 2.
+Every WebGPU custom texture has an adjacent generated sampler. Filter pairs
+start at bindings 1 and 2 in lexical key order. For compositors,
+`uNextTexture` uses binding 1, so the first custom pair uses bindings 2 and 3:
+
+```wgsl
+@group(1) @binding(1) var uNoiseTexture: texture_2d<f32>;
+@group(1) @binding(2) var uNoiseTextureSampler: sampler;
+
+let noise = textureSample(uNoiseTexture, uNoiseTextureSampler, uv);
+```
+
+Always use the custom sampler for its texture. Group 0's `uSampler` belongs to
+the filter input and does not contain the custom texture's `wrap` or `mipmap`
+settings.
 
 ## Mesh, Bounds, And Alpha
 

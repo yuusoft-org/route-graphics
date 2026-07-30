@@ -97,7 +97,9 @@ export const addElementWithRenderState = ({ plugin, ...options }) => {
   const operation = plugin.add(options);
   const { parent, element } = options;
   let mountedChild = getAddedChild(parent, element, childrenBefore);
-  markMountedElement(mountedChild, element);
+  markMountedElement(mountedChild, element, {
+    animations: options.animations,
+  });
 
   if (!isPromise(operation)) {
     return operation;
@@ -107,7 +109,9 @@ export const addElementWithRenderState = ({ plugin, ...options }) => {
     if (!mountedChild || mountedChild.destroyed) {
       mountedChild = getAddedChild(parent, element, childrenBefore);
     }
-    markMountedElement(mountedChild, element);
+    markMountedElement(mountedChild, element, {
+      animations: options.animations,
+    });
   });
 };
 

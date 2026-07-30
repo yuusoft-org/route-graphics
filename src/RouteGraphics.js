@@ -1253,6 +1253,7 @@ const createRouteGraphics = () => {
       eventHandler: handler,
       signal,
       shaderTime: shaderTimeMS / 1000,
+      getShaderTime: () => shaderTimeMS / 1000,
     });
 
     // Flush animation commands to apply initial values immediately
@@ -1368,10 +1369,10 @@ const createRouteGraphics = () => {
         animationPlaybackTimeMS = nextTime;
       }
 
-      animationBus.flush();
-      animationBus.setTime(nextTime);
       shaderTimeMS = Math.max(0, nextTime);
       setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
+      animationBus.flush();
+      animationBus.setTime(nextTime);
 
       if (animationPlaybackMode !== "manual") {
         animationPlaybackTimeMS = null;
@@ -1548,9 +1549,9 @@ const createRouteGraphics = () => {
             return;
           }
 
-          animationBus.tick(time.deltaMS);
           shaderTimeMS += time.deltaMS;
           setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
+          animationBus.tick(time.deltaMS);
           if (typeof app.render === "function") {
             app.render();
           }
@@ -1564,9 +1565,9 @@ const createRouteGraphics = () => {
 
           if (event?.detail?.deltaMS) {
             const deltaMS = Number(event.detail.deltaMS);
-            animationBus.tick(deltaMS);
             shaderTimeMS += deltaMS;
             setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
+            animationBus.tick(deltaMS);
             if (typeof app.render === "function") {
               app.render();
             }

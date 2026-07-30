@@ -55,6 +55,7 @@ describe("shader config normalization", () => {
     expect(filters[0].textures[0]).toMatchObject({
       key: "noise",
       symbol: "uNoiseTexture",
+      samplerSymbol: "uNoiseTextureSampler",
       src: "noise-texture",
     });
     expect(filters[0].pipeline).toEqual({
@@ -80,6 +81,24 @@ describe("shader config normalization", () => {
         },
       ]),
     ).toThrow(/duplicate shader symbol uNoiseTexture/);
+  });
+
+  it("rejects generated custom-texture sampler symbol collisions", () => {
+    expect(() =>
+      normalizeElementShaderFilters([
+        {
+          id: "bad-sampler",
+          type: "shader",
+          parameters: {
+            noiseTextureSampler: 1,
+          },
+          textures: {
+            noise: "noise-texture",
+          },
+          source,
+        },
+      ]),
+    ).toThrow(/duplicate shader symbol uNoiseTextureSampler/);
   });
 
   it("rejects reserved generated texture symbols", () => {

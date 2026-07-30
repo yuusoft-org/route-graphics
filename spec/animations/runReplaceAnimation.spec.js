@@ -421,6 +421,7 @@ describe("runReplaceAnimation", () => {
       },
     };
 
+    const shaderClock = 4.25;
     runReplaceAnimation({
       app,
       parent,
@@ -454,7 +455,8 @@ describe("runReplaceAnimation", () => {
       elementPlugins: [],
       plugin,
       zIndex: 0,
-      shaderTime: 4.25,
+      shaderTime: 1,
+      getShaderTime: () => shaderClock,
       signal: new AbortController().signal,
     });
 
@@ -844,6 +846,7 @@ describe("runReplaceAnimation", () => {
     };
     const animatedCompositor = {
       ...passthroughCompositor,
+      time: true,
       parameters: [amountParameter, tintParameter],
       uniforms: [amountParameter, tintParameter],
       tween: {
@@ -863,6 +866,7 @@ describe("runReplaceAnimation", () => {
       },
     };
 
+    let shaderClock = 7.5;
     runReplaceAnimation({
       app,
       parent,
@@ -885,6 +889,8 @@ describe("runReplaceAnimation", () => {
       elementPlugins: [],
       plugin,
       zIndex: 0,
+      shaderTime: 1,
+      getShaderTime: () => shaderClock,
       signal: new AbortController().signal,
     });
 
@@ -940,6 +946,7 @@ describe("runReplaceAnimation", () => {
     compositorFilter.apply(filterManager, Texture.EMPTY, Texture.EMPTY, true);
 
     expect(shaderUniforms.uniforms.uProgress).toBeCloseTo(0.5);
+    expect(shaderUniforms.uniforms.uTime).toBeCloseTo(7.5);
     expect(shaderUniforms.uniforms.uAmount).toBeCloseTo(0.35);
     expect(Array.from(shaderUniforms.uniforms.uTint)).toEqual(
       expect.arrayContaining([
@@ -961,6 +968,10 @@ describe("runReplaceAnimation", () => {
       Texture.EMPTY,
       true,
     );
+
+    shaderClock = 9.25;
+    dispatched.payload.applyFrame(150);
+    expect(shaderUniforms.uniforms.uTime).toBeCloseTo(9.25);
   });
 
   it("reuses plain sprite textures for compositor snapshots instead of baking display scale into the texture", () => {

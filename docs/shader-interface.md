@@ -390,9 +390,12 @@ Existing v1 shaders that omit `time` keep their original layout.
 Texture keys use the parameter naming rule and map to:
 
 ```txt
-noise           -> uNoiseTexture
-displacementMap -> uDisplacementMapTexture
+noise           -> uNoiseTexture, uNoiseTextureSampler
+displacementMap -> uDisplacementMapTexture, uDisplacementMapTextureSampler
 ```
+
+The sampler symbol is used by WebGPU. WebGL continues to expose each custom
+texture as a combined `sampler2D`.
 
 A value can be a source alias/URL:
 
@@ -499,9 +502,23 @@ The fixed group layout is:
 @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
 ```
 
-For filters, custom textures start at `@group(1) @binding(1)` in lexical key
-order. For compositors, `uNextTexture` is binding 1 and custom textures start at
-binding 2.
+In WebGPU, each custom texture occupies two bindings in lexical key order: the
+texture followed by its generated sampler. For filters, the first pair is
+`@group(1) @binding(1)` and binding 2. For compositors, `uNextTexture` remains
+binding 1, so the first custom texture pair is binding 2 and binding 3.
+
+For a filter texture named `noise`, declare and sample it as:
+
+```wgsl
+@group(1) @binding(1) var uNoiseTexture: texture_2d<f32>;
+@group(1) @binding(2) var uNoiseTextureSampler: sampler;
+
+let noise = textureSample(uNoiseTexture, uNoiseTextureSampler, uv);
+```
+
+Use the generated custom sampler rather than group 0's `uSampler`; that sampler
+belongs to the filter input and does not carry the custom texture's `wrap` or
+`mipmap` settings.
 
 ### Minimal WGSL Filter Scaffold
 
@@ -626,6 +643,7 @@ parameter when a target cannot be resolved.
 Reserved symbols include `uTexture`, `uPrevTexture`, `uNextTexture`,
 `uNextTextureMatrix`, `uNextTextureClamp`, `uMaskTexture`, `uProgress`,
 `uTime`, `uResolution`, `uSampler`, and the documented WGSL ABI names.
+Generated custom sampler symbols also participate in collision validation.
 
 ## Deliberate Boundaries
 

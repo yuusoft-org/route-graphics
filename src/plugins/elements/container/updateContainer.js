@@ -53,6 +53,7 @@ export const updateContainer = ({
   completionTracker,
   signal,
   shaderTime,
+  getShaderTime,
   deferRenderStateCommit,
   commitRenderState,
 }) => {
@@ -186,6 +187,7 @@ export const updateContainer = ({
         renderContext,
         signal,
         shaderTime,
+        getShaderTime,
       });
 
       reapplyContainerInheritedHover({

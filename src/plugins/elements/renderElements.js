@@ -29,6 +29,7 @@ import { shouldUpdateUnchangedShaderFilterParameters } from "./util/shaderFilter
  * @param {Object} [params.renderContext] - Render context flags for nested mounts
  * @param {AbortSignal} [params.signal] - Render cancellation signal
  * @param {number} [params.shaderTime] - Current deterministic shader time in seconds
+ * @param {Function} [params.getShaderTime] - Returns the current deterministic shader time in seconds
  */
 export const renderElements = ({
   app,
@@ -43,6 +44,7 @@ export const renderElements = ({
   renderContext = createRenderContext(),
   signal,
   shaderTime = 0,
+  getShaderTime,
 }) => {
   // Enable PixiJS built-in sorting by zIndex
   parent.sortableChildren = true;
@@ -84,6 +86,7 @@ export const renderElements = ({
       zIndex,
       signal,
       shaderTime,
+      getShaderTime,
       plugin,
     });
   const deleteElement = ({ parent: targetParent = parent, element }) =>
@@ -120,6 +123,7 @@ export const renderElements = ({
       zIndex,
       signal,
       shaderTime,
+      getShaderTime,
       plugin,
     });
   };
@@ -248,6 +252,7 @@ export const renderElements = ({
         zIndex: nextIndexById.get(element.id) ?? -1,
         signal,
         shaderTime,
+        getShaderTime,
       }) === true;
     const shouldResetShaderParameters =
       shouldUpdateUnchangedShaderFilterParameters({
@@ -310,6 +315,7 @@ export const renderElements = ({
           zIndex: getExistingChildZIndex(element.id),
           signal,
           shaderTime,
+          getShaderTime,
         }),
       );
       continue;
@@ -371,6 +377,7 @@ export const renderElements = ({
           zIndex,
           signal,
           shaderTime,
+          getShaderTime,
         }),
       );
       continue;
@@ -431,6 +438,7 @@ export const renderElements = ({
           zIndex,
           signal,
           shaderTime,
+          getShaderTime,
         }),
       );
       continue;

@@ -89,6 +89,9 @@ export const toShaderUniformSymbol = (key) => `u${toPascalCase(key)}`;
 
 export const toShaderTextureSymbol = (key) => `u${toPascalCase(key)}Texture`;
 
+export const toShaderTextureSamplerSymbol = (key) =>
+  `${toShaderTextureSymbol(key)}Sampler`;
+
 const assertGeneratedSymbolAvailable = ({
   key,
   symbol,
@@ -195,6 +198,12 @@ const registerExistingSymbols = (symbols, entries) => {
       key: entry.key,
       kind: entry.role ?? "uniform",
     });
+    if (entry.samplerSymbol) {
+      symbols.set(entry.samplerSymbol, {
+        key: entry.key,
+        kind: "texture sampler",
+      });
+    }
   }
 };
 
@@ -294,6 +303,7 @@ const normalizeShaderTextures = ({
   return keys.map((key) => {
     assertShaderKey(key, `${path}.${key}`);
     const symbol = toShaderTextureSymbol(key);
+    const samplerSymbol = toShaderTextureSamplerSymbol(key);
     assertGeneratedSymbolAvailable({
       key,
       symbol,
@@ -301,10 +311,18 @@ const normalizeShaderTextures = ({
       symbols,
       kind: "texture",
     });
+    assertGeneratedSymbolAvailable({
+      key,
+      symbol: samplerSymbol,
+      path,
+      symbols,
+      kind: "texture sampler",
+    });
 
     return {
       key,
       symbol,
+      samplerSymbol,
       ...normalizeTextureDescriptor(
         textures[key],
         `${path}.${key}`,
