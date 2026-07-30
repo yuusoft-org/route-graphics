@@ -19,6 +19,7 @@ import {
 import {
   getShaderFilterTargetState,
   hasShaderProgressUpdateAnimation,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
@@ -123,6 +124,12 @@ export const updateText = ({
   } else {
     resetShaderFilterProgress(textElement);
   }
+  prepareShaderFilterAnimationTargets({
+    displayObject: textElement,
+    element: nextTextComputedNode,
+    animations,
+    targetId: prevTextComputedNode.id,
+  });
 
   const updateElement = () => {
     if (isDeepEqual(prevTextComputedNode, nextTextComputedNode)) {
@@ -144,6 +151,8 @@ export const updateText = ({
         width: nextTextComputedNode.width,
         height: nextTextComputedNode.height,
         force: shouldForceShaderProgress,
+        animations,
+        targetId: prevTextComputedNode.id,
       });
       setElementRenderState(textElement, nextTextComputedNode);
       commitRenderState?.(textElement);
@@ -160,6 +169,8 @@ export const updateText = ({
       width: nextTextComputedNode.width,
       height: nextTextComputedNode.height,
       force: shouldForceShaderProgress,
+      animations,
+      targetId: prevTextComputedNode.id,
     });
     setElementRenderState(textElement, nextTextComputedNode);
     commitRenderState?.(textElement);

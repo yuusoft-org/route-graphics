@@ -29,6 +29,7 @@ import {
   restoreManagedVideoSpriteSizes,
 } from "./plugins/elements/video/managedVideoTextureSizing.js";
 import { hitTestElementBounds as hitTestElementBoundsInTree } from "./util/hitTestElementBounds.js";
+import { setShaderTimeInTree } from "./plugins/elements/util/shaderFilterEffect.js";
 
 /**
  * @typedef {import('./types.js').RouteGraphicsInitOptions} RouteGraphicsInitOptions
@@ -253,6 +254,14 @@ const createRouteGraphics = () => {
     }
   };
 
+  const assertRendererPreference = (preference) => {
+    if (preference !== "webgl" && preference !== "webgpu") {
+      throw new Error(
+        `Invalid renderer preference "${preference}". Expected "webgl" or "webgpu".`,
+      );
+    }
+  };
+
   /**
    * @type {ApplicationWithAudioStage}
    */
@@ -338,6 +347,19 @@ const createRouteGraphics = () => {
    * @type {number | null}
    */
   let animationPlaybackTimeMS = null;
+
+  /**
+   * Deterministic shader clock, in milliseconds.
+   * @type {number}
+   */
+  let shaderTimeMS = 0;
+
+  /**
+   * Requested and selected renderer backend.
+   * @type {"webgl" | "webgpu"}
+   */
+  let rendererPreference = "webgl";
+  let selectedRendererType = "webgl";
 
   /**
    * @type {Function[]}
@@ -1258,6 +1280,7 @@ const createRouteGraphics = () => {
     // Present the updated stage immediately instead of relying on Pixi's
     // implicit auto-render loop, which can fail in VT/manual browser runs.
     if (typeof appInstance.render === "function") {
+      setShaderTimeInTree(appInstance.stage, shaderTimeMS / 1000);
       appInstance.render();
     }
 
@@ -1274,6 +1297,10 @@ const createRouteGraphics = () => {
 
   const routeGraphicsInstance = {
     rendererName: "pixi",
+
+    get rendererType() {
+      return selectedRendererType;
+    },
 
     get canvas() {
       return app.canvas;
@@ -1292,6 +1319,7 @@ const createRouteGraphics = () => {
 
     extractBase64: async (label) => {
       if (typeof app.render === "function") {
+        setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
         app.render();
       }
 
@@ -1341,6 +1369,8 @@ const createRouteGraphics = () => {
 
       animationBus.flush();
       animationBus.setTime(nextTime);
+      shaderTimeMS = Math.max(0, nextTime);
+      setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
 
       if (animationPlaybackMode !== "manual") {
         animationPlaybackTimeMS = null;
@@ -1367,12 +1397,20 @@ const createRouteGraphics = () => {
         debug = false,
         onFirstRender,
         animationPlaybackMode: nextAnimationPlaybackMode = "auto",
+        rendererPreference: nextRendererPreference = "webgl",
+        rendererFallback = true,
       } = options;
 
       onFirstRenderCallback = onFirstRender;
       assertAnimationPlaybackMode(nextAnimationPlaybackMode);
+      assertRendererPreference(nextRendererPreference);
+      if (typeof rendererFallback !== "boolean") {
+        throw new Error("rendererFallback must be a boolean.");
+      }
       animationPlaybackMode = nextAnimationPlaybackMode;
       animationPlaybackTimeMS = null;
+      shaderTimeMS = 0;
+      rendererPreference = nextRendererPreference;
       animationBusListenerCleanup.forEach((cleanup) => cleanup());
       animationBusListenerCleanup = [];
 
@@ -1405,9 +1443,16 @@ const createRouteGraphics = () => {
         width,
         height,
         backgroundColor,
-        preference: "webgl",
+        preference: rendererPreference,
         preserveDrawingBuffer: debug === true,
       });
+      selectedRendererType = app.renderer?.gpu != null ? "webgpu" : "webgl";
+      if (!rendererFallback && selectedRendererType !== rendererPreference) {
+        app.destroy();
+        throw new Error(
+          `Renderer "${rendererPreference}" is unavailable and rendererFallback is false.`,
+        );
+      }
       if (typeof app.ticker?.remove === "function") {
         app.ticker.remove(app.render, app);
       }
@@ -1503,6 +1548,8 @@ const createRouteGraphics = () => {
           }
 
           animationBus.tick(time.deltaMS);
+          shaderTimeMS += time.deltaMS;
+          setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
           if (typeof app.render === "function") {
             app.render();
           }
@@ -1515,7 +1562,10 @@ const createRouteGraphics = () => {
           }
 
           if (event?.detail?.deltaMS) {
-            animationBus.tick(Number(event.detail.deltaMS));
+            const deltaMS = Number(event.detail.deltaMS);
+            animationBus.tick(deltaMS);
+            shaderTimeMS += deltaMS;
+            setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
             if (typeof app.render === "function") {
               app.render();
             }
@@ -1603,6 +1653,9 @@ const createRouteGraphics = () => {
       if (app) app.destroy();
       animationPlaybackMode = "auto";
       animationPlaybackTimeMS = null;
+      shaderTimeMS = 0;
+      rendererPreference = "webgl";
+      selectedRendererType = "webgl";
       backgroundGraphic = undefined;
     },
 

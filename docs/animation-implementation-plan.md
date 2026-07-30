@@ -1,414 +1,158 @@
 # Animation Implementation Plan
 
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
-## Goal
+## Purpose
 
-Track the remaining implementation work for the semantic cutover to:
+Track animation-runtime work separately from the public contract in
+`docs/animation-model.md`.
+
+## Implemented Public Model
+
+The runtime and schema currently support:
 
 - top-level `animations`
 - required `type: update | transition`
-- `tween` as the motion payload
-- `prev` / `next` for handoff surfaces
-- `mask` for reveal-driven transitions
+- ordinary update `tween` properties
+- `prev.tween` and `next.tween` transition surface motion
+- single and sequence transition masks
+- inline single-pass and multi-pass shader compositors
+- mask followed by custom compositor passes
+- element shader filters on every built-in visual node
+- filter-specific shader parameter timelines
+- custom transition compositor parameter timelines
+- deterministic opt-in shader time
+- `playback.continuity: render | persistent`
+- positive playback speed
+- non-blocking loops for updates
+- manual deterministic sampling
 
-The old public `operation`-based shape has been removed.
+The old `operation`, `properties`, `subjects`, `live`, and `replace` public
+shapes have been removed.
 
-## Where We Are Now
-
-Current runtime shape:
-
-- public normalization expects `type: update | transition`
-- update animation is driven through one central animation bus
-- every changed render cancels all active update animations before planning the next state
-- transition supports add, update, and delete lifecycles through diff planning
-- transition supports `prev` and `next` tween composition with optional `mask`
-- transition supports shader `compositor` with top-level `tween.uProgress`
-- element shader filters are supported through `elements[].filters`
-- update playback supports positive speed multipliers and infinite,
-  non-blocking loops
-
-Primary files involved today:
-
-- `src/util/normalizeRenderState.js`
-- `src/util/normalizeAnimations.js`
-- `src/plugins/elements/renderElements.js`
-- `src/plugins/animations/animationBus.js`
-- `src/plugins/animations/planAnimations.js`
-- `src/plugins/animations/replace/runReplaceAnimation.js`
-- `src/schemas/animations/animation.yaml`
-- `src/types.js`
-
-## Target Public Model
+## Runtime Ownership
 
 ### Update
 
-```yaml
-animations:
-  - id: "move-makkuro"
-    targetId: "makkuro"
-    type: "update"
-    tween:
-      x:
-        initialValue: 640
-        keyframes:
-          - duration: 600
-            value: 220
-            easing: "linear"
-```
+An update animates one live display object. One animation context may contain
+both:
+
+- ordinary transform/alpha/blur property timelines
+- any number of filter-specific shader parameter groups under
+  `tween.filters.<filterId>`
+
+The animation bus samples both groups from the same clock, applies playback
+speed and looping once, and completes them as one animation.
 
 ### Transition
 
-```yaml
-animations:
-  - id: "scene-handoff"
-    targetId: "scene-root"
-    type: "transition"
-    prev:
-      tween:
-        translateX:
-          initialValue: 0
-          keyframes:
-            - duration: 500
-              value: -1
-              easing: "linear"
-    next:
-      tween:
-        translateX:
-          initialValue: 1
-          keyframes:
-            - duration: 500
-              value: 0
-              easing: "linear"
-    mask:
-      kind: "single"
-      texture: "masks/spiral-07.png"
-      channel: "red"
-      softness: 0.08
-      progress:
-        initialValue: 0
-        keyframes:
-          - duration: 500
-            value: 1
-            easing: "linear"
+A transition owns a captured previous/next surface handoff. Its execution
+pipeline is:
+
+```txt
+capture previous and next surfaces
+-> apply prev/next surface motion
+-> optional mask pass
+-> optional compositor pass chain
+-> present final overlay frame
+-> reveal live next subtree
 ```
 
-Key rules:
+A parent transition owns the subtree surface while active. Descendant
+animations are deferred until finalize instead of being live-composited into
+the captured surfaces.
 
-- `update` uses `tween`
-- `update` and `transition` both support absolute `x` / `y` and subject-relative
-  `translateX` / `translateY`
-- a single tween cannot combine `x` with `translateX`, or `y` with `translateY`
-- `update` and `transition` support optional `playback.continuity: persistent`
-- `update` and `transition` support optional positive `playback.speed`
-- `update` supports optional `playback.loop: true`
-- `transition` uses `prev`, `next`, and optional `mask`
-- `transition` may define:
-  - `prev` only
-  - `next` only
-  - both
-  - `mask` with no explicit motion overrides
-  - `compositor`
-- `update` cannot use `mask`
-- shader compositor support is `transition`-only
-- shader compositor support is mutually exclusive with `mask` in v1
-- top-level `transition.tween` is valid only for `uProgress` when a compositor
-  is present
-- compositor support requires top-level `tween.uProgress`
-- `update` is update-only and must not be used for add/delete
-- a parent `transition` owns the subtree surface while active
-- descendant animations under that parent `transition` are deferred until finalize
+### Persistent Continuity
 
-## Completed Migration
+An update continues only when its id, target, normalized `tween`, filter
+timelines, playback config, and live target identity remain compatible.
 
-The public type rename is complete.
+A transition continues only when its id, target, `prev`, `next`, `mask`,
+inline `compositor` including its tween, playback config, and owned subtree
+remain compatible.
 
-Already implemented in the current runtime:
+Changed configuration restarts the animation. Omission cancels it.
 
-- public `type: update | transition`
-- `tween` instead of `properties`
-- `prev` / `next` / `mask`
-- transition `compositor`
-- element `filters`
-- diff-driven add/update/delete mapping for transition lifecycles
-- next-only and prev-only transitions
-- tween plus mask composition in one transition animation
+## Inline Effects Milestone
 
-## Historical Step 1: Rename The Public Types
-
-Status:
-
-- complete
-
-Completed work:
-
-- renamed public `live` to `update`
-- renamed public `replace` to `transition`
-- updated schema, normalization, docs, tests, and examples together
-- did not keep a compatibility alias layer
-
-## Remaining Work
-
-## Step 2: Tighten Lifecycle Semantics
-
-Goal:
-
-- make lifecycle behavior match `update` and `transition`
-
-Work:
-
-- `update` should dispatch only in update paths
-- add/delete paths should never dispatch `update`
-- `transition` should own all enter, exit, and swap behavior
-- keep the diff deciding add/update/delete
-- keep `renderElements()` as the central transition entrypoint for those lifecycles
-
-Files likely touched:
-
-- `src/plugins/animations/planAnimations.js`
-- `src/plugins/elements/renderElements.js`
-- `src/util/diffElements.js`
-
-## Step 3: Route Fresh Child Mounts Through The Planner
-
-Goal:
-
-- preserve child transitions on first mount without relying on add-time update animation
-
-Work:
-
-- for newly mounted containers, render children through `renderElements()`
-- use `prevComputedTree: []` for fresh subtree mounts
-- stop recursive raw child `add()` from being the only first-mount path
-- keep child `transition` support working for brand-new subtrees when no ancestor transition is active
-
-## Step 4: Make Parent Transition Own The Subtree Surface
-
-Goal:
-
-- keep the transition runner snapshot-based instead of becoming a live subtree compositor
-
-Work:
-
-- keep the current snapshot-style prev/next surface handoff
-- when a parent `transition` is active, defer descendant animations for that same state change until finalize
-- mount the hidden next subtree in a suppressed animation state
-- on finalize, reveal the live subtree and start or resume descendant animations
-
-## Step 5: Keep Update Cheap
-
-Goal:
-
-- preserve the cheap live-object property animation path for persistent elements
-
-Work:
-
-- continue using the animation bus for `type: update`
-- keep update-time motion on one live display object
-- use `transition` for enter/exit/swap even when the effect is a simple fade
-- use `update` only for elements that persist across the state change
-
-## Step 5A: Add Persistent Playback Continuity
-
-Goal:
-
-- allow selected `update` and `transition` animations to continue across later
-  renders without adding a third top-level animation type
-
-Specified public interface:
-
-```yaml
-animations:
-  - id: "bg-breathe"
-    targetId: "bg"
-    type: "update"
-    playback:
-      continuity: "persistent"
-    tween:
-      scaleX:
-        keyframes:
-          - duration: 3000
-            value: 1.05
-            easing: "easeInOutSine"
-          - duration: 3000
-            value: 1
-            easing: "easeInOutSine"
-```
-
-Implemented contract:
-
-- `playback` is optional on `update` and `transition`
-- `playback.continuity` supports `render` and `persistent`
-- when omitted, `update` keeps current render-scoped behavior
-- when omitted, `transition` keeps current render-scoped behavior
-- when present on `update`, the same animation should continue across later
-  renders if `id`, `targetId`, and normalized config are unchanged
-- when present on `transition`, the same in-flight handoff should continue
-  across later renders if `id`, `targetId`, and normalized `prev` / `next` /
-  `mask` / `compositor` / top-level `tween.uProgress` / `playback` config are
-  unchanged
-- if a later render omits the animation, it stops
-- if a later render changes the animation config, it restarts
-- a persistent animation should not count toward any render's
-  `renderComplete`; renders complete independently of persistent playback
-- persistent transition continuity keeps the same active handoff alive; it does
-  not retarget the transition mid-flight
+Status: complete.
 
 Implemented work:
 
-- extend normalization and schema for optional `playback.continuity`
-- reconcile persistent update animations by stable animation `id` instead of
-  cancelling them unconditionally on every changed render
-- reconcile persistent transitions by stable animation `id` and keep the
-  existing overlay / hidden-next handoff alive across unrelated later renders
-- keep render-scoped animations on current reset behavior when continuity is not
-  requested
-- skip completion tracking for persistent animations, so their eventual finish
-  never emits `renderComplete`
-- keep the restart rules simple: changed config or changed owned target/subtree
-  breaks continuity and starts a new animation instance
+- retained inline effect ownership; no root registry
+- added ordered pass chains
+- added scalar, vector, and matrix parameters
+- added targeted parameter timelines
+- added deterministic read-only `uTime`
+- added pass padding, resolution, antialias, clipping, blend, and mesh
+- added per-texture sampling
+- added selectable WebGL/WebGPU initialization
+- added mask plus compositor composition
+- broadened element filter support
+- reused programs and filter instances where safe
+- added validation, diagnostics, schemas, tests, and documentation
 
-Primary runtime files:
+See `docs/shader-interface.md` for the full contract.
 
-- `src/util/normalizeAnimations.js`
-- `src/schemas/animations/animation.yaml`
-- `src/RouteGraphics.js`
-- `src/plugins/animations/animationBus.js`
+## Remaining Animation Work
+
+These are animation-lifecycle improvements, not missing shader-effect
+capabilities.
+
+### Tighten Update Lifecycle Semantics
+
+Goal:
+
+- dispatch `update` only when an element persists across a state change
+- keep all authored enter, exit, and replacement handoffs under `transition`
+- remove remaining add/delete update behavior kept for legacy compatibility
+
+Primary areas:
+
+- element add/delete handlers
 - `src/plugins/animations/planAnimations.js`
-- `src/plugins/animations/updateAnimationDispatch.js`
-- `src/util/diffElements.js`
+- `src/plugins/elements/renderElements.js`
 
-## Step 5B: Add Looping Update Playback
-
-Status:
-
-- complete
-
-Public interface:
-
-```yaml
-animations:
-  - id: "ambient-pulse"
-    targetId: "portrait"
-    type: "update"
-    playback:
-      continuity: "persistent"
-      speed: 1.5
-      loop: true
-    tween:
-      scaleX:
-        initialValue: 1
-        keyframes:
-          - duration: 600
-            value: 1.05
-            easing: "easeInOutSine"
-          - duration: 600
-            value: 1
-            easing: "easeInOutSine"
-```
-
-Implemented contract:
-
-- looping is valid only for `type: update`
-- the timeline wraps by its finite positive duration after applying playback
-  speed
-- ticked and manually sampled playback use the same deterministic phase
-- loops never enter render completion tracking
-- loops never emit animation completion
-- cancellation or omission stops a loop without synthesizing completion
-- looping transitions and loop-plus-`complete` configurations are rejected
-- persistent continuity may carry the same loop across compatible renders;
-  changed tween or playback configuration restarts it
-
-## Step 6: Keep Mask Transition As The Reveal Primitive
+### Complete First-Mount Child Planning
 
 Goal:
 
-- keep one clear reveal primitive
+- route newly mounted container children through the central render planner
+- preserve child transitions on first mount when no ancestor transition owns
+  the subtree
+- consistently suppress and later release descendant animations when an
+  ancestor transition does own the subtree
 
-Work:
-
-- keep `mask.kind: single | sequence`
-- keep `channel`, `softness`, `invert`, and `progress`
-- keep sequence masks on explicit `frames[].at` positions with `sample: hold | linear`
-- keep mask transition-only
-
-No new public primitive is needed here.
-
-## Step 7: Support Transition Composition
+### Broaden Transition Lifecycle Coverage
 
 Goal:
 
-- allow richer transitions without multiplying top-level concepts
+- keep animated sprites paused/resolved during transition snapshots
+- keep text-revealing nodes paused/resolved during captured handoffs
+- verify video, slider, input, and particle lifecycle behavior under parent
+  transitions
 
-Work:
+This is distinct from shader filtering: those visual node types already accept
+element shader filters.
 
-- allow `prev.tween`
-- allow `next.tween`
-- allow `mask`
-- make those composable inside one transition
+### Completion Leases
 
-This is the shape needed for:
-
-- push plus dissolve
-- slide plus reveal
-- richer VN transitions
-
-This is implemented. Keep VT coverage around it so it stays working.
-
-## Step 8: Broaden Element-Type Support
-
-Goal:
-
-- make transition behavior consistent across the library
-
-Work:
-
-- let `animated-sprite` mount paused for transition snapshotting and post-finalize start
-- add a resolved or paused build path for `text-revealing`
-- keep both suppressed while an ancestor transition owns the subtree surface
-- then evaluate:
-  - `video`
-  - `slider`
-  - `particles`
-
-## Step 9: Revisit Shader Later, If Needed
-
-Goal:
-
-- keep the core small until a real need returns
-
-Current decision:
-
-- do not support shader-backed transition for now
-
-Future rule:
-
-- if shader compositor support returns, it should live under `transition`
-- it should not change the `update | transition` split
-- element shader filters should live on elements, outside animation objects
-
-## Future Cleanup: Completion Leases
-
-The current completion tracker still uses paired:
-
-- `track(version)`
-- `complete(version)`
-
-That is workable, but it spreads version capture and release logic through many code paths.
-
-A later cleanup should move this to an acquired lease/token model such as:
+The completion tracker still uses paired `track(version)` and
+`complete(version)` calls. A later internal cleanup can replace these with an
+idempotent acquired lease/token:
 
 ```js
 const completion = completionTracker.acquire();
 completion.complete();
 ```
 
-Benefits:
+This would simplify cancellation and asynchronous finalize paths without
+changing the public animation model.
 
-- idempotent completion semantics
-- fewer version-plumbing bugs in async and deferred flows
-- clearer ownership for cancellation and finalize paths
-- less callback coupling around `getVersion()` / `track()` / `complete()`
+## Non-Goals
 
-This should be done as a dedicated follow-up, not mixed into the current animation semantic migration.
+- a third top-level animation type
+- live per-frame rendering of both transition subtrees
+- an arbitrary shader render graph
+- a root-level effect registry
+- changing semantic layout or hit testing from shader mesh deformation

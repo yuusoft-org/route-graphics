@@ -12,6 +12,7 @@ import {
   updateElementWithRenderState,
 } from "./elementRenderState.js";
 import { createRenderContext } from "./renderContext.js";
+import { shouldUpdateUnchangedShaderFilterParameters } from "./util/shaderFilterEffect.js";
 
 /**
  * Render elements using plugin system.
@@ -228,7 +229,7 @@ export const renderElements = ({
 
     const plugin = getPlugin(element.type);
 
-    if (
+    const shouldUpdatePlugin =
       plugin.shouldUpdateUnchanged?.({
         app,
         parent,
@@ -242,8 +243,15 @@ export const renderElements = ({
         renderContext,
         zIndex: nextIndexById.get(element.id) ?? -1,
         signal,
-      }) !== true
-    ) {
+      }) === true;
+    const shouldResetShaderParameters =
+      shouldUpdateUnchangedShaderFilterParameters({
+        parent,
+        nextElement: element,
+        animations: animationsByTarget,
+      });
+
+    if (!shouldUpdatePlugin && !shouldResetShaderParameters) {
       continue;
     }
 

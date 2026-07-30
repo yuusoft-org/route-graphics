@@ -110,6 +110,7 @@ export const getAnimationContinuitySignature = (animation = {}) => {
     return JSON.stringify({
       type: animation.type,
       tween: animation.tween,
+      filterTweens: animation.filterTweens ?? null,
       playback: animation.playback ?? null,
     });
   }
@@ -120,7 +121,6 @@ export const getAnimationContinuitySignature = (animation = {}) => {
     next: animation.next ?? null,
     mask: animation.mask ?? null,
     compositor: animation.compositor ?? null,
-    tween: animation.tween ?? null,
     playback: animation.playback ?? null,
   });
 };

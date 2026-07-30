@@ -141,6 +141,15 @@ not sufficient.
   matching precision in both stages.
 - For `uProgress` or other stateful animation behavior, include forward and
   backward navigation steps when reset/continuity is part of the contract.
+- For a targeted parameter animation, include the filter id and at least one
+  independently animated scalar or vector value in the visual checkpoints.
+- For `time: true`, sample through `setAnimationTime(timeMS)` so references are
+  deterministic; do not accept ticker-wall-clock screenshots as baselines.
+- For multi-pass effects, ensure each pass makes a visually observable
+  contribution and test pass-order changes when order is part of the contract.
+- When a transition combines `mask` and `compositor`, verify the built-in mask
+  result feeds the first custom pass and that later custom passes retain
+  `uNextTexture`.
 - For transition compositors, inspect a near-completion frame and the
   post-completion frame. The compositor should visually settle into the final
   target before overlay teardown so there is no end-of-transition handoff jump.

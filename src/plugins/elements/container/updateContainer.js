@@ -23,6 +23,7 @@ import {
   getShaderFilterTargetState,
   hasStaleShaderFilterProgressInTree,
   hasShaderProgressUpdateAnimation,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
@@ -80,6 +81,12 @@ export const updateContainer = ({
   } else {
     resetShaderFilterProgress(containerElement);
   }
+  prepareShaderFilterAnimationTargets({
+    displayObject: containerElement,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
 
   const updateElement = () => {
     if (!isDeepEqual(prevElement, nextElement)) {
@@ -95,6 +102,8 @@ export const updateContainer = ({
         width: nextElement.width,
         height: nextElement.height,
         force: shouldForceShaderProgress,
+        animations,
+        targetId: prevElement.id,
       });
 
       const prevUsesViewport = prevElement.scroll || prevElement.anchorToBottom;

@@ -69,6 +69,10 @@ Use `createAudioPlugin(...)` when you want a custom sound source or scheduling s
 
 `createAnimationPlugin(...)` currently registers an animation type so the runtime accepts that animation family. The built-in `tween` plugin is the reference implementation. In practice, most custom behavior today is built through element and audio plugins.
 
+Custom element filters and transition compositors do not require a plugin.
+Author single-pass or multi-pass effects, textures, and animated parameters
+through the built-in [Shaders](/docs/guides/shaders/) interface.
+
 ## Design Advice
 
 - Keep `parse(...)` deterministic. It should normalize shape, not perform side effects.

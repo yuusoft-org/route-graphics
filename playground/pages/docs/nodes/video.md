@@ -33,6 +33,10 @@ Try it in the [Playground](/playground/?template=video-demo).
 | `volume`   | number  | No                  | `100`          | Runtime uses `volume / 100`.      |
 | `loop`     | boolean | No                  | `false`        | Replay video on end.              |
 | `blur`     | object  | No                  | -              | Directional Gaussian blur.        |
+| `filters`  | array   | No                  | `[]`           | Ordered custom shader filters.    |
+
+`filters` post-processes the current video texture after built-in blur. See
+[Shaders](/docs/guides/shaders/) for the shader interface.
 
 ## Blur
 
@@ -97,12 +101,13 @@ elements:
 animations:
   - id: cutscene-fade
     targetId: cutscene
-    type: live
-    tween:
-      alpha:
-        initialValue: 0
-        keyframes:
-          - value: 1
-            duration: 400
-            easing: linear
+    type: transition
+    next:
+      tween:
+        alpha:
+          initialValue: 0
+          keyframes:
+            - value: 1
+              duration: 400
+              easing: linear
 ```

@@ -9,10 +9,14 @@ import {
   UniformGroup,
 } from "pixi.js";
 import { setManagedFilter } from "./managedFilters.js";
-import { getShaderConfigSignature } from "./shaderConfig.js";
+import {
+  getShaderStructureSignature,
+  toShaderUniformSymbol,
+} from "./shaderConfig.js";
 
 const SHADER_FILTERS_STATE_KEY = "__routeGraphicsShaderFilters";
 const SHADER_PROGRESS_KEY = "__routeGraphicsShaderProgress";
+const SHADER_TIME_KEY = "__routeGraphicsShaderTime";
 const SHADER_DESTROY_CLEANUP_KEY = "__routeGraphicsShaderDestroyCleanup";
 
 export const DEFAULT_SHADER_FILTER_VERTEX = `
@@ -49,6 +53,15 @@ void main(void)
 `;
 
 const clampFiniteProgress = (value) => (Number.isFinite(value) ? value : 0);
+const normalizeShaderTime = (value) =>
+  Number.isFinite(value) ? Math.max(0, value) : 0;
+
+const cloneParameterValue = (value) =>
+  ArrayBuffer.isView(value)
+    ? new Float32Array(value)
+    : Array.isArray(value)
+      ? [...value]
+      : value;
 
 const getAnimationsForTarget = (animations, targetId) => {
   if (!animations) return [];
@@ -61,8 +74,40 @@ const getAnimationsForTarget = (animations, targetId) => {
 export const hasShaderProgressUpdateAnimation = (animations, targetId) =>
   getAnimationsForTarget(animations, targetId).some(
     (animation) =>
-      animation?.type === "update" && animation.tween?.uProgress !== undefined,
+      animation?.type === "update" &&
+      Object.values(animation.filterTweens ?? {}).some(
+        (tween) => tween.uProgress !== undefined,
+      ),
   );
+
+const getActiveShaderAnimationChannels = (animations, targetId) => {
+  const channels = new Set();
+  for (const animation of getAnimationsForTarget(animations, targetId)) {
+    if (animation?.type !== "update") continue;
+
+    for (const [filterId, tween] of Object.entries(
+      animation.filterTweens ?? {},
+    )) {
+      for (const parameter of Object.keys(tween)) {
+        channels.add(`${filterId}:${parameter}`);
+      }
+    }
+  }
+  return channels;
+};
+
+const shaderValuesEqual = (left, right) => {
+  if (ArrayBuffer.isView(left) || Array.isArray(left)) {
+    if (!ArrayBuffer.isView(right) && !Array.isArray(right)) return false;
+    const leftArray = Array.from(left);
+    const rightArray = Array.from(right);
+    return (
+      leftArray.length === rightArray.length &&
+      leftArray.every((value, index) => value === rightArray[index])
+    );
+  }
+  return left === right;
+};
 
 const toUniformValue = (uniform) => {
   if (uniform.type === "f32") {
@@ -77,6 +122,7 @@ const createShaderUniformGroup = (
   width,
   height,
   progress,
+  time,
   { includeNextTextureTransform = false } = {},
 ) => {
   const uniforms = {
@@ -84,10 +130,17 @@ const createShaderUniformGroup = (
       value: clampFiniteProgress(progress),
       type: "f32",
     },
-    uResolution: {
-      value: new Float32Array([Math.max(1, width), Math.max(1, height)]),
-      type: "vec2<f32>",
-    },
+  };
+
+  if (shader.time === true) {
+    uniforms.uTime = {
+      value: normalizeShaderTime(time),
+      type: "f32",
+    };
+  }
+  uniforms.uResolution = {
+    value: new Float32Array([Math.max(1, width), Math.max(1, height)]),
+    type: "vec2<f32>",
   };
 
   if (includeNextTextureTransform) {
@@ -112,7 +165,9 @@ const createShaderUniformGroup = (
 };
 
 const getPipelineAddressMode = (pipeline) =>
-  pipeline?.textureWrap === "repeat" ? "repeat" : "clamp-to-edge";
+  (pipeline?.wrap ?? pipeline?.textureWrap) === "repeat"
+    ? "repeat"
+    : "clamp-to-edge";
 
 const getPipelineMipmapFilter = (pipeline) =>
   pipeline?.mipmap === true ? "linear" : "nearest";
@@ -150,10 +205,10 @@ const createTextureResources = (shader) => {
 
   for (const texture of shader.textures ?? []) {
     const textureSource = Texture.from(texture.src).source;
-    const resource = createTexturePipelineSource(
-      textureSource,
-      shader.pipeline,
-    );
+    const resource = createTexturePipelineSource(textureSource, {
+      ...shader.pipeline,
+      ...texture,
+    });
 
     resources[texture.symbol] = resource;
 
@@ -343,6 +398,36 @@ export const setShaderFilterProgress = (filter, progress) => {
   shaderUniforms.update();
 };
 
+export const setShaderFilterTime = (filter, time) => {
+  const shaderUniforms = filter?.resources?.shaderUniforms;
+  if (!shaderUniforms?.uniforms) {
+    return;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(shaderUniforms.uniforms, "uTime")) {
+    return;
+  }
+  shaderUniforms.uniforms.uTime = normalizeShaderTime(time);
+  shaderUniforms.update();
+};
+
+export const setShaderFilterParameter = (filter, key, value) => {
+  const shaderUniforms = filter?.resources?.shaderUniforms;
+  const symbol = toShaderUniformSymbol(key);
+  if (
+    !shaderUniforms?.uniforms ||
+    !Object.prototype.hasOwnProperty.call(shaderUniforms.uniforms, symbol)
+  ) {
+    return false;
+  }
+
+  const currentValue = shaderUniforms.uniforms[symbol];
+  shaderUniforms.uniforms[symbol] =
+    typeof currentValue === "number" ? Number(value) : new Float32Array(value);
+  shaderUniforms.update();
+  return true;
+};
+
 export const setShaderFilterResolution = (filter, width, height) => {
   const shaderUniforms = filter?.resources?.shaderUniforms;
   if (!shaderUniforms?.uniforms) {
@@ -361,6 +446,7 @@ export const createShaderFilter = ({
   width,
   height,
   progress = 0,
+  time = 0,
   nextTextureSource,
   name = "route-graphics-shader-filter",
 }) => {
@@ -369,6 +455,7 @@ export const createShaderFilter = ({
     width,
     height,
     progress,
+    time,
     { includeNextTextureTransform: Boolean(nextTextureSource) },
   );
   const textureResources = createTextureResources(shader);
@@ -380,6 +467,7 @@ export const createShaderFilter = ({
 
   const filter = Filter.from({
     gpu: {
+      name,
       vertex: {
         source: shader.source.webgpu.source,
         entryPoint: "mainVertex",
@@ -396,6 +484,10 @@ export const createShaderFilter = ({
     },
     resources,
     blendMode: shader.pipeline?.blend ?? "normal",
+    padding: shader.padding ?? 0,
+    resolution: shader.resolution ?? 1,
+    antialias: shader.antialias ?? "off",
+    clipToViewport: shader.clipToViewport ?? true,
   });
 
   const geometry = createShaderFilterGeometry(shader.mesh?.grid);
@@ -426,8 +518,178 @@ export const createShaderFilter = ({
   return filter;
 };
 
+const createParameterState = (effect) =>
+  new Map(
+    (effect.parameters ?? effect.uniforms ?? []).map((parameter) => [
+      parameter.key,
+      {
+        ...parameter,
+        value: cloneParameterValue(parameter.value),
+      },
+    ]),
+  );
+
+export const createShaderEffect = ({
+  effect,
+  width,
+  height,
+  progress = 0,
+  time = 0,
+  nextTextureSource,
+  name = "route-graphics-shader-effect",
+}) => {
+  const parameters = createParameterState(effect);
+  const passes = effect.passes ?? [effect];
+  const filters = passes.map((pass, index) =>
+    createShaderFilter({
+      shader: pass,
+      width,
+      height,
+      progress,
+      time,
+      nextTextureSource,
+      name: `${name}-${pass.id ?? index + 1}`,
+    }),
+  );
+
+  const runtime = {
+    id: effect.id,
+    config: effect,
+    filters,
+    parameters,
+    progress: clampFiniteProgress(progress),
+    time: normalizeShaderTime(time),
+  };
+
+  for (const filter of filters) {
+    filter.__routeGraphicsShaderEffectRuntime = runtime;
+  }
+
+  return runtime;
+};
+
+export const destroyShaderEffect = (runtime) => {
+  for (const filter of runtime?.filters ?? []) {
+    filter.destroy();
+  }
+};
+
+export const setShaderEffectProgress = (runtime, progress) => {
+  if (!runtime) return;
+  runtime.progress = clampFiniteProgress(progress);
+  for (const filter of runtime.filters) {
+    setShaderFilterProgress(filter, runtime.progress);
+  }
+};
+
+export const setShaderEffectTime = (runtime, time) => {
+  if (!runtime) return;
+  runtime.time = normalizeShaderTime(time);
+  for (const filter of runtime.filters) {
+    setShaderFilterTime(filter, runtime.time);
+  }
+};
+
+export const setShaderEffectResolution = (runtime, width, height) => {
+  for (const filter of runtime?.filters ?? []) {
+    setShaderFilterResolution(filter, width, height);
+  }
+};
+
+export const getShaderEffectParameter = (runtime, key) => {
+  if (key === "uProgress") {
+    return runtime?.progress ?? 0;
+  }
+
+  const parameter = runtime?.parameters?.get(key);
+  return parameter ? cloneParameterValue(parameter.value) : undefined;
+};
+
+const assertCompatibleParameterValue = (parameter, value, effectId) => {
+  if (parameter.type === "f32") {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new Error(
+        `Shader filter "${effectId}" parameter "${parameter.key}" must be a finite number.`,
+      );
+    }
+    return value;
+  }
+
+  const expectedLength = parameter.value.length;
+  if (!Array.isArray(value) && !ArrayBuffer.isView(value)) {
+    throw new Error(
+      `Shader filter "${effectId}" parameter "${parameter.key}" must be a ${expectedLength}-number array.`,
+    );
+  }
+
+  const arrayValue = Array.from(value);
+  if (
+    arrayValue.length !== expectedLength ||
+    !arrayValue.every(
+      (component) =>
+        typeof component === "number" && Number.isFinite(component),
+    )
+  ) {
+    throw new Error(
+      `Shader filter "${effectId}" parameter "${parameter.key}" must be a ${expectedLength}-number array.`,
+    );
+  }
+  return arrayValue;
+};
+
+export const validateShaderEffectParameterValue = (runtime, key, value) => {
+  if (!runtime) {
+    return false;
+  }
+
+  const parameter =
+    key === "uProgress"
+      ? {
+          key,
+          type: "f32",
+          value: runtime.progress,
+        }
+      : runtime.parameters.get(key);
+  if (!parameter) {
+    return false;
+  }
+
+  assertCompatibleParameterValue(parameter, value, runtime.id ?? "compositor");
+  return true;
+};
+
+export const setShaderEffectParameter = (runtime, key, value) => {
+  if (!runtime) {
+    return false;
+  }
+
+  if (key === "uProgress") {
+    setShaderEffectProgress(runtime, value);
+    return true;
+  }
+
+  const parameter = runtime.parameters.get(key);
+  if (!parameter) {
+    return false;
+  }
+
+  const nextValue = assertCompatibleParameterValue(
+    parameter,
+    value,
+    runtime.id ?? "compositor",
+  );
+  parameter.value = cloneParameterValue(nextValue);
+  for (const filter of runtime.filters) {
+    setShaderFilterParameter(filter, key, nextValue);
+  }
+  return true;
+};
+
 const getShaderFiltersState = (displayObject) =>
   displayObject?.[SHADER_FILTERS_STATE_KEY] ?? null;
+
+export const hasInstalledShaderFilters = (displayObject) =>
+  Boolean(getShaderFiltersState(displayObject));
 
 const setShaderFiltersState = (displayObject, state) => {
   Object.defineProperty(displayObject, SHADER_FILTERS_STATE_KEY, {
@@ -463,8 +725,15 @@ const installShaderFilterDestroyCleanup = (displayObject) => {
 
 const applyProgressToFilters = (displayObject, progress) => {
   const state = getShaderFiltersState(displayObject);
-  for (const filter of state?.filters ?? []) {
-    setShaderFilterProgress(filter, progress);
+  for (const effect of state?.effects ?? []) {
+    setShaderEffectProgress(effect, progress);
+  }
+};
+
+const applyTimeToFilters = (displayObject, time) => {
+  const state = getShaderFiltersState(displayObject);
+  for (const effect of state?.effects ?? []) {
+    setShaderEffectTime(effect, time);
   }
 };
 
@@ -509,6 +778,151 @@ export const resetShaderFilterProgress = (displayObject) => {
   displayObject.uProgress = 0;
 };
 
+export const setShaderTime = (displayObject, time) => {
+  if (!displayObject) return;
+  const nextTime = normalizeShaderTime(time);
+  displayObject[SHADER_TIME_KEY] = nextTime;
+  applyTimeToFilters(displayObject, nextTime);
+};
+
+export const setShaderTimeInTree = (displayObject, time) => {
+  if (!displayObject) return;
+  setShaderTime(displayObject, time);
+  for (const child of displayObject.children ?? []) {
+    setShaderTimeInTree(child, time);
+  }
+};
+
+const findShaderEffectRuntime = (displayObject, filterId) =>
+  getShaderFiltersState(displayObject)?.effects?.find(
+    (effect) => effect.id === filterId,
+  ) ?? null;
+
+export const prepareShaderFilterAnimationTargets = ({
+  displayObject,
+  element,
+  animations,
+  targetId = element?.id,
+}) => {
+  const targetedTweens = getAnimationsForTarget(animations, targetId)
+    .filter((animation) => animation?.type === "update")
+    .flatMap((animation) => Object.entries(animation.filterTweens ?? {}));
+
+  if (targetedTweens.length === 0) {
+    return false;
+  }
+
+  const state = getShaderFiltersState(displayObject);
+  const nextSignature = element?.filters?.length
+    ? getShaderStructureSignature(element.filters)
+    : null;
+  const needsNextFilterState =
+    state?.signature !== nextSignature ||
+    targetedTweens.some(([filterId, tween]) => {
+      const runtime = findShaderEffectRuntime(displayObject, filterId);
+      return (
+        !runtime ||
+        Object.keys(tween).some(
+          (parameter) =>
+            getShaderEffectParameter(runtime, parameter) === undefined,
+        )
+      );
+    });
+
+  if (!needsNextFilterState) {
+    return false;
+  }
+
+  syncShaderFilters(displayObject, element?.filters, {
+    width: element?.width,
+    height: element?.height,
+    animations,
+    targetId,
+  });
+  return true;
+};
+
+export const getShaderFilterAnimationTarget = (
+  displayObject,
+  filterId,
+  animationId,
+) => {
+  if (!displayObject || typeof filterId !== "string") {
+    throw new Error(
+      `Animation "${animationId}" must target a mounted shader filter.`,
+    );
+  }
+
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        if (typeof property !== "string") return undefined;
+        if (property === "destroyed") return displayObject.destroyed === true;
+        const runtime = findShaderEffectRuntime(displayObject, filterId);
+        if (!runtime) {
+          throw new Error(
+            `Animation "${animationId}" could not find shader filter "${filterId}" on element "${displayObject.label}".`,
+          );
+        }
+        const value = getShaderEffectParameter(runtime, property);
+        if (value === undefined) {
+          throw new Error(
+            `Animation "${animationId}" cannot target unknown parameter "${property}" on shader filter "${filterId}".`,
+          );
+        }
+        return value;
+      },
+      set(_target, property, value) {
+        if (typeof property !== "string") return false;
+        const runtime = findShaderEffectRuntime(displayObject, filterId);
+        if (!runtime) {
+          throw new Error(
+            `Animation "${animationId}" could not find shader filter "${filterId}" on element "${displayObject.label}".`,
+          );
+        }
+        if (!setShaderEffectParameter(runtime, property, value)) {
+          throw new Error(
+            `Animation "${animationId}" cannot target unknown parameter "${property}" on shader filter "${filterId}".`,
+          );
+        }
+        return true;
+      },
+    },
+  );
+};
+
+export const validateShaderFilterAnimationTarget = (
+  displayObject,
+  filterId,
+  animationId,
+  tween,
+) => {
+  const runtime = findShaderEffectRuntime(displayObject, filterId);
+  if (!runtime) {
+    throw new Error(
+      `Animation "${animationId}" could not find shader filter "${filterId}" on element "${displayObject?.label}".`,
+    );
+  }
+
+  for (const [parameter, config] of Object.entries(tween ?? {})) {
+    const values = [
+      ...(config.initialValue === undefined ? [] : [config.initialValue]),
+      ...config.keyframes.map((keyframe) => keyframe.value),
+    ];
+
+    for (const value of values) {
+      if (!validateShaderEffectParameterValue(runtime, parameter, value)) {
+        throw new Error(
+          `Animation "${animationId}" cannot target unknown parameter "${parameter}" on shader filter "${filterId}".`,
+        );
+      }
+    }
+  }
+
+  return getShaderFilterAnimationTarget(displayObject, filterId, animationId);
+};
+
 const hasShaderFilters = (element) =>
   element?.filters?.some((filter) => filter?.type === "shader") ?? false;
 
@@ -531,51 +945,79 @@ const findDisplayObjectByLabel = (displayObject, label) => {
   return null;
 };
 
-const hasStaleShaderFilterProgress = ({ parent, element, animations }) => {
+const hasStaleShaderFilterParameters = ({ parent, element, animations }) => {
   if (!element) {
     return false;
   }
 
-  if (
-    hasShaderFilters(element) &&
-    !hasShaderProgressUpdateAnimation(animations, element.id)
-  ) {
+  if (hasShaderFilters(element)) {
     const displayObject = findDisplayObjectByLabel(parent, element.id);
+    const state = getShaderFiltersState(displayObject);
+    const activeChannels = getActiveShaderAnimationChannels(
+      animations,
+      element.id,
+    );
 
     if (
       displayObject?.[SHADER_PROGRESS_KEY] !== undefined &&
-      displayObject.uProgress !== 0
+      displayObject.uProgress !== 0 &&
+      !activeChannels.has("*:uProgress")
     ) {
       return true;
     }
+
+    for (const runtime of state?.effects ?? []) {
+      if (
+        runtime.progress !== 0 &&
+        !activeChannels.has("*:uProgress") &&
+        !activeChannels.has(`${runtime.id}:uProgress`)
+      ) {
+        return true;
+      }
+
+      for (const parameter of runtime.config.parameters ?? []) {
+        const current = runtime.parameters.get(parameter.key)?.value;
+        if (
+          !shaderValuesEqual(current, parameter.value) &&
+          !activeChannels.has(`${runtime.id}:${parameter.key}`)
+        ) {
+          return true;
+        }
+      }
+    }
   }
 
-  return hasStaleShaderFilterProgressInTree({
+  return hasStaleShaderFilterParametersInTree({
     parent,
     elements: element.children,
     animations,
   });
 };
 
-export const hasStaleShaderFilterProgressInTree = ({
+export const hasStaleShaderFilterParametersInTree = ({
   parent,
   elements = [],
   animations,
 }) =>
   (elements ?? []).some((element) =>
-    hasStaleShaderFilterProgress({ parent, element, animations }),
+    hasStaleShaderFilterParameters({ parent, element, animations }),
   );
 
-export const shouldUpdateUnchangedShaderFilterProgress = ({
+export const shouldUpdateUnchangedShaderFilterParameters = ({
   parent,
   nextElement,
   animations,
 }) =>
-  hasStaleShaderFilterProgress({
+  hasStaleShaderFilterParameters({
     parent,
     element: nextElement,
     animations,
   });
+
+export const hasStaleShaderFilterProgressInTree =
+  hasStaleShaderFilterParametersInTree;
+export const shouldUpdateUnchangedShaderFilterProgress =
+  shouldUpdateUnchangedShaderFilterParameters;
 
 const clearShaderFilters = (displayObject) => {
   if (!getShaderFiltersState(displayObject)) {
@@ -586,14 +1028,53 @@ const clearShaderFilters = (displayObject) => {
   delete displayObject[SHADER_FILTERS_STATE_KEY];
 };
 
+const getAnimatedShaderFilterValues = (displayObject, animations, targetId) => {
+  const values = [];
+
+  for (const animation of getAnimationsForTarget(animations, targetId)) {
+    if (animation?.type !== "update") continue;
+
+    for (const [filterId, tween] of Object.entries(
+      animation.filterTweens ?? {},
+    )) {
+      const runtime = findShaderEffectRuntime(displayObject, filterId);
+      if (!runtime) continue;
+
+      for (const parameter of Object.keys(tween)) {
+        const value = getShaderEffectParameter(runtime, parameter);
+        if (value !== undefined) {
+          values.push({ filterId, parameter, value });
+        }
+      }
+    }
+  }
+
+  return values;
+};
+
+const restoreAnimatedShaderFilterValues = (displayObject, values) => {
+  for (const { filterId, parameter, value } of values) {
+    const runtime = findShaderEffectRuntime(displayObject, filterId);
+    if (runtime && getShaderEffectParameter(runtime, parameter) !== undefined) {
+      setShaderEffectParameter(runtime, parameter, value);
+    }
+  }
+};
+
 export const syncShaderFilters = (
   displayObject,
   filters,
-  { width, height, force = false } = {},
+  { width, height, force = false, animations, targetId } = {},
 ) => {
   if (!displayObject) {
     return;
   }
+
+  const animatedValues = getAnimatedShaderFilterValues(
+    displayObject,
+    animations,
+    targetId,
+  );
 
   if (!filters?.length && !force) {
     clearShaderFilters(displayObject);
@@ -602,6 +1083,9 @@ export const syncShaderFilters = (
 
   installShaderProgressProperty(displayObject);
   installShaderFilterDestroyCleanup(displayObject);
+  if (displayObject[SHADER_TIME_KEY] === undefined) {
+    displayObject[SHADER_TIME_KEY] = 0;
+  }
 
   if (!filters?.length) {
     clearShaderFilters(displayObject);
@@ -613,32 +1097,44 @@ export const syncShaderFilters = (
     1,
     Math.round(height ?? displayObject.height ?? 1),
   );
-  const signature = getShaderConfigSignature(filters);
+  const signature = getShaderStructureSignature(filters);
   const previousState = getShaderFiltersState(displayObject);
 
   if (previousState?.signature === signature) {
-    for (const filter of previousState.filters) {
-      setShaderFilterResolution(filter, safeWidth, safeHeight);
-      setShaderFilterProgress(filter, displayObject.uProgress);
+    for (let index = 0; index < previousState.effects.length; index++) {
+      const runtime = previousState.effects[index];
+      const config = filters[index];
+      runtime.config = config;
+      setShaderEffectResolution(runtime, safeWidth, safeHeight);
+      setShaderEffectTime(runtime, displayObject[SHADER_TIME_KEY]);
+      setShaderEffectProgress(runtime, displayObject.uProgress);
+      for (const parameter of config.parameters ?? []) {
+        setShaderEffectParameter(runtime, parameter.key, parameter.value);
+      }
     }
+    restoreAnimatedShaderFilterValues(displayObject, animatedValues);
     setManagedFilter(displayObject, "shader", previousState.filters);
     return;
   }
 
-  const nextFilters = filters.map((filterConfig) =>
-    createShaderFilter({
-      shader: filterConfig,
+  const nextEffects = filters.map((filterConfig) =>
+    createShaderEffect({
+      effect: filterConfig,
       width: safeWidth,
       height: safeHeight,
       progress: displayObject.uProgress,
+      time: displayObject[SHADER_TIME_KEY],
       name: `route-graphics-shader-filter-${filterConfig.id}`,
     }),
   );
+  const nextFilters = nextEffects.flatMap((effect) => effect.filters);
 
   setShaderFiltersState(displayObject, {
     signature,
+    effects: nextEffects,
     filters: nextFilters,
   });
+  restoreAnimatedShaderFilterValues(displayObject, animatedValues);
   setManagedFilter(displayObject, "shader", nextFilters);
 };
 

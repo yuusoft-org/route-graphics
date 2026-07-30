@@ -267,7 +267,9 @@ const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
       this.canvas = document.createElement("canvas");
     }
 
-    async init({ width, height, backgroundColor }) {
+    async init(options) {
+      const { width, height, backgroundColor } = options;
+      this.initOptions = options;
       this.renderer.width = width;
       this.renderer.height = height;
       this.renderer.background.color = backgroundColor;
@@ -457,6 +459,45 @@ describe("RouteGraphics public API", () => {
     const { app } = await setupRouteGraphics();
 
     expect(app.hitTestElementBounds({ x: 10, y: 10 })).toEqual([]);
+  });
+
+  it("selects the requested renderer backend and exposes the result", async () => {
+    const { app, pixiMock } = await setupRouteGraphics({
+      initOptions: {
+        rendererPreference: "webgpu",
+      },
+      rendererOverrides: {
+        gpu: { device: {} },
+      },
+    });
+
+    expect(pixiMock.__getLastApplication().initOptions.preference).toBe(
+      "webgpu",
+    );
+    expect(app.rendererType).toBe("webgpu");
+  });
+
+  it("rejects renderer fallback when the requested backend is unavailable", async () => {
+    await expect(
+      setupRouteGraphics({
+        initOptions: {
+          rendererPreference: "webgpu",
+          rendererFallback: false,
+        },
+      }),
+    ).rejects.toThrow(
+      'Renderer "webgpu" is unavailable and rendererFallback is false.',
+    );
+  });
+
+  it("rejects unknown renderer preferences", async () => {
+    await expect(
+      setupRouteGraphics({
+        initOptions: {
+          rendererPreference: "canvas",
+        },
+      }),
+    ).rejects.toThrow(/Expected "webgl" or "webgpu"/);
   });
 
   it("unloads and reloads buffer-backed textures", async () => {

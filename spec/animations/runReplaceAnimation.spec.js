@@ -78,6 +78,12 @@ const passthroughCompositor = {
   textures: [],
   pipeline: {},
   mesh: { grid: [1, 1] },
+  tween: {
+    uProgress: {
+      initialValue: 0,
+      keyframes: [{ duration: 300, value: 1, easing: "linear" }],
+    },
+  },
   source: {
     webgl: {
       fragment: `
@@ -295,7 +301,6 @@ describe("runReplaceAnimation", () => {
         generateTexture: vi.fn(() => Texture.EMPTY),
       },
     };
-
     runReplaceAnimation({
       app,
       parent,
@@ -710,6 +715,40 @@ describe("runReplaceAnimation", () => {
         render: vi.fn(),
       },
     };
+    const amountParameter = {
+      key: "amount",
+      symbol: "uAmount",
+      role: "parameter",
+      type: "f32",
+      value: 0.2,
+    };
+    const tintParameter = {
+      key: "tint",
+      symbol: "uTint",
+      role: "parameter",
+      type: "vec3<f32>",
+      value: [0.2, 0.4, 0.6],
+    };
+    const animatedCompositor = {
+      ...passthroughCompositor,
+      parameters: [amountParameter, tintParameter],
+      uniforms: [amountParameter, tintParameter],
+      tween: {
+        ...passthroughCompositor.tween,
+        amount: {
+          keyframes: [{ duration: 600, value: 0.8, easing: "linear" }],
+        },
+        tint: {
+          keyframes: [
+            {
+              duration: 300,
+              value: [0.8, 0.6, 0.4],
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    };
 
     runReplaceAnimation({
       app,
@@ -720,13 +759,7 @@ describe("runReplaceAnimation", () => {
         id: "scene-compositor",
         targetId: "scene-root",
         type: "transition",
-        tween: {
-          uProgress: {
-            initialValue: 0,
-            keyframes: [{ duration: 300, value: 1, easing: "linear" }],
-          },
-        },
-        compositor: passthroughCompositor,
+        compositor: animatedCompositor,
       },
       animations: new Map(),
       animationBus,
@@ -748,6 +781,7 @@ describe("runReplaceAnimation", () => {
         payload: expect.objectContaining({
           id: "scene-compositor",
           driver: "custom",
+          duration: 600,
           deferCompletionUntilNextFrame: true,
         }),
       }),
@@ -792,6 +826,15 @@ describe("runReplaceAnimation", () => {
 
     compositorFilter.apply(filterManager, Texture.EMPTY, Texture.EMPTY, true);
 
+    expect(shaderUniforms.uniforms.uProgress).toBeCloseTo(0.5);
+    expect(shaderUniforms.uniforms.uAmount).toBeCloseTo(0.35);
+    expect(Array.from(shaderUniforms.uniforms.uTint)).toEqual(
+      expect.arrayContaining([
+        expect.closeTo(0.5),
+        expect.closeTo(0.5),
+        expect.closeTo(0.5),
+      ]),
+    );
     expect(filterManager.calculateSpriteMatrix).toHaveBeenCalledWith(
       shaderUniforms.uniforms.uNextTextureMatrix,
       compositorSprite,
@@ -857,12 +900,6 @@ describe("runReplaceAnimation", () => {
         id: "sprite-compositor",
         targetId: "scene-root",
         type: "transition",
-        tween: {
-          uProgress: {
-            initialValue: 0,
-            keyframes: [{ duration: 300, value: 1, easing: "linear" }],
-          },
-        },
         compositor: passthroughCompositor,
       },
       animations: new Map(),

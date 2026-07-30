@@ -30,11 +30,15 @@ Try it in the [Playground](/playground/?template=interactive-elements).
 | `rotation`   | number          | No                  | `0`             | Degrees.                                                                         |
 | `alpha`      | number          | No                  | `1`             | Opacity `0..1`.                                                                  |
 | `textStyle`  | object          | No                  | engine defaults | See table below.                                                                 |
+| `filters`    | array           | No                  | `[]`            | Ordered custom shader filters applied after text rendering.                      |
 | `hover`      | object          | No                  | -               | Hover style, cursor, sound, payload.                                             |
 | `click`      | object          | No                  | -               | Press style, sound, payload.                                                     |
 | `rightClick` | object          | No                  | -               | Right-press style, sound, payload.                                               |
 | `scrollUp`   | object          | No                  | -               | Wheel-up payload hook.                                                           |
 | `scrollDown` | object          | No                  | -               | Wheel-down payload hook.                                                         |
+
+Text shadows are rendered before `filters`. See
+[Shaders](/docs/guides/shaders/) for the shader interface.
 
 ### `textStyle`
 
@@ -211,12 +215,13 @@ elements:
 animations:
   - id: status-fade
     targetId: status
-    type: live
-    tween:
-      alpha:
-        initialValue: 0
-        keyframes:
-          - value: 1
-            duration: 300
-            easing: linear
+    type: transition
+    next:
+      tween:
+        alpha:
+          initialValue: 0
+          keyframes:
+            - value: 1
+              duration: 300
+              easing: linear
 ```

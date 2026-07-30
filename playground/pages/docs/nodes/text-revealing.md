@@ -29,6 +29,7 @@ Try it in the [Playground](/playground/?template=text-revealing).
 | `originY`                   | number                               | No                  | anchor         | Transform origin Y in pixels from the layout box.                                                                               |
 | `rotation`                  | number                               | No                  | `0`            | Degrees.                                                                                                                        |
 | `alpha`                     | number                               | No                  | `1`            | Opacity `0..1`.                                                                                                                 |
+| `filters`                   | array                                | No                  | `[]`           | Ordered inline shader effects applied to the revealed text container.                                                           |
 | `textStyle`                 | object                               | No                  | text defaults  | Base style for segments. `fontFamily` accepts a string or an ordered string array.                                              |
 | `speed`                     | number                               | No                  | `50`           | Uses a curved `0..100` scale. `0..99` gets progressively faster with extra control in the upper range; `100` renders instantly. |
 | `initialRevealedCharacters` | number                               | No                  | `0`            | Leading characters to paint as already revealed before the animation starts.                                                    |
@@ -37,6 +38,9 @@ Try it in the [Playground](/playground/?template=text-revealing).
 | `revealSound`               | object                               | No                  | -              | Sound played while text reveals. By default, it stops at the end of the active loop iteration.                                  |
 | `indicator`                 | object                               | No                  | -              | Revealing/complete visual config + offset. Supports static images and spritesheets.                                             |
 | `complete`                  | object                               | No                  | -              | Parsed and kept in computed node.                                                                                               |
+
+`filters` process the currently revealed text, furigana, and indicator as one
+surface. See [Shaders](/docs/guides/shaders/).
 
 ### `content[]` item shape
 

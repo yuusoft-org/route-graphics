@@ -12,6 +12,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { prepareShaderFilterAnimationTargets } from "../util/shaderFilterEffect.js";
 
 /**
  * Update slider element
@@ -37,6 +38,12 @@ export const updateSlider = ({
   if (!sliderElement) return;
 
   sliderElement.zIndex = zIndex;
+  prepareShaderFilterAnimationTargets({
+    displayObject: sliderElement,
+    element: nextSliderComputedNode,
+    animations,
+    targetId: prevSliderComputedNode.id,
+  });
 
   const updateElement = () => {
     if (!isDeepEqual(prevSliderComputedNode, nextSliderComputedNode)) {

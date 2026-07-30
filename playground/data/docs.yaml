@@ -23,6 +23,9 @@ items:
       - id: guide-events-render-complete
         title: "Events & Render Complete"
         href: "/docs/guides/events-render-complete/"
+      - id: guide-shaders
+        title: "Shaders"
+        href: "/docs/guides/shaders/"
       - id: guide-custom-plugins
         title: "Custom Plugins"
         href: "/docs/guides/custom-plugins/"

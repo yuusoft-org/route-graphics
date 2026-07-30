@@ -115,7 +115,7 @@ $def:
         default: 0
   indicatorVisual:
     type: object
-    description: Indicator visual. Use `kind: image` for a static texture or `kind: spritesheet` for frame animation.
+    description: "Indicator visual. Use `kind: image` for a static texture or `kind: spritesheet` for frame animation."
     properties:
       kind:
         type: string
@@ -241,6 +241,8 @@ properties:
     minimum: 0
     maximum: 1
     default: 1
+  filters:
+    $ref: "../shader-config.yaml#/definitions/elementFilters"
   indicator:
     type: object
     description: Settings for the text continuation indicator
@@ -301,7 +303,8 @@ properties:
     "$ref": "#/$def/textStyle"
   complete:
     type: object
+    description: Reserved per-node completion configuration. The runtime currently reports completion through the global renderComplete event.
     properties:
       payload:
         type: object
-        description: Payload for complete action event
+        description: Reserved payload for future per-node completion support

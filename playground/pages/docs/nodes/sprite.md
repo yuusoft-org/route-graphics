@@ -31,11 +31,15 @@ Try it in the [Playground](/playground/?template=sprite-demo).
 | `alpha`      | number | No                  | `1`            | Opacity `0..1`.                             |
 | `rotation`   | number | No                  | `0`            | Degrees.                                    |
 | `blur`       | object | No                  | -              | Directional Gaussian blur.                  |
+| `filters`    | array  | No                  | `[]`           | Ordered custom shader filters.              |
 | `hover`      | object | No                  | -              | Optional hover image/sound/cursor/payload.  |
 | `click`      | object | No                  | -              | Optional pressed image/sound/payload.       |
 | `rightClick` | object | No                  | -              | Optional right-pressed image/sound/payload. |
 | `scrollUp`   | object | No                  | -              | Wheel-up payload hook.                      |
 | `scrollDown` | object | No                  | -              | Wheel-down payload hook.                    |
+
+`filters` runs after built-in blur. See [Shaders](/docs/guides/shaders/) for
+the shader interface.
 
 ## Blur
 
@@ -114,7 +118,7 @@ elements:
 elements:
   - id: token
     type: sprite
-    x: 80
+    x: 500
     y: 500
     width: 64
     height: 64
@@ -123,12 +127,13 @@ elements:
 animations:
   - id: token-slide
     targetId: token
-    type: live
-    tween:
-      x:
-        initialValue: 80
-        keyframes:
-          - value: 500
-            duration: 800
-            easing: linear
+    type: transition
+    next:
+      tween:
+        x:
+          initialValue: 80
+          keyframes:
+            - value: 500
+              duration: 800
+              easing: linear
 ```

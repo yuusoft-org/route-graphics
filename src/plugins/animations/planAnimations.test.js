@@ -13,10 +13,10 @@ describe("getAnimationContinuitySignature", () => {
       compositor: {
         type: "shader",
         uniforms: [{ key: "amount", symbol: "uAmount", type: "f32", value: 1 }],
-      },
-      tween: {
-        uProgress: {
-          keyframes: [{ duration: 500, value: 1, easing: "linear" }],
+        tween: {
+          uProgress: {
+            keyframes: [{ duration: 500, value: 1, easing: "linear" }],
+          },
         },
       },
     };
@@ -24,9 +24,12 @@ describe("getAnimationContinuitySignature", () => {
     expect(getAnimationContinuitySignature(base)).not.toBe(
       getAnimationContinuitySignature({
         ...base,
-        tween: {
-          uProgress: {
-            keyframes: [{ duration: 900, value: 1, easing: "linear" }],
+        compositor: {
+          ...base.compositor,
+          tween: {
+            uProgress: {
+              keyframes: [{ duration: 900, value: 1, easing: "linear" }],
+            },
           },
         },
       }),

@@ -15,28 +15,33 @@ Try it in the [Playground](/playground/?template=basic-shapes).
 
 ## Field Reference
 
-| Field        | Type   | Required | Default | Notes                               |
-| ------------ | ------ | -------- | ------- | ----------------------------------- |
-| `id`         | string | Yes      | -       | Element id.                         |
-| `type`       | string | Yes      | -       | Must be `rect`.                     |
-| `width`      | number | Yes      | -       | Render width.                       |
-| `height`     | number | Yes      | -       | Render height.                      |
-| `x`          | number | No       | `0`     | Position before anchor transform.   |
-| `y`          | number | No       | `0`     | Position before anchor transform.   |
-| `anchorX`    | number | No       | `0`     | Anchor offset ratio.                |
-| `anchorY`    | number | No       | `0`     | Anchor offset ratio.                |
-| `originX`    | number | No       | anchor  | Transform origin X in pixels.       |
-| `originY`    | number | No       | anchor  | Transform origin Y in pixels.       |
-| `alpha`      | number | No       | `1`     | Opacity `0..1`.                     |
-| `fill`       | string \| object | No | transparent | Fill color or structured gradient fill. |
-| `border`     | object | No       | -       | Border config.                      |
-| `rotation`   | number | No       | `0`     | Degrees.                            |
-| `hover`      | object | No       | -       | Hover event config.                 |
-| `click`      | object | No       | -       | Click event config.                 |
-| `rightClick` | object | No       | -       | Right click event config.           |
-| `drag`       | object | No       | -       | `start`/`move`/`end` payload hooks. |
-| `scrollUp`   | object | No       | -       | Wheel-up payload hook.              |
-| `scrollDown` | object | No       | -       | Wheel-down payload hook.            |
+| Field        | Type             | Required | Default     | Notes                                   |
+| ------------ | ---------------- | -------- | ----------- | --------------------------------------- |
+| `id`         | string           | Yes      | -           | Element id.                             |
+| `type`       | string           | Yes      | -           | Must be `rect`.                         |
+| `width`      | number           | Yes      | -           | Render width.                           |
+| `height`     | number           | Yes      | -           | Render height.                          |
+| `x`          | number           | No       | `0`         | Position before anchor transform.       |
+| `y`          | number           | No       | `0`         | Position before anchor transform.       |
+| `anchorX`    | number           | No       | `0`         | Anchor offset ratio.                    |
+| `anchorY`    | number           | No       | `0`         | Anchor offset ratio.                    |
+| `originX`    | number           | No       | anchor      | Transform origin X in pixels.           |
+| `originY`    | number           | No       | anchor      | Transform origin Y in pixels.           |
+| `alpha`      | number           | No       | `1`         | Opacity `0..1`.                         |
+| `fill`       | string \| object | No       | transparent | Fill color or structured gradient fill. |
+| `border`     | object           | No       | -           | Border config.                          |
+| `rotation`   | number           | No       | `0`         | Degrees.                                |
+| `filters`    | array            | No       | `[]`        | Ordered custom shader filters.          |
+| `hover`      | object           | No       | -           | Hover event config.                     |
+| `click`      | object           | No       | -           | Click event config.                     |
+| `rightClick` | object           | No       | -           | Right click event config.               |
+| `drag`       | object           | No       | -           | `start`/`move`/`end` payload hooks.     |
+| `scrollUp`   | object           | No       | -           | Wheel-up payload hook.                  |
+| `scrollDown` | object           | No       | -           | Wheel-down payload hook.                |
+
+`filters` runs after built-in rendering effects. See
+[Shaders](/docs/guides/shaders/) for source, uniform, texture, pipeline, and
+filter parameter animation rules.
 
 ### `border`
 

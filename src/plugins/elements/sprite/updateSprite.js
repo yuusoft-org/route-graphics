@@ -14,6 +14,7 @@ import {
 import {
   getShaderFilterTargetState,
   hasShaderProgressUpdateAnimation,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
@@ -75,6 +76,12 @@ export const updateSprite = ({
   } else {
     resetShaderFilterProgress(spriteElement);
   }
+  prepareShaderFilterAnimationTargets({
+    displayObject: spriteElement,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
 
   let didSyncResourceBeforeAnimation = false;
   const liveAnimations = getLiveAnimations(animations, prevElement.id);
@@ -300,6 +307,8 @@ export const updateSprite = ({
         width,
         height,
         force: shouldForceShaderProgress,
+        animations,
+        targetId: prevElement.id,
       });
     }
 

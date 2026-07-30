@@ -106,19 +106,119 @@ describe("shader config normalization", () => {
     ).toThrow(/reserved shader symbol uNextTextureMatrix/);
   });
 
-  it("rejects unsupported uniform value shapes", () => {
+  it("supports vector and matrix parameters and rejects unknown shapes", () => {
+    const [filter] = normalizeElementShaderFilters([
+      {
+        id: "typed",
+        type: "shader",
+        parameters: {
+          direction: [1, 0, 0],
+          transform: {
+            type: "mat3",
+            value: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+          },
+        },
+        source,
+      },
+    ]);
+
+    expect(filter.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "direction",
+          type: "vec3<f32>",
+          value: [1, 0, 0],
+        }),
+        expect.objectContaining({
+          key: "transform",
+          type: "mat3x3<f32>",
+        }),
+      ]),
+    );
+
     expect(() =>
       normalizeElementShaderFilters([
         {
           id: "bad",
           type: "shader",
-          uniforms: {
-            color: [1, 0, 0],
+          parameters: {
+            unsupported: [1, 2, 3, 4, 5],
           },
           source,
         },
       ]),
-    ).toThrow(/length-4 number array/);
+    ).toThrow(/length 2, 3, 4, 9, or 16/);
+  });
+
+  it("normalizes inline multi-pass effects and pass-local overrides", () => {
+    const [filter] = normalizeElementShaderFilters([
+      {
+        id: "bloom",
+        type: "shader",
+        parameters: {
+          amount: 0.75,
+        },
+        textures: {
+          noise: {
+            src: "noise-texture",
+            wrap: "repeat",
+            mipmap: true,
+          },
+        },
+        padding: 12,
+        resolution: "inherit",
+        antialias: true,
+        time: true,
+        mesh: {
+          grid: [8, 4],
+        },
+        passes: [
+          {
+            id: "horizontal",
+            source,
+            uniforms: {
+              axis: [1, 0],
+            },
+          },
+          {
+            id: "vertical",
+            source,
+            pipeline: {
+              blend: "add",
+            },
+            padding: 20,
+          },
+        ],
+      },
+    ]);
+
+    expect(filter.passes).toHaveLength(2);
+    expect(filter.passes[0]).toMatchObject({
+      id: "horizontal",
+      padding: 12,
+      resolution: "inherit",
+      antialias: "on",
+      time: true,
+      mesh: { grid: [8, 4] },
+    });
+    expect(filter.passes[0].uniforms.map(({ key }) => key)).toEqual([
+      "amount",
+      "axis",
+    ]);
+    expect(filter.passes[0].textures[0]).toMatchObject({
+      key: "noise",
+      wrap: "repeat",
+      mipmap: true,
+    });
+    expect(filter.passes[1]).toMatchObject({
+      id: "vertical",
+      padding: 20,
+      pipeline: {
+        blend: "add",
+        textureWrap: "clamp",
+        mipmap: false,
+      },
+    });
   });
 
   it("normalizes compositor mesh defaults and explicit grids", () => {

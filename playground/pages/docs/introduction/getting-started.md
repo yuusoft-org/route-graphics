@@ -53,6 +53,8 @@ const app = createRouteGraphics();
 await app.init({
   width: 1280,
   height: 720,
+  rendererPreference: "webgl",
+  rendererFallback: true,
   plugins: {
     elements: [
       textPlugin,
@@ -76,6 +78,11 @@ await app.init({
 await app.loadAssets(assetBufferManager.getBufferMap());
 document.body.appendChild(app.canvas);
 ```
+
+`rendererPreference` accepts `webgl` or `webgpu`. It defaults to `webgl`.
+`rendererFallback` defaults to `true`; set it to `false` if selecting the other
+backend should fail initialization. After initialization, `app.rendererType`
+reports the backend that was actually selected.
 
 ## 4. Render state
 
@@ -110,4 +117,8 @@ From here:
 
 - [Assets & Loading](/docs/guides/assets-loading/) explains aliases and runtime asset classes.
 - [Events & Render Complete](/docs/guides/events-render-complete/) covers lifecycle timing.
+- [Shaders](/docs/guides/shaders/) covers inline multi-pass filters,
+  independently animated parameters, deterministic time, and transition
+  compositors.
+- [Tween](/docs/nodes/tween/) covers update and transition animations.
 - [Using the Playground](/docs/guides/playground/) shows how to iterate on examples and inspect emitted events.

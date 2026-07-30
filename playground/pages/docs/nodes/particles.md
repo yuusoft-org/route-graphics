@@ -33,6 +33,10 @@ Need the exhaustive field reference? See `src/plugins/elements/particles/docs/SC
 | `rotation` | number | No       | `0`     | Element-level rotation in degrees.                 |
 | `alpha`    | number | No       | `1`     | Container alpha.                                   |
 | `seed`     | number | No       | -       | Deterministic randomness for testing and previews. |
+| `filters`  | array  | No       | `[]`    | Ordered inline shader effects.                     |
+
+`filters` post-processes the emitter container after particle rendering. See
+[Shaders](/docs/guides/shaders/).
 
 ## Modules
 

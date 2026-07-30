@@ -1,4 +1,8 @@
 import { isDeepEqual } from "../../util/isDeepEqual.js";
+import {
+  hasInstalledShaderFilters,
+  syncShaderFilters,
+} from "./util/shaderFilterEffect.js";
 
 const ELEMENT_RENDER_STATE = Symbol("routeGraphicsElementRenderState");
 const ELEMENT_HIT_TEST_BOUNDS = Symbol("routeGraphicsElementHitTestBounds");
@@ -64,8 +68,26 @@ const getAddedChild = (parent, element, childrenBefore) => {
   return null;
 };
 
-const markMountedElement = (child, element) => {
+const markMountedElement = (
+  child,
+  element,
+  { animations, targetId = element?.id } = {},
+) => {
   if (child) {
+    const hasRuntimeReadyFilters =
+      Array.isArray(element.filters) &&
+      element.filters.every(
+        (filter) => Array.isArray(filter?.passes) || filter?.source,
+      );
+    if (hasRuntimeReadyFilters || hasInstalledShaderFilters(child)) {
+      syncShaderFilters(child, element.filters, {
+        width: element.width,
+        height: element.height,
+        force: true,
+        animations,
+        targetId,
+      });
+    }
     setElementRenderState(child, element);
   }
 };
@@ -130,7 +152,10 @@ export const updateElementWithRenderState = ({ plugin, ...options }) => {
         displayObject ??
         getMountedChild(parent, nextElement.id) ??
         getMountedChild(parent, prevElement.id);
-      markMountedElement(mountedChild, nextElement);
+      markMountedElement(mountedChild, nextElement, {
+        animations: options.animations,
+        targetId: prevElement.id,
+      });
     }
     deferredCommit?.settle();
   };

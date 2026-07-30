@@ -37,8 +37,12 @@ Try it in the [Playground](/playground/?template=slider-demo).
 | `originY`        | number                     | No            | anchor       | Transform origin Y in pixels.                                                    |
 | `rotation`       | number                     | No            | `0`          | Degrees.                                                                         |
 | `alpha`          | number                     | No            | `1`          | Opacity `0..1`.                                                                  |
+| `filters`        | array                      | No            | `[]`         | Ordered inline shader effects.                                                   |
 | `hover`          | object                     | No            | -            | Hover textures/sound/cursor.                                                     |
 | `change`         | object                     | No            | -            | Event payload on value changes.                                                  |
+
+`filters` post-processes the complete track and thumb container. See
+[Shaders](/docs/guides/shaders/).
 
 ## Runtime Validation
 

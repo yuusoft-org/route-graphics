@@ -47,19 +47,19 @@ states:
       - id: sprite-textured-compositor
         targetId: sprite-compositor
         type: transition
-        tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: easeInOutCubic
         compositor:
           type: shader
           mesh:
             grid: [8, 4]
           uniforms:
             wave: 0.14
+          tween:
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: easeInOutCubic
           textures:
             paper: mask-diagonal
           pipeline:

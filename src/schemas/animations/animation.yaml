@@ -129,6 +129,14 @@ $defs:
     required:
       - auto
     additionalProperties: false
+  filterTweens:
+    type: object
+    minProperties: 1
+    description: Shader parameter timelines grouped by inline filter id.
+    patternProperties:
+      "^.+$":
+        $ref: "../shader-config.yaml#/definitions/shaderTween"
+    additionalProperties: false
   updateTween:
     type: object
     properties:
@@ -152,6 +160,8 @@ $defs:
         $ref: "#/$defs/tweenProperty"
       blurY:
         $ref: "#/$defs/tweenProperty"
+      filters:
+        $ref: "#/$defs/filterTweens"
     allOf:
       - not:
           required:
@@ -297,6 +307,7 @@ properties:
     description: Animation structure.
   complete:
     type: object
+    description: Reserved per-animation completion configuration. The runtime currently emits only the global renderComplete lifecycle event.
     properties:
       payload:
         type: object
@@ -311,30 +322,34 @@ properties:
     $ref: "#/$defs/transitionSide"
   mask:
     $ref: "#/$defs/mask"
+  compositor:
+    $ref: "../shader-config.yaml#/definitions/compositor"
+additionalProperties: false
 allOf:
   - if:
       properties:
         type:
           const: update
     then:
-      required:
-        - tween
+      required: [tween]
       not:
         anyOf:
           - required: [prev]
           - required: [next]
           - required: [mask]
+          - required: [compositor]
   - if:
       properties:
         type:
           const: transition
     then:
-      not:
-        required: [tween]
       anyOf:
         - required: [prev]
         - required: [next]
         - required: [mask]
+        - required: [compositor]
+      not:
+        required: [tween]
   - if:
       required: [playback]
       properties:

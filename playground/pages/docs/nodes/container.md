@@ -29,6 +29,7 @@ Try it in the [Playground](/playground/?template=container-layout).
 | `originY`    | number                                   | No                  | anchor         | Transform origin Y in pixels.                                     |
 | `alpha`      | number                                   | No                  | `1`            | Opacity `0..1`.                                                   |
 | `blur`       | object                                   | No                  | -              | Directional Gaussian blur applied to the whole subtree.           |
+| `filters`    | array                                    | No                  | `[]`           | Ordered custom shader filters applied to the composed subtree.    |
 | `children`   | array                                    | No                  | `[]`           | Any registered element plugin type can be nested.                 |
 | `direction`  | `absolute` \| `horizontal` \| `vertical` | No                  | `absolute`     | Auto-positioning for children in non-absolute modes.              |
 | `gapX`       | number                                   | No                  | `0`            | Horizontal spacing between children, and between wrapped columns. |
@@ -41,6 +42,9 @@ Try it in the [Playground](/playground/?template=container-layout).
 | `rightClick` | object                                   | No                  | -              | Right click event config. Supports `inheritToChildren`.           |
 | `scrollUp`   | object                                   | No                  | -              | Wheel-up payload hook.                                            |
 | `scrollDown` | object                                   | No                  | -              | Wheel-down payload hook.                                          |
+
+Container `filters` post-process the composed child surface after built-in
+blur. See [Shaders](/docs/guides/shaders/) for the shader interface.
 
 ## Layout Behavior Notes
 

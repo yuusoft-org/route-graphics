@@ -16,6 +16,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { prepareShaderFilterAnimationTargets } from "../util/shaderFilterEffect.js";
 
 /**
  * @typedef {import('../../../types.js').ParticlesComputedNode} ParticlesComputedNode
@@ -65,6 +66,12 @@ export const updateParticles = ({
 
   // Update zIndex
   container.zIndex = zIndex;
+  prepareShaderFilterAnimationTargets({
+    displayObject: container,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
 
   // Check if we need to recreate the emitter (config changes)
   const needsRecreate = hasConfigChanged(prevElement, nextElement);

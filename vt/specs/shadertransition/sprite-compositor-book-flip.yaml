@@ -59,16 +59,6 @@ states:
       - id: sprite-book-flip-compositor
         targetId: book-flip-sprite
         type: transition
-        tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 960
-                value: 1
-                easing: easeInOutCubic
-              - duration: 40
-                value: 1
-                easing: linear
         compositor:
           type: shader
           mesh:
@@ -76,6 +66,16 @@ states:
           uniforms:
             curl: 0.9
             shadow: 0.42
+          tween:
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 960
+                  value: 1
+                  easing: easeInOutCubic
+                - duration: 40
+                  value: 1
+                  easing: linear
           pipeline:
             blend: normal
             textureWrap: clamp

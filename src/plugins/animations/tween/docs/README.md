@@ -29,6 +29,9 @@ Each `tween` property can use either:
 
 `keyframes` and `auto` are mutually exclusive on the same property.
 
+Inline shader filter parameters use `tween.filters.<filterId>`. They use manual
+keyframes and may coexist with ordinary element properties in the same update.
+
 Position tweens support `x` / `y` and `translateX` / `translateY` in both
 `update` and `transition`. `x` / `y` are absolute parent-space pixels.
 `translateX` / `translateY` are subject-size multipliers, so `translateX: -1`
@@ -224,7 +227,8 @@ masks.
 
 - `update` is update-only. Integrations should reject `type: update` for enter, exit, and replace paths.
 - `mask` is transition-only.
-- custom shader-backed transition is not supported right now.
+- a custom shader-backed transition uses an inline `compositor` with
+  `compositor.tween.progress` and optional parameter timelines.
 - `prev.tween` and `next.tween` can be combined with `mask`.
 - if an ancestor `transition` is active for the same change, nested child transitions are suppressed until finalize
 

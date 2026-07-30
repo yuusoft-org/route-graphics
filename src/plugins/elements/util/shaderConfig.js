@@ -6,6 +6,30 @@ const COMPOSITOR_TEXTURE_LIMIT = 6;
 const SHADER_FILTER_TYPES = new Set(["shader"]);
 const BLEND_MODES = new Set(["normal", "add", "multiply", "screen"]);
 const TEXTURE_WRAP_MODES = new Set(["clamp", "repeat"]);
+const ANTIALIAS_MODES = new Set(["on", "off", "inherit"]);
+
+const UNIFORM_TYPE_ALIASES = new Map([
+  ["f32", "f32"],
+  ["vec2", "vec2<f32>"],
+  ["vec2<f32>", "vec2<f32>"],
+  ["vec3", "vec3<f32>"],
+  ["vec3<f32>", "vec3<f32>"],
+  ["vec4", "vec4<f32>"],
+  ["vec4<f32>", "vec4<f32>"],
+  ["mat3", "mat3x3<f32>"],
+  ["mat3x3<f32>", "mat3x3<f32>"],
+  ["mat4", "mat4x4<f32>"],
+  ["mat4x4<f32>", "mat4x4<f32>"],
+]);
+
+const UNIFORM_TYPE_LENGTHS = new Map([
+  ["f32", 1],
+  ["vec2<f32>", 2],
+  ["vec3<f32>", 3],
+  ["vec4<f32>", 4],
+  ["mat3x3<f32>", 9],
+  ["mat4x4<f32>", 16],
+]);
 
 const RESERVED_SHADER_SYMBOLS = new Set([
   "uTexture",
@@ -13,7 +37,9 @@ const RESERVED_SHADER_SYMBOLS = new Set([
   "uNextTexture",
   "uNextTextureMatrix",
   "uNextTextureClamp",
+  "uMaskTexture",
   "uProgress",
+  "uTime",
   "uResolution",
   "uSampler",
   "GlobalFilterUniforms",
@@ -85,31 +111,94 @@ const assertGeneratedSymbolAvailable = ({
   symbols.set(symbol, { key, kind });
 };
 
-const normalizeUniformValue = (value, path) => {
+const inferUniformType = (value, path) => {
   if (isFiniteNumber(value)) {
-    return {
-      type: "f32",
-      value,
-    };
+    return "f32";
+  }
+
+  if (!Array.isArray(value) || !value.every(isFiniteNumber)) {
+    throw new Error(
+      `Input Error: ${path} must be a finite number or a numeric array`,
+    );
+  }
+
+  switch (value.length) {
+    case 2:
+      return "vec2<f32>";
+    case 3:
+      return "vec3<f32>";
+    case 4:
+      return "vec4<f32>";
+    case 9:
+      return "mat3x3<f32>";
+    case 16:
+      return "mat4x4<f32>";
+    default:
+      throw new Error(
+        `Input Error: ${path} numeric arrays must have length 2, 3, 4, 9, or 16`,
+      );
+  }
+};
+
+const normalizeTypedUniformValue = (descriptor, path) => {
+  const type = UNIFORM_TYPE_ALIASES.get(descriptor.type);
+  if (!type) {
+    throw new Error(
+      `Input Error: ${path}.type must be one of: ${Array.from(
+        UNIFORM_TYPE_ALIASES.keys(),
+      ).join(", ")}`,
+    );
+  }
+
+  const expectedLength = UNIFORM_TYPE_LENGTHS.get(type);
+  const value = descriptor.value;
+  if (expectedLength === 1) {
+    if (!isFiniteNumber(value)) {
+      throw new Error(`Input Error: ${path}.value must be a finite number`);
+    }
+    return { type, value };
   }
 
   if (
-    Array.isArray(value) &&
-    (value.length === 2 || value.length === 4) &&
-    value.every(isFiniteNumber)
+    !Array.isArray(value) ||
+    value.length !== expectedLength ||
+    !value.every(isFiniteNumber)
   ) {
-    return {
-      type: value.length === 2 ? "vec2<f32>" : "vec4<f32>",
-      value: [...value],
-    };
+    throw new Error(
+      `Input Error: ${path}.value must be a ${expectedLength}-number array for ${type}`,
+    );
   }
 
-  throw new Error(
-    `Input Error: ${path} must be a number, a length-2 number array, or a length-4 number array`,
-  );
+  return { type, value: [...value] };
 };
 
-const normalizeShaderUniforms = (uniforms, path, symbols) => {
+const normalizeUniformValue = (value, path) => {
+  if (isPlainObject(value)) {
+    if (value.type === undefined || value.value === undefined) {
+      throw new Error(
+        `Input Error: ${path} typed values must define type and value`,
+      );
+    }
+    return normalizeTypedUniformValue(value, path);
+  }
+
+  const type = inferUniformType(value, path);
+  return {
+    type,
+    value: type === "f32" ? value : [...value],
+  };
+};
+
+const registerExistingSymbols = (symbols, entries) => {
+  for (const entry of entries) {
+    symbols.set(entry.symbol, {
+      key: entry.key,
+      kind: entry.role ?? "uniform",
+    });
+  }
+};
+
+const normalizeShaderUniforms = (uniforms, path, symbols, role = "uniform") => {
   if (uniforms === undefined) {
     return [];
   }
@@ -126,18 +215,59 @@ const normalizeShaderUniforms = (uniforms, path, symbols) => {
         symbol,
         path,
         symbols,
-        kind: "uniform",
+        kind: role,
       });
 
       return {
         key,
         symbol,
+        role,
         ...normalizeUniformValue(uniforms[key], `${path}.${key}`),
       };
     });
 };
 
-const normalizeShaderTextures = ({ textures, path, symbols, maxTextures }) => {
+const normalizeTextureDescriptor = (value, path, pipeline) => {
+  if (typeof value === "string") {
+    assertNonEmptyString(value, path);
+    return {
+      src: value,
+      wrap: pipeline.textureWrap,
+      mipmap: pipeline.mipmap,
+    };
+  }
+
+  assertPlainObject(value, path);
+  assertNonEmptyString(value.src, `${path}.src`);
+
+  const wrap = value.wrap ?? pipeline.textureWrap;
+  if (!TEXTURE_WRAP_MODES.has(wrap)) {
+    throw new Error(
+      `Input Error: ${path}.wrap must be one of: ${Array.from(
+        TEXTURE_WRAP_MODES,
+      ).join(", ")}`,
+    );
+  }
+
+  const mipmap = value.mipmap ?? pipeline.mipmap;
+  if (typeof mipmap !== "boolean") {
+    throw new Error(`Input Error: ${path}.mipmap must be a boolean`);
+  }
+
+  return {
+    src: value.src,
+    wrap,
+    mipmap,
+  };
+};
+
+const normalizeShaderTextures = ({
+  textures,
+  path,
+  symbols,
+  maxTextures,
+  pipeline,
+}) => {
   if (textures === undefined) {
     return [];
   }
@@ -145,7 +275,6 @@ const normalizeShaderTextures = ({ textures, path, symbols, maxTextures }) => {
   assertPlainObject(textures, path);
 
   const keys = Object.keys(textures).sort();
-
   if (keys.length > maxTextures) {
     throw new Error(
       `Input Error: ${path} supports at most ${maxTextures} custom textures`,
@@ -154,7 +283,6 @@ const normalizeShaderTextures = ({ textures, path, symbols, maxTextures }) => {
 
   return keys.map((key) => {
     assertShaderKey(key, `${path}.${key}`);
-    assertNonEmptyString(textures[key], `${path}.${key}`);
     const symbol = toShaderTextureSymbol(key);
     assertGeneratedSymbolAvailable({
       key,
@@ -167,46 +295,40 @@ const normalizeShaderTextures = ({ textures, path, symbols, maxTextures }) => {
     return {
       key,
       symbol,
-      src: textures[key],
+      ...normalizeTextureDescriptor(textures[key], `${path}.${key}`, pipeline),
     };
   });
 };
 
-const normalizeShaderPipeline = (pipeline, path) => {
-  if (pipeline === undefined) {
-    return {
-      blend: "normal",
-      textureWrap: "clamp",
-      mipmap: false,
-    };
+const normalizeShaderPipeline = (pipeline, path, defaults = {}) => {
+  if (pipeline !== undefined) {
+    assertPlainObject(pipeline, path);
   }
 
-  assertPlainObject(pipeline, path);
-
-  const blend = pipeline.blend ?? "normal";
+  const blend = pipeline?.blend ?? defaults.blend ?? "normal";
   if (!BLEND_MODES.has(blend)) {
     throw new Error(
-      `Input Error: ${path}.blend must be one of: ${Array.from(BLEND_MODES).join(", ")}`,
+      `Input Error: ${path}.blend must be one of: ${Array.from(
+        BLEND_MODES,
+      ).join(", ")}`,
     );
   }
 
-  const textureWrap = pipeline.textureWrap ?? "clamp";
+  const textureWrap = pipeline?.textureWrap ?? defaults.textureWrap ?? "clamp";
   if (!TEXTURE_WRAP_MODES.has(textureWrap)) {
     throw new Error(
-      `Input Error: ${path}.textureWrap must be one of: ${Array.from(TEXTURE_WRAP_MODES).join(", ")}`,
+      `Input Error: ${path}.textureWrap must be one of: ${Array.from(
+        TEXTURE_WRAP_MODES,
+      ).join(", ")}`,
     );
   }
 
-  const mipmap = pipeline.mipmap ?? false;
+  const mipmap = pipeline?.mipmap ?? defaults.mipmap ?? false;
   if (typeof mipmap !== "boolean") {
     throw new Error(`Input Error: ${path}.mipmap must be a boolean`);
   }
 
-  return {
-    blend,
-    textureWrap,
-    mipmap,
-  };
+  return { blend, textureWrap, mipmap };
 };
 
 const normalizeShaderSource = (source, path) => {
@@ -246,47 +368,131 @@ const normalizeShaderSource = (source, path) => {
   };
 };
 
-const normalizeShaderMesh = (mesh, path) => {
-  if (mesh === undefined) {
-    return {
-      grid: [1, 1],
-    };
+const normalizeShaderMesh = (mesh, path, defaultMesh) => {
+  const candidate = mesh ?? defaultMesh;
+  if (candidate === undefined) {
+    return { grid: [1, 1] };
   }
 
-  assertPlainObject(mesh, path);
-
+  assertPlainObject(candidate, path);
   if (
-    !Array.isArray(mesh.grid) ||
-    mesh.grid.length !== 2 ||
-    !mesh.grid.every((value) => Number.isInteger(value) && value >= 1)
+    !Array.isArray(candidate.grid) ||
+    candidate.grid.length !== 2 ||
+    !candidate.grid.every(
+      (value) => Number.isInteger(value) && value >= 1 && value <= 512,
+    )
   ) {
     throw new Error(
-      `Input Error: ${path}.grid must be [columns, rows] with positive integers`,
+      `Input Error: ${path}.grid must be [columns, rows] with integers from 1 to 512`,
     );
   }
 
+  return { grid: [candidate.grid[0], candidate.grid[1]] };
+};
+
+const normalizePassOptions = (raw, path, defaults = {}) => {
+  const padding = raw.padding ?? defaults.padding ?? 0;
+  if (!isFiniteNumber(padding) || padding < 0) {
+    throw new Error(
+      `Input Error: ${path}.padding must be a finite number >= 0`,
+    );
+  }
+
+  const resolution = raw.resolution ?? defaults.resolution ?? 1;
+  if (
+    resolution !== "inherit" &&
+    (!isFiniteNumber(resolution) || resolution <= 0)
+  ) {
+    throw new Error(
+      `Input Error: ${path}.resolution must be "inherit" or a finite number > 0`,
+    );
+  }
+
+  let antialias = raw.antialias ?? defaults.antialias ?? "off";
+  if (typeof antialias === "boolean") {
+    antialias = antialias ? "on" : "off";
+  }
+  if (!ANTIALIAS_MODES.has(antialias)) {
+    throw new Error(
+      `Input Error: ${path}.antialias must be on, off, inherit, or a boolean`,
+    );
+  }
+
+  const clipToViewport = raw.clipToViewport ?? defaults.clipToViewport ?? true;
+  if (typeof clipToViewport !== "boolean") {
+    throw new Error(`Input Error: ${path}.clipToViewport must be a boolean`);
+  }
+
+  const time = raw.time ?? defaults.time ?? false;
+  if (typeof time !== "boolean") {
+    throw new Error(`Input Error: ${path}.time must be a boolean`);
+  }
+
+  return { padding, resolution, antialias, clipToViewport, time };
+};
+
+const normalizeEffectPass = ({
+  pass,
+  index,
+  path,
+  parameters,
+  commonTextures,
+  effectPipeline,
+  effectOptions,
+  effectMesh,
+  textureLimit,
+}) => {
+  assertPlainObject(pass, path);
+
+  const id = pass.id ?? `pass${index + 1}`;
+  assertNonEmptyString(id, `${path}.id`);
+
+  const pipeline = normalizeShaderPipeline(
+    pass.pipeline,
+    `${path}.pipeline`,
+    effectPipeline,
+  );
+  const symbols = new Map();
+  registerExistingSymbols(symbols, parameters);
+  registerExistingSymbols(symbols, commonTextures);
+
+  const uniforms = normalizeShaderUniforms(
+    pass.uniforms,
+    `${path}.uniforms`,
+    symbols,
+  );
+  const remainingTextureBudget = textureLimit - commonTextures.length;
+  const textures = normalizeShaderTextures({
+    textures: pass.textures,
+    path: `${path}.textures`,
+    symbols,
+    maxTextures: remainingTextureBudget,
+    pipeline,
+  });
+
   return {
-    grid: [mesh.grid[0], mesh.grid[1]],
+    id,
+    source: normalizeShaderSource(pass.source, `${path}.source`),
+    uniforms: [...parameters, ...uniforms].sort((a, b) =>
+      a.key.localeCompare(b.key),
+    ),
+    textures: [...commonTextures, ...textures].sort((a, b) =>
+      a.key.localeCompare(b.key),
+    ),
+    pipeline,
+    mesh: normalizeShaderMesh(pass.mesh, `${path}.mesh`, effectMesh),
+    ...normalizePassOptions(pass, path, effectOptions),
   };
 };
 
-const normalizeShaderConfig = ({
-  shader,
-  path,
-  requireId,
-  textureLimit,
-  allowMesh,
-}) => {
+const normalizeShaderConfig = ({ shader, path, requireId, textureLimit }) => {
   assertPlainObject(shader, path);
 
   if (!SHADER_FILTER_TYPES.has(shader.type)) {
     throw new Error(`Input Error: ${path}.type must be shader`);
   }
 
-  const normalized = {
-    type: "shader",
-  };
-
+  const normalized = { type: "shader" };
   if (requireId) {
     assertNonEmptyString(shader.id, `${path}.id`);
     normalized.id = shader.id;
@@ -295,31 +501,80 @@ const normalizeShaderConfig = ({
     normalized.id = shader.id;
   }
 
+  if (shader.parameters !== undefined && shader.uniforms !== undefined) {
+    throw new Error(
+      `Input Error: ${path} cannot define both parameters and legacy uniforms`,
+    );
+  }
+
   const symbols = new Map();
-  normalized.uniforms = normalizeShaderUniforms(
-    shader.uniforms,
-    `${path}.uniforms`,
+  normalized.parameters = normalizeShaderUniforms(
+    shader.parameters ?? shader.uniforms,
+    shader.parameters !== undefined ? `${path}.parameters` : `${path}.uniforms`,
     symbols,
+    "parameter",
+  );
+  // Internal compatibility alias for integrations that consumed the v1
+  // normalized shape. New runtime code uses `parameters`.
+  normalized.uniforms = normalized.parameters;
+  normalized.pipeline = normalizeShaderPipeline(
+    shader.pipeline,
+    `${path}.pipeline`,
   );
   normalized.textures = normalizeShaderTextures({
     textures: shader.textures,
     path: `${path}.textures`,
     symbols,
     maxTextures: textureLimit,
+    pipeline: normalized.pipeline,
   });
-  normalized.pipeline = normalizeShaderPipeline(
-    shader.pipeline,
-    `${path}.pipeline`,
-  );
-  normalized.source = normalizeShaderSource(shader.source, `${path}.source`);
+  normalized.mesh = normalizeShaderMesh(shader.mesh, `${path}.mesh`);
+  Object.assign(normalized, normalizePassOptions(shader, path));
 
-  if (shader.mesh !== undefined && !allowMesh) {
-    throw new Error(`Input Error: ${path}.mesh is only valid for compositors`);
+  const hasPasses = shader.passes !== undefined;
+  if (hasPasses && shader.source !== undefined) {
+    throw new Error(
+      `Input Error: ${path} cannot define both source and passes`,
+    );
   }
 
-  if (allowMesh) {
-    normalized.mesh = normalizeShaderMesh(shader.mesh, `${path}.mesh`);
+  let rawPasses;
+  if (hasPasses) {
+    if (!Array.isArray(shader.passes) || shader.passes.length === 0) {
+      throw new Error(`Input Error: ${path}.passes must be a non-empty array`);
+    }
+    rawPasses = shader.passes;
+  } else {
+    rawPasses = [
+      {
+        id: "main",
+        source: shader.source,
+      },
+    ];
   }
+
+  const seenPassIds = new Set();
+  normalized.passes = rawPasses.map((pass, index) => {
+    const normalizedPass = normalizeEffectPass({
+      pass,
+      index,
+      path: hasPasses ? `${path}.passes[${index}]` : path,
+      parameters: normalized.parameters,
+      commonTextures: normalized.textures,
+      effectPipeline: normalized.pipeline,
+      effectOptions: normalized,
+      effectMesh: normalized.mesh,
+      textureLimit,
+    });
+
+    if (seenPassIds.has(normalizedPass.id)) {
+      throw new Error(
+        `Input Error: ${path}.passes[${index}].id must be unique`,
+      );
+    }
+    seenPassIds.add(normalizedPass.id);
+    return normalizedPass;
+  });
 
   return normalized;
 };
@@ -328,20 +583,17 @@ export const normalizeElementShaderFilters = (filters, path = "filters") => {
   if (filters === undefined) {
     return undefined;
   }
-
   if (!Array.isArray(filters)) {
     throw new Error(`Input Error: ${path} must be an array`);
   }
 
   const seenIds = new Set();
-
   return filters.map((filter, index) => {
     const normalized = normalizeShaderConfig({
       shader: filter,
       path: `${path}[${index}]`,
       requireId: true,
       textureLimit: FILTER_TEXTURE_LIMIT,
-      allowMesh: false,
     });
 
     if (seenIds.has(normalized.id)) {
@@ -349,7 +601,6 @@ export const normalizeElementShaderFilters = (filters, path = "filters") => {
         `Input Error: ${path}[${index}].id must be unique within filters`,
       );
     }
-
     seenIds.add(normalized.id);
     return normalized;
   });
@@ -361,8 +612,18 @@ export const normalizeShaderCompositor = (compositor, path = "compositor") =>
     path,
     requireId: false,
     textureLimit: COMPOSITOR_TEXTURE_LIMIT,
-    allowMesh: true,
   });
 
 export const getShaderConfigSignature = (config) =>
   JSON.stringify(config ?? null);
+
+export const getShaderStructureSignature = (config) =>
+  JSON.stringify(
+    config ?? null,
+    function omitMutableParameterValues(key, value) {
+      if (key === "value" && this?.role === "parameter") {
+        return null;
+      }
+      return value;
+    },
+  );

@@ -1,12 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Cache, Texture } from "pixi.js";
 import {
+  createShaderEffect,
   createShaderFilter,
+  getShaderFilterAnimationTarget,
   installShaderProgressProperty,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
+  setShaderEffectParameter,
+  setShaderEffectTime,
   shouldUpdateUnchangedShaderFilterProgress,
   syncShaderFilters,
+  validateShaderFilterAnimationTarget,
 } from "./shaderFilterEffect.js";
+import { normalizeElementShaderFilters } from "./shaderConfig.js";
+import { createAnimationBus } from "../../animations/animationBus.js";
+import { dispatchUpdateAnimationsNow } from "../../animations/updateAnimationDispatch.js";
 
 const TEST_TEXTURE_ALIAS = "shader-filter-effect-test-texture";
 
@@ -88,7 +97,7 @@ describe("shader filter progress state", () => {
     ).toBe(true);
   });
 
-  it("does not request an unchanged update while uProgress is actively animated", () => {
+  it("resets stale legacy broadcast progress even with targeted progress", () => {
     const displayObject = { label: "shader-target" };
     const parent = { children: [displayObject] };
 
@@ -107,11 +116,15 @@ describe("shader filter progress state", () => {
             id: "progress",
             targetId: "shader-target",
             type: "update",
-            tween: { uProgress: { initialValue: 0, keyframes: [] } },
+            filterTweens: {
+              grade: {
+                uProgress: { initialValue: 0, keyframes: [] },
+              },
+            },
           },
         ],
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("finds stale shader progress in unchanged descendants", () => {
@@ -144,6 +157,818 @@ describe("shader filter progress state", () => {
 });
 
 describe("shader filter resources", () => {
+  it("creates an ordered filter chain and shares mutable parameters across passes", () => {
+    const [config] = normalizeElementShaderFilters([
+      {
+        id: "glow",
+        type: "shader",
+        parameters: {
+          amount: 0.25,
+          tint: [1, 0.5, 0],
+        },
+        time: true,
+        passes: [
+          { id: "horizontal", source: shaderSource },
+          { id: "vertical", source: shaderSource },
+        ],
+      },
+    ]);
+    const runtime = createShaderEffect({
+      effect: config,
+      width: 64,
+      height: 32,
+      time: 1.5,
+    });
+
+    expect(runtime.filters).toHaveLength(2);
+    for (const filter of runtime.filters) {
+      expect(filter.resources.shaderUniforms.uniforms.uAmount).toBe(0.25);
+      expect(
+        Array.from(filter.resources.shaderUniforms.uniforms.uTint),
+      ).toEqual([1, 0.5, 0]);
+      expect(filter.resources.shaderUniforms.uniforms.uTime).toBe(1.5);
+    }
+
+    setShaderEffectParameter(runtime, "amount", 0.8);
+    setShaderEffectParameter(runtime, "tint", [0, 0.25, 1]);
+    setShaderEffectTime(runtime, 2);
+
+    for (const filter of runtime.filters) {
+      expect(filter.resources.shaderUniforms.uniforms.uAmount).toBe(0.8);
+      expect(
+        Array.from(filter.resources.shaderUniforms.uniforms.uTint),
+      ).toEqual([0, 0.25, 1]);
+      expect(filter.resources.shaderUniforms.uniforms.uTime).toBe(2);
+    }
+
+    for (const filter of runtime.filters) {
+      filter.destroy();
+    }
+  });
+
+  it("does not add uTime unless the inline effect opts in", () => {
+    const legacyFilter = createShaderFilter({
+      shader: createTestShader(),
+      width: 32,
+      height: 32,
+    });
+    const timedFilter = createShaderFilter({
+      shader: createTestShader({ time: true }),
+      width: 32,
+      height: 32,
+      time: 1.25,
+    });
+
+    expect(legacyFilter.resources.shaderUniforms.uniforms).not.toHaveProperty(
+      "uTime",
+    );
+    expect(timedFilter.resources.shaderUniforms.uniforms.uTime).toBe(1.25);
+
+    legacyFilter.destroy();
+    timedFilter.destroy();
+  });
+
+  it("updates parameter values without rebuilding the filter programs", () => {
+    const createConfig = (amount) =>
+      normalizeElementShaderFilters([
+        {
+          id: "grade",
+          type: "shader",
+          parameters: {
+            amount,
+          },
+          source: shaderSource,
+        },
+      ]);
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+
+    syncShaderFilters(displayObject, createConfig(0.2), {
+      width: 32,
+      height: 32,
+    });
+    const originalFilter = displayObject.filters[0];
+
+    syncShaderFilters(displayObject, createConfig(0.9), {
+      width: 32,
+      height: 32,
+    });
+
+    expect(displayObject.filters[0]).toBe(originalFilter);
+    expect(originalFilter.resources.shaderUniforms.uniforms.uAmount).toBe(0.9);
+
+    const animationTarget = getShaderFilterAnimationTarget(
+      displayObject,
+      "grade",
+      "animate-grade",
+    );
+    animationTarget.amount = 0.4;
+    expect(animationTarget.amount).toBe(0.4);
+    expect(originalFilter.resources.shaderUniforms.uniforms.uAmount).toBe(0.4);
+
+    displayObject.destroy();
+  });
+
+  it("preserves completed targeted values while applying untargeted destination values", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+    const createConfig = (amount, levels) =>
+      normalizeElementShaderFilters([
+        {
+          id: "grade",
+          type: "shader",
+          parameters: { amount, levels },
+          source: shaderSource,
+        },
+      ]);
+    const animations = [
+      {
+        id: "animate-grade",
+        targetId: "shader-target",
+        type: "update",
+        filterTweens: {
+          grade: {
+            amount: {
+              keyframes: [{ duration: 100, value: 0.9, easing: "linear" }],
+            },
+            uProgress: {
+              keyframes: [{ duration: 100, value: 0.75, easing: "linear" }],
+            },
+          },
+        },
+      },
+    ];
+
+    syncShaderFilters(displayObject, createConfig(0.2, [0.1, 0.2]), {
+      width: 32,
+      height: 32,
+    });
+    const animationTarget = getShaderFilterAnimationTarget(
+      displayObject,
+      "grade",
+      "animate-grade",
+    );
+    animationTarget.amount = 0.9;
+    animationTarget.uProgress = 0.75;
+
+    syncShaderFilters(displayObject, createConfig(0.4, [0.8, 0.9]), {
+      width: 32,
+      height: 32,
+      animations,
+      targetId: "shader-target",
+    });
+
+    expect(animationTarget.amount).toBe(0.9);
+    expect(animationTarget.uProgress).toBe(0.75);
+    expect(animationTarget.levels).toEqual([0.8, 0.9]);
+
+    displayObject.destroy();
+  });
+
+  it("preserves an inferred targeted value while preparing a changed shader program", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+    const initialFilters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0.2 },
+        source: shaderSource,
+      },
+    ]);
+    const nextFilters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0.4 },
+        source: {
+          ...shaderSource,
+          webgl: {
+            ...shaderSource.webgl,
+            fragment: `${shaderSource.webgl.fragment}\n// destination program`,
+          },
+        },
+      },
+    ]);
+    const animations = [
+      {
+        id: "animate-changed-grade",
+        targetId: "shader-target",
+        type: "update",
+        filterTweens: {
+          grade: {
+            amount: {
+              keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+            },
+          },
+        },
+      },
+    ];
+
+    syncShaderFilters(displayObject, initialFilters, {
+      width: 32,
+      height: 32,
+    });
+    const originalFilter = displayObject.filters[0];
+    getShaderFilterAnimationTarget(
+      displayObject,
+      "grade",
+      "animate-changed-grade",
+    ).amount = 0.7;
+
+    expect(
+      prepareShaderFilterAnimationTargets({
+        displayObject,
+        element: {
+          id: "shader-target",
+          width: 32,
+          height: 32,
+          filters: nextFilters,
+        },
+        animations,
+      }),
+    ).toBe(true);
+
+    expect(displayObject.filters[0]).not.toBe(originalFilter);
+    expect(
+      getShaderFilterAnimationTarget(
+        displayObject,
+        "grade",
+        "animate-changed-grade",
+      ).amount,
+    ).toBe(0.7);
+
+    displayObject.destroy();
+  });
+
+  it("prepares a newly added destination filter before animation dispatch", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+    const nextFilters = normalizeElementShaderFilters([
+      {
+        id: "tone",
+        type: "shader",
+        parameters: {
+          amount: 0.2,
+        },
+        source: shaderSource,
+      },
+    ]);
+
+    expect(
+      prepareShaderFilterAnimationTargets({
+        displayObject,
+        element: {
+          id: "shader-target",
+          width: 32,
+          height: 32,
+          filters: nextFilters,
+        },
+        animations: [
+          {
+            id: "animate-new-filter",
+            targetId: "shader-target",
+            type: "update",
+            filterTweens: {
+              tone: {
+                amount: {
+                  keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+                },
+              },
+            },
+          },
+        ],
+      }),
+    ).toBe(true);
+
+    expect(
+      getShaderFilterAnimationTarget(
+        displayObject,
+        "tone",
+        "animate-new-filter",
+      ).amount,
+    ).toBe(0.2);
+
+    displayObject.destroy();
+  });
+
+  it("prepares a newly declared parameter on an existing destination filter", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+    syncShaderFilters(
+      displayObject,
+      normalizeElementShaderFilters([
+        {
+          id: "tone",
+          type: "shader",
+          parameters: {
+            amount: 0.2,
+          },
+          source: shaderSource,
+        },
+      ]),
+      { width: 32, height: 32 },
+    );
+    const nextFilters = normalizeElementShaderFilters([
+      {
+        id: "tone",
+        type: "shader",
+        parameters: {
+          amount: 0.2,
+          levels: [0.5, 1],
+        },
+        source: shaderSource,
+      },
+    ]);
+
+    expect(
+      prepareShaderFilterAnimationTargets({
+        displayObject,
+        element: {
+          id: "shader-target",
+          width: 32,
+          height: 32,
+          filters: nextFilters,
+        },
+        animations: [
+          {
+            id: "animate-new-parameter",
+            targetId: "shader-target",
+            type: "update",
+            filterTweens: {
+              tone: {
+                levels: {
+                  keyframes: [
+                    {
+                      duration: 100,
+                      value: [1, 0.2],
+                      easing: "linear",
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      }),
+    ).toBe(true);
+
+    expect(
+      getShaderFilterAnimationTarget(
+        displayObject,
+        "tone",
+        "animate-new-parameter",
+      ).levels,
+    ).toEqual([0.5, 1]);
+
+    displayObject.destroy();
+  });
+
+  it("validates targeted animation shapes before playback starts", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: {
+          amount: 0.2,
+        },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, {
+      width: 32,
+      height: 32,
+    });
+
+    expect(() =>
+      validateShaderFilterAnimationTarget(displayObject, "grade", "bad-shape", {
+        amount: {
+          keyframes: [{ duration: 100, value: [1, 2] }],
+        },
+      }),
+    ).toThrow(/parameter "amount" must be a finite number/);
+    expect(() =>
+      validateShaderFilterAnimationTarget(
+        displayObject,
+        "grade",
+        "unknown-parameter",
+        {
+          missing: {
+            keyframes: [{ duration: 100, value: 1 }],
+          },
+        },
+      ),
+    ).toThrow(/unknown parameter "missing"/);
+
+    displayObject.destroy();
+  });
+
+  it("animates normal properties and multiple filter targets on one clock", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      alpha: 0.2,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0.2 },
+        source: shaderSource,
+      },
+      {
+        id: "glow",
+        type: "shader",
+        parameters: { strength: 0.4 },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    const animationBus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: [
+        {
+          id: "combined",
+          targetId: "shader-target",
+          type: "update",
+          tween: {
+            alpha: {
+              keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+            },
+          },
+          filterTweens: {
+            grade: {
+              amount: {
+                keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+              },
+            },
+            glow: {
+              strength: {
+                keyframes: [{ duration: 100, value: 0.8, easing: "linear" }],
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      element: displayObject,
+      targetState: { alpha: 1 },
+    });
+
+    animationBus.flush();
+    animationBus.tick(50);
+
+    expect(displayObject.alpha).toBeCloseTo(0.6);
+    expect(
+      displayObject.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.6);
+    expect(
+      displayObject.filters[1].resources.shaderUniforms.uniforms.uStrength,
+    ).toBeCloseTo(0.6);
+
+    displayObject.destroy();
+  });
+
+  it("animates progress only on the explicitly targeted filter", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        source: shaderSource,
+      },
+      {
+        id: "glow",
+        type: "shader",
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    const animationBus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: [
+        {
+          id: "targeted-progress",
+          targetId: "shader-target",
+          type: "update",
+          filterTweens: {
+            grade: {
+              uProgress: {
+                initialValue: 0,
+                keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      element: displayObject,
+      targetState: {},
+    });
+
+    animationBus.flush();
+    animationBus.tick(50);
+
+    expect(
+      displayObject.filters[0].resources.shaderUniforms.uniforms.uProgress,
+    ).toBeCloseTo(0.5);
+    expect(
+      displayObject.filters[1].resources.shaderUniforms.uniforms.uProgress,
+    ).toBe(0);
+
+    displayObject.destroy();
+  });
+
+  it("interpolates relative vector parameter keyframes component by component", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: {
+          tint: [0.2, 0.3, 0.4],
+        },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    const animationBus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: [
+        {
+          id: "relative-tint",
+          targetId: "shader-target",
+          type: "update",
+          filterTweens: {
+            grade: {
+              tint: {
+                keyframes: [
+                  {
+                    duration: 100,
+                    value: [0.4, -0.2, 0.2],
+                    relative: true,
+                    easing: "linear",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      element: displayObject,
+      targetState: {},
+    });
+
+    animationBus.flush();
+    animationBus.tick(50);
+
+    expect(
+      Array.from(
+        displayObject.filters[0].resources.shaderUniforms.uniforms.uTint,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.closeTo(0.4),
+        expect.closeTo(0.2),
+        expect.closeTo(0.5),
+      ]),
+    );
+
+    displayObject.destroy();
+  });
+
+  it("waits for the longest ordinary or filter timeline before completing", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      alpha: 0,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: {
+          amount: 0,
+        },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    const completionTracker = {
+      getVersion: () => 7,
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const animationBus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: [
+        {
+          id: "mixed-duration",
+          targetId: "shader-target",
+          type: "update",
+          tween: {
+            alpha: {
+              initialValue: 0,
+              keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+            },
+          },
+          filterTweens: {
+            grade: {
+              amount: {
+                initialValue: 0,
+                keyframes: [{ duration: 200, value: 1, easing: "linear" }],
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker,
+      element: displayObject,
+      targetState: { alpha: 1 },
+    });
+
+    animationBus.flush();
+    animationBus.tick(100);
+
+    expect(displayObject.alpha).toBe(1);
+    expect(
+      displayObject.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.5);
+    expect(completionTracker.complete).not.toHaveBeenCalled();
+
+    animationBus.tick(100);
+
+    expect(
+      displayObject.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBe(1);
+    expect(completionTracker.complete).toHaveBeenCalledWith(7);
+
+    displayObject.destroy();
+  });
+
+  it("rejects a missing filter target before dispatching playback", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0 },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    expect(() =>
+      dispatchUpdateAnimationsNow({
+        animations: [
+          {
+            id: "missing-filter",
+            targetId: "shader-target",
+            type: "update",
+            filterTweens: {
+              glow: {
+                amount: {
+                  keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+                },
+              },
+            },
+          },
+        ],
+        animationBus: createAnimationBus(),
+        completionTracker: {
+          getVersion: () => 1,
+          track: vi.fn(),
+          complete: vi.fn(),
+        },
+        element: displayObject,
+        targetState: {},
+      }),
+    ).toThrow(/could not find shader filter "glow"/);
+
+    displayObject.destroy();
+  });
+
+  it("keeps an actively targeted parameter from being treated as stale", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+    const parent = { children: [displayObject] };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0.2 },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+    getShaderFilterAnimationTarget(
+      displayObject,
+      "grade",
+      "active-grade",
+    ).amount = 0.8;
+
+    expect(
+      shouldUpdateUnchangedShaderFilterProgress({
+        parent,
+        nextElement: {
+          id: "shader-target",
+          filters: [{ id: "grade", type: "shader" }],
+        },
+        animations: [
+          {
+            id: "active-grade",
+            targetId: "shader-target",
+            type: "update",
+            filterTweens: {
+              grade: {
+                amount: {
+                  keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+                },
+              },
+            },
+          },
+        ],
+      }),
+    ).toBe(false);
+
+    displayObject.destroy();
+  });
+
   it("does not mutate cached texture sources when applying pipeline options", () => {
     Cache.set(TEST_TEXTURE_ALIAS, Texture.WHITE);
     const cachedSource = Texture.WHITE.source;
