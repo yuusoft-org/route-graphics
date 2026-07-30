@@ -9,6 +9,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { syncShaderFilters } from "../util/shaderFilterEffect.js";
 
 /**
  * Add text-revealing element to the stage
@@ -34,6 +35,10 @@ export const addTextRevealing = async ({
   applyElementTransform(container, element);
   if (element.alpha !== undefined) container.alpha = element.alpha;
   parent.addChild(container);
+  syncShaderFilters(container, element.filters, {
+    width: element.width,
+    height: element.height,
+  });
 
   dispatchLiveAnimations({
     animations,

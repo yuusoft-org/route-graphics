@@ -227,14 +227,21 @@ const normalizeShaderUniforms = (uniforms, path, symbols, role = "uniform") => {
     });
 };
 
-const normalizeTextureDescriptor = (value, path, pipeline) => {
+const normalizeTextureDescriptor = (
+  value,
+  path,
+  pipeline,
+  preserveInheritedSampling,
+) => {
   if (typeof value === "string") {
     assertNonEmptyString(value, path);
-    return {
-      src: value,
-      wrap: pipeline.textureWrap,
-      mipmap: pipeline.mipmap,
-    };
+    return preserveInheritedSampling
+      ? { src: value }
+      : {
+          src: value,
+          wrap: pipeline.textureWrap,
+          mipmap: pipeline.mipmap,
+        };
   }
 
   assertPlainObject(value, path);
@@ -256,8 +263,10 @@ const normalizeTextureDescriptor = (value, path, pipeline) => {
 
   return {
     src: value.src,
-    wrap,
-    mipmap,
+    ...(value.wrap !== undefined || !preserveInheritedSampling ? { wrap } : {}),
+    ...(value.mipmap !== undefined || !preserveInheritedSampling
+      ? { mipmap }
+      : {}),
   };
 };
 
@@ -267,6 +276,7 @@ const normalizeShaderTextures = ({
   symbols,
   maxTextures,
   pipeline,
+  preserveInheritedSampling = false,
 }) => {
   if (textures === undefined) {
     return [];
@@ -295,7 +305,12 @@ const normalizeShaderTextures = ({
     return {
       key,
       symbol,
-      ...normalizeTextureDescriptor(textures[key], `${path}.${key}`, pipeline),
+      ...normalizeTextureDescriptor(
+        textures[key],
+        `${path}.${key}`,
+        pipeline,
+        preserveInheritedSampling,
+      ),
     };
   });
 };
@@ -469,6 +484,11 @@ const normalizeEffectPass = ({
     maxTextures: remainingTextureBudget,
     pipeline,
   });
+  const resolvedCommonTextures = commonTextures.map((texture) => ({
+    ...texture,
+    wrap: texture.wrap ?? pipeline.textureWrap,
+    mipmap: texture.mipmap ?? pipeline.mipmap,
+  }));
 
   return {
     id,
@@ -476,7 +496,7 @@ const normalizeEffectPass = ({
     uniforms: [...parameters, ...uniforms].sort((a, b) =>
       a.key.localeCompare(b.key),
     ),
-    textures: [...commonTextures, ...textures].sort((a, b) =>
+    textures: [...resolvedCommonTextures, ...textures].sort((a, b) =>
       a.key.localeCompare(b.key),
     ),
     pipeline,
@@ -527,6 +547,7 @@ const normalizeShaderConfig = ({ shader, path, requireId, textureLimit }) => {
     symbols,
     maxTextures: textureLimit,
     pipeline: normalized.pipeline,
+    preserveInheritedSampling: true,
   });
   normalized.mesh = normalizeShaderMesh(shader.mesh, `${path}.mesh`);
   Object.assign(normalized, normalizePassOptions(shader, path));

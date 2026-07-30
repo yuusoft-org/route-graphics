@@ -221,6 +221,70 @@ describe("shader config normalization", () => {
     });
   });
 
+  it("resolves inherited shared-texture sampling against each pass pipeline", () => {
+    const [filter] = normalizeElementShaderFilters([
+      {
+        id: "multi-sample",
+        type: "shader",
+        textures: {
+          inherited: "inherited-texture",
+          explicit: {
+            src: "explicit-texture",
+            wrap: "repeat",
+            mipmap: true,
+          },
+        },
+        pipeline: {
+          textureWrap: "repeat",
+          mipmap: true,
+        },
+        passes: [
+          {
+            id: "clamped",
+            source,
+            pipeline: {
+              textureWrap: "clamp",
+              mipmap: false,
+            },
+          },
+          {
+            id: "inherited",
+            source,
+          },
+        ],
+      },
+    ]);
+
+    const inheritedTexture = filter.textures.find(
+      ({ key }) => key === "inherited",
+    );
+    expect(inheritedTexture).not.toHaveProperty("wrap");
+    expect(inheritedTexture).not.toHaveProperty("mipmap");
+    expect(filter.passes[0].textures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "inherited",
+          wrap: "clamp",
+          mipmap: false,
+        }),
+        expect.objectContaining({
+          key: "explicit",
+          wrap: "repeat",
+          mipmap: true,
+        }),
+      ]),
+    );
+    expect(filter.passes[1].textures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "inherited",
+          wrap: "repeat",
+          mipmap: true,
+        }),
+      ]),
+    );
+  });
+
   it("normalizes compositor mesh defaults and explicit grids", () => {
     expect(
       normalizeShaderCompositor({

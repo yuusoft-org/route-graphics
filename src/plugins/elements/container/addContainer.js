@@ -46,6 +46,7 @@ const addChildrenDirectly = ({
   renderContext,
   completionTracker,
   signal,
+  shaderTime,
 }) => {
   const pendingOperations = [];
 
@@ -68,6 +69,7 @@ const addChildrenDirectly = ({
       renderContext,
       completionTracker,
       signal,
+      shaderTime,
     });
 
     if (operation && typeof operation.then === "function") {
@@ -98,6 +100,7 @@ export const addContainer = ({
   zIndex,
   completionTracker,
   signal,
+  shaderTime,
 }) => {
   const { id, children, scroll, alpha } = element;
 
@@ -135,6 +138,7 @@ export const addContainer = ({
         renderContext,
         completionTracker,
         signal,
+        shaderTime,
       });
     } else {
       // Route unique fresh mounts through the planner so child transitions can run.
@@ -150,6 +154,7 @@ export const addContainer = ({
         elementPlugins,
         renderContext,
         signal,
+        shaderTime,
       });
     }
   }

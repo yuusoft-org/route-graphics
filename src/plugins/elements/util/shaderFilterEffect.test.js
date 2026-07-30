@@ -15,7 +15,10 @@ import {
 } from "./shaderFilterEffect.js";
 import { normalizeElementShaderFilters } from "./shaderConfig.js";
 import { createAnimationBus } from "../../animations/animationBus.js";
-import { dispatchUpdateAnimationsNow } from "../../animations/updateAnimationDispatch.js";
+import {
+  applyInitialUpdateAnimationState,
+  dispatchUpdateAnimationsNow,
+} from "../../animations/updateAnimationDispatch.js";
 
 const TEST_TEXTURE_ALIAS = "shader-filter-effect-test-texture";
 
@@ -722,6 +725,120 @@ describe("shader filter resources", () => {
     expect(
       displayObject.filters[1].resources.shaderUniforms.uniforms.uProgress,
     ).toBe(0);
+
+    displayObject.destroy();
+  });
+
+  it("settles the display object when a filter-only animation is cancelled", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      x: 10,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0 },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    const animationBus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: [
+        {
+          id: "filter-only",
+          targetId: "shader-target",
+          type: "update",
+          filterTweens: {
+            grade: {
+              amount: {
+                keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      element: displayObject,
+      targetState: { x: 200 },
+    });
+
+    animationBus.flush();
+    animationBus.tick(25);
+    expect(displayObject.x).toBe(10);
+
+    animationBus.cancelAllExcept(new Set());
+
+    expect(displayObject.x).toBe(200);
+    displayObject.destroy();
+  });
+
+  it("applies filter initial values while update animations are suppressed", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: {
+          amount: 0.2,
+          tint: [1, 1, 1],
+        },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    applyInitialUpdateAnimationState(displayObject, [
+      {
+        id: "deferred-filter",
+        targetId: "shader-target",
+        type: "update",
+        filterTweens: {
+          grade: {
+            amount: {
+              initialValue: 0.65,
+              keyframes: [{ duration: 100, value: 1, easing: "linear" }],
+            },
+            tint: {
+              initialValue: [0.25, 0.5, 0.75],
+              keyframes: [
+                {
+                  duration: 100,
+                  value: [1, 1, 1],
+                  easing: "linear",
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(
+      displayObject.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.65);
+    expect(
+      Array.from(
+        displayObject.filters[0].resources.shaderUniforms.uniforms.uTint,
+      ),
+    ).toEqual([0.25, 0.5, 0.75]);
 
     displayObject.destroy();
   });

@@ -34,6 +34,7 @@ import {
   setShaderEffectProgress,
   setShaderEffectResolution,
   setShaderEffectTime,
+  setShaderTimeInTree,
   validateShaderEffectParameterValue,
 } from "../../elements/util/shaderFilterEffect.js";
 const DEFAULT_SUBJECT_VALUES = {
@@ -1738,6 +1739,7 @@ const instantiateNextLiveElement = ({
   renderContext,
   zIndex,
   signal,
+  shaderTime,
 }) => {
   if (!nextElement) {
     return null;
@@ -1755,6 +1757,7 @@ const instantiateNextLiveElement = ({
     renderContext,
     zIndex,
     signal,
+    shaderTime,
   });
 
   if (result && typeof result.then === "function") {
@@ -1813,6 +1816,7 @@ export const runReplaceAnimation = ({
   resolveParent,
   zIndex,
   signal,
+  shaderTime = 0,
 }) => {
   if (!prevElement && !nextElement) {
     throw new Error(
@@ -2063,6 +2067,10 @@ export const runReplaceAnimation = ({
       );
     }
 
+    if (nextDisplayObject) {
+      setShaderTimeInTree(nextDisplayObject, shaderTime);
+    }
+
     const useLivePlainOverlay =
       animation.mask === undefined &&
       animation.compositor === undefined &&
@@ -2266,6 +2274,7 @@ export const runReplaceAnimation = ({
         renderContext: hiddenMountContext,
         zIndex,
         signal: transitionSignal,
+        shaderTime,
       })
     : null;
 

@@ -7,6 +7,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { syncShaderFilters } from "../util/shaderFilterEffect.js";
 
 /**
  * @typedef {import('pixi.js').Application} Application
@@ -228,6 +229,10 @@ export const addParticle = ({
   if (element.alpha !== undefined) {
     container.alpha = element.alpha;
   }
+  syncShaderFilters(container, element.filters, {
+    width,
+    height,
+  });
 
   dispatchLiveAnimations({
     animations,

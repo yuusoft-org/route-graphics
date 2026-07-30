@@ -10,6 +10,11 @@ import {
   flushDeferredMountOperations,
 } from "../../src/plugins/elements/renderContext.js";
 import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import { syncShaderFilters } from "../../src/plugins/elements/util/shaderFilterEffect.js";
+import {
+  createAnimatedShaderFilterFixture,
+  createFilterAnimationFixture,
+} from "../util/shaderFilterFixtures.js";
 
 describe("buildAnimationContinuityPlan", () => {
   it("continues a persistent update when the target is unchanged", () => {
@@ -836,6 +841,56 @@ describe("dispatchUpdateAnimations", () => {
         }),
       }),
     );
+  });
+
+  it("applies filter initial values before capturing a suppressed mount", () => {
+    const animationBus = { dispatch: vi.fn() };
+    const completionTracker = {
+      getVersion: () => 7,
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const renderContext = createRenderContext({ suppressAnimations: true });
+    const element = {
+      label: "child-filter",
+      width: 32,
+      height: 32,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    syncShaderFilters(element, createAnimatedShaderFilterFixture(), {
+      width: 32,
+      height: 32,
+    });
+
+    const dispatched = dispatchUpdateAnimations({
+      animations: createFilterAnimationFixture("child-filter"),
+      targetId: "child-filter",
+      animationBus,
+      completionTracker,
+      element,
+      targetState: { x: 100 },
+      renderContext,
+    });
+
+    expect(dispatched).toBe(true);
+    expect(
+      element.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.4);
+    expect(animationBus.dispatch).not.toHaveBeenCalled();
+
+    flushDeferredMountOperations(renderContext);
+
+    expect(animationBus.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          id: "child-filter-grade",
+          element,
+          targetState: { x: 100 },
+        }),
+      }),
+    );
+    element.destroy();
   });
 
   it("defers persistent update animations without tracking render completion", () => {

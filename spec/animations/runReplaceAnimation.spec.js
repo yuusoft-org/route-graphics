@@ -14,6 +14,8 @@ import {
   selectSequenceMaskFrameState,
 } from "../../src/plugins/animations/replace/runReplaceAnimation.js";
 import { getElementRenderState } from "../../src/plugins/elements/elementRenderState.js";
+import { syncShaderFilters } from "../../src/plugins/elements/util/shaderFilterEffect.js";
+import { normalizeElementShaderFilters } from "../../src/plugins/elements/util/shaderConfig.js";
 import {
   queueDeferredAnimatedSpritePlay,
   queueDeferredParticlesStart,
@@ -172,6 +174,35 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 }
 `,
     },
+  },
+};
+
+const timedFilterSource = {
+  webgl: {
+    fragment: `
+      in vec2 vTextureCoord;
+      out vec4 finalColor;
+      uniform sampler2D uTexture;
+      void main() { finalColor = texture(uTexture, vTextureCoord); }
+    `,
+  },
+  webgpu: {
+    source: `
+      struct VSOutput {
+        @builtin(position) position: vec4<f32>,
+        @location(0) uv: vec2<f32>,
+      };
+
+      @vertex fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput {
+        return VSOutput(vec4<f32>(aPosition, 0.0, 1.0), aPosition);
+      }
+
+      @fragment fn mainFragment(
+        @location(0) uv: vec2<f32>,
+      ) -> @location(0) vec4<f32> {
+        return vec4<f32>(uv, 0.0, 1.0);
+      }
+    `,
   },
 };
 
@@ -352,6 +383,88 @@ describe("runReplaceAnimation", () => {
     expect(nextDisplayObject.visible).toBe(true);
     expect(deferredEffect).toHaveBeenCalledTimes(1);
     expect(tracker.complete).toHaveBeenCalledWith(11);
+  });
+
+  it("seeds hidden transition snapshots with the current shader clock", () => {
+    const parent = createParent();
+    const nextDisplayObject = createDisplayObject("scene-root");
+    const [timedFilter] = normalizeElementShaderFilters([
+      {
+        id: "clock",
+        type: "shader",
+        time: true,
+        source: timedFilterSource,
+      },
+    ]);
+    let snapshotTime;
+
+    const plugin = {
+      add: vi.fn(({ parent: targetParent }) => {
+        syncShaderFilters(nextDisplayObject, [timedFilter], {
+          width: 100,
+          height: 100,
+        });
+        targetParent.addChild(nextDisplayObject);
+      }),
+      delete: vi.fn(),
+    };
+    const animationBus = {
+      dispatch: vi.fn(),
+    };
+    const app = {
+      renderer: {
+        generateTexture: vi.fn(({ target }) => {
+          snapshotTime =
+            target.filters[0].resources.shaderUniforms.uniforms.uTime;
+          return Texture.EMPTY;
+        }),
+      },
+    };
+
+    runReplaceAnimation({
+      app,
+      parent,
+      prevElement: null,
+      nextElement: {
+        id: "scene-root",
+        type: "container",
+        children: [],
+      },
+      animation: {
+        id: "scene-enter",
+        targetId: "scene-root",
+        type: "transition",
+        next: {
+          tween: {
+            alpha: {
+              initialValue: 0,
+              keyframes: [{ duration: 300, value: 1, easing: "linear" }],
+            },
+          },
+        },
+      },
+      animations: new Map(),
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      eventHandler: vi.fn(),
+      elementPlugins: [],
+      plugin,
+      zIndex: 0,
+      shaderTime: 4.25,
+      signal: new AbortController().signal,
+    });
+
+    expect(snapshotTime).toBeCloseTo(4.25);
+    expect(
+      nextDisplayObject.filters[0].resources.shaderUniforms.uniforms.uTime,
+    ).toBeCloseTo(4.25);
+
+    animationBus.dispatch.mock.calls[0][0].payload.onComplete();
+    nextDisplayObject.destroy();
   });
 
   it("uses separate plugins for cross-type transition lifecycle operations", () => {

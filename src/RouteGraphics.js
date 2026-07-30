@@ -1252,6 +1252,7 @@ const createRouteGraphics = () => {
       completionTracker,
       eventHandler: handler,
       signal,
+      shaderTime: shaderTimeMS / 1000,
     });
 
     // Flush animation commands to apply initial values immediately

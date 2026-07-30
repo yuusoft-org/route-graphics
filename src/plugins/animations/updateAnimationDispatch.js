@@ -163,6 +163,23 @@ export const applyInitialUpdateAnimationState = (
         value: config.initialValue,
       });
     }
+
+    for (const [filterId, tween] of Object.entries(
+      animation.filterTweens ?? {},
+    )) {
+      const filterTarget = validateShaderFilterAnimationTarget(
+        element,
+        filterId,
+        animation.id,
+        tween,
+      );
+
+      for (const [property, config] of Object.entries(tween)) {
+        if (config.initialValue !== undefined) {
+          filterTarget[property] = config.initialValue;
+        }
+      }
+    }
   }
 };
 
@@ -208,15 +225,14 @@ export const dispatchUpdateAnimationsNow = ({
       : animationBaseState;
 
   for (const animation of animationsToDispatch) {
-    const propertyGroups = [];
-    if (animation.tween) {
-      propertyGroups.push({
+    const propertyGroups = [
+      {
         element: dispatchElement,
-        properties: animation.tween,
+        properties: animation.tween ?? {},
         targetState,
         animationBaseState: dispatchAnimationBaseState,
-      });
-    }
+      },
+    ];
     for (const [filterId, tween] of Object.entries(
       animation.filterTweens ?? {},
     )) {
