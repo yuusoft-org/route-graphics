@@ -15,6 +15,13 @@ Route Graphics is built around plugin groups registered in `init(...)`:
 
 Element plugins are the main extension point. They own parsing plus add/update/delete behavior for a single node type.
 
+Element plugin implementations are an advanced, renderer-coupled extension
+surface: their lifecycle receives the current Pixi application/container
+objects. That boundary is separate from the stable declarative state, shader,
+animation, event, and Route Graphics instance APIs. Portable consumers should
+use built-in elements and inline shaders; custom element plugin implementations
+must be retested when Pixi is intentionally upgraded.
+
 ```js
 import { createElementPlugin } from "route-graphics";
 

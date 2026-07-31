@@ -63,6 +63,7 @@ describe("shader config normalization", () => {
       textureWrap: "clamp",
       mipmap: false,
     });
+    expect(JSON.parse(JSON.stringify(filters))).toEqual(filters);
   });
 
   it("rejects generated uniform and texture symbol collisions", () => {

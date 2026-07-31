@@ -2,12 +2,11 @@ import {
   Filter,
   Geometry,
   Matrix,
-  Point,
-  RendererType,
   Texture,
   TextureSource,
   UniformGroup,
 } from "pixi.js";
+import { applyPixiShaderFilterMesh } from "../../../renderer/pixi/shaderMeshAdapter.js";
 import { setManagedFilter } from "./managedFilters.js";
 import {
   getShaderStructureSignature,
@@ -274,149 +273,6 @@ const createShaderFilterGeometry = (grid = [1, 1]) => {
   });
 };
 
-const assertShaderMeshFilterSystemCompatibility = (filterManager) => {
-  const missingInternals = [];
-  if (!Array.isArray(filterManager?._filterStack)) {
-    missingInternals.push("_filterStack");
-  }
-  if (!Number.isInteger(filterManager?._filterStackIndex)) {
-    missingInternals.push("_filterStackIndex");
-  }
-  if (!filterManager?._filterGlobalUniforms?.uniforms) {
-    missingInternals.push("_filterGlobalUniforms");
-  }
-  if (
-    typeof filterManager?._globalFilterBindGroup?.setResource !== "function"
-  ) {
-    missingInternals.push("_globalFilterBindGroup");
-  }
-
-  if (missingInternals.length > 0) {
-    throw new Error(
-      `Custom shader meshes require the pinned Pixi FilterSystem internals; incompatible runtime is missing ${missingInternals.join(
-        ", ",
-      )}.`,
-    );
-  }
-};
-
-const applyShaderFilterWithGeometry = ({
-  filterManager,
-  filter,
-  geometry,
-  input,
-  output,
-  clear,
-}) => {
-  assertShaderMeshFilterSystemCompatibility(filterManager);
-  const renderer = filterManager.renderer;
-  const filterData =
-    filterManager._filterStack[filterManager._filterStackIndex];
-  const bounds = filterData.bounds;
-  const offset = Point.shared;
-  const previousRenderSurface = filterData.previousRenderSurface;
-  const isFinalTarget = previousRenderSurface === output;
-  let resolution =
-    renderer.renderTarget.rootRenderTarget.colorTexture.source._resolution;
-  let currentIndex = filterManager._filterStackIndex - 1;
-
-  while (currentIndex > 0 && filterManager._filterStack[currentIndex].skip) {
-    currentIndex--;
-  }
-
-  if (currentIndex > 0) {
-    resolution =
-      filterManager._filterStack[currentIndex].inputTexture.source._resolution;
-  }
-
-  const filterUniforms = filterManager._filterGlobalUniforms;
-  const uniforms = filterUniforms.uniforms;
-  const outputFrame = uniforms.uOutputFrame;
-  const inputSize = uniforms.uInputSize;
-  const inputPixel = uniforms.uInputPixel;
-  const inputClamp = uniforms.uInputClamp;
-  const globalFrame = uniforms.uGlobalFrame;
-  const outputTexture = uniforms.uOutputTexture;
-
-  if (isFinalTarget) {
-    let lastIndex = filterManager._filterStackIndex;
-
-    while (lastIndex > 0) {
-      lastIndex--;
-      const previousFilterData = filterManager._filterStack[lastIndex];
-      if (!previousFilterData.skip) {
-        offset.x = previousFilterData.bounds.minX;
-        offset.y = previousFilterData.bounds.minY;
-        break;
-      }
-    }
-
-    outputFrame[0] = bounds.minX - offset.x;
-    outputFrame[1] = bounds.minY - offset.y;
-  } else {
-    outputFrame[0] = 0;
-    outputFrame[1] = 0;
-  }
-
-  outputFrame[2] = input.frame.width;
-  outputFrame[3] = input.frame.height;
-  inputSize[0] = input.source.width;
-  inputSize[1] = input.source.height;
-  inputSize[2] = 1 / inputSize[0];
-  inputSize[3] = 1 / inputSize[1];
-  inputPixel[0] = input.source.pixelWidth;
-  inputPixel[1] = input.source.pixelHeight;
-  inputPixel[2] = 1 / inputPixel[0];
-  inputPixel[3] = 1 / inputPixel[1];
-  inputClamp[0] = 0.5 * inputPixel[2];
-  inputClamp[1] = 0.5 * inputPixel[3];
-  inputClamp[2] = input.frame.width * inputSize[2] - 0.5 * inputPixel[2];
-  inputClamp[3] = input.frame.height * inputSize[3] - 0.5 * inputPixel[3];
-
-  const rootTexture = renderer.renderTarget.rootRenderTarget.colorTexture;
-  globalFrame[0] = offset.x * resolution;
-  globalFrame[1] = offset.y * resolution;
-  globalFrame[2] = rootTexture.source.width * resolution;
-  globalFrame[3] = rootTexture.source.height * resolution;
-
-  const renderTarget = renderer.renderTarget.getRenderTarget(output);
-  renderer.renderTarget.bind(output, Boolean(clear));
-
-  if (output instanceof Texture) {
-    outputTexture[0] = output.frame.width;
-    outputTexture[1] = output.frame.height;
-  } else {
-    outputTexture[0] = renderTarget.width;
-    outputTexture[1] = renderTarget.height;
-  }
-
-  outputTexture[2] = renderTarget.isRoot ? -1 : 1;
-  filterUniforms.update();
-
-  if (renderer.renderPipes.uniformBatch) {
-    const batchUniforms =
-      renderer.renderPipes.uniformBatch.getUboResource(filterUniforms);
-    filterManager._globalFilterBindGroup.setResource(batchUniforms, 0);
-  } else {
-    filterManager._globalFilterBindGroup.setResource(filterUniforms, 0);
-  }
-
-  filterManager._globalFilterBindGroup.setResource(input.source, 1);
-  filterManager._globalFilterBindGroup.setResource(input.source.style, 2);
-  filter.groups[0] = filterManager._globalFilterBindGroup;
-
-  renderer.encoder.draw({
-    geometry,
-    shader: filter,
-    state: filter._state,
-    topology: "triangle-list",
-  });
-
-  if (renderer.type === RendererType.WEBGL) {
-    renderer.renderTarget.finishRenderPass();
-  }
-};
-
 export const setShaderFilterProgress = (filter, progress) => {
   const shaderUniforms = filter?.resources?.shaderUniforms;
   if (!shaderUniforms?.uniforms) {
@@ -522,7 +378,7 @@ export const createShaderFilter = ({
   const geometry = createShaderFilterGeometry(shader.mesh?.grid);
   if (geometry) {
     filter.apply = (filterManager, input, output, clear) => {
-      applyShaderFilterWithGeometry({
+      applyPixiShaderFilterMesh({
         filterManager,
         filter,
         geometry,

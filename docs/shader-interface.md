@@ -40,8 +40,8 @@ Keeping the declaration inline has useful semantics:
 - there is no second namespace or lookup failure mode
 - single-use effects do not need artificial global ids
 
-The runtime still reuses compiled programs through Pixi's source caches. Inline
-does not mean recompiling unchanged source on every render.
+The runtime still reuses compiled programs through the renderer's source
+caches. Inline does not mean recompiling unchanged source on every render.
 
 If reusable authoring becomes important, it should be implemented as tooling
 that expands templates into this canonical inline form. It does not require a
@@ -77,7 +77,7 @@ element rendering
 -> final output
 ```
 
-For `input`, the Pixi-rendered element is filtered. The temporary HTML editor
+For `input`, the GPU-rendered element is filtered. The temporary HTML editor
 shown while the input is actively focused is a DOM overlay and is not processed
 by GPU filters.
 
@@ -454,6 +454,12 @@ adapter; an unavailable or unusable adapter is a test failure.
 
 ## Source And ABI
 
+The bindings, symbols, entry points, and uniform ordering in this section are
+the Route Graphics shader ABI. They are a stable authored contract, not a Pixi
+API. The internal renderer adapter maps this ABI onto the installed rendering
+backend. Shader source should use only the documented ABI and must not depend
+on additional renderer globals or runtime objects.
+
 Each source block is:
 
 ```yaml
@@ -468,8 +474,8 @@ source:
       # required WGSL source
 ```
 
-WGSL must define `mainVertex` and `mainFragment`. GLSL uses Pixi v8 `in`/`out`
-syntax. If `webgl.vertex` is omitted, Route Graphics supplies a standard Pixi
+WGSL must define `mainVertex` and `mainFragment`. GLSL uses modern `in`/`out`
+syntax. If `webgl.vertex` is omitted, Route Graphics supplies its standard
 filter vertex shader with `aPosition` and `vTextureCoord`.
 
 ### Built-In Inputs
@@ -609,8 +615,8 @@ the owning render target and filter area still impose their normal limits.
 
 ## Alpha And Final Handoff
 
-Shader output follows Pixi premultiplied-alpha semantics. When constructing a
-color from unpremultiplied values, return:
+Shader output follows the Route Graphics premultiplied-alpha contract. When
+constructing a color from unpremultiplied values, return:
 
 ```txt
 vec4(rgb * alpha, alpha)
@@ -627,19 +633,20 @@ place. It does not rebuild the filter chain. Changes to source, pass structure,
 static uniforms, textures, pipeline, mesh, or pass options rebuild the affected
 effect.
 
-Compiled GLSL and WGSL programs are reused by Pixi's source-based program
-caches. Per-effect filter instances remain separate so parameters can animate
-independently.
+Compiled GLSL and WGSL programs are reused by the renderer's source-based
+program caches. Per-effect filter instances remain separate so parameters can
+animate independently.
 
 Owned filters, cloned texture sources, and mesh geometry are destroyed with the
 display object or transition overlay.
 
-The subdivided mesh path integrates with Pixi's filter geometry internals.
-`pixi.js` is therefore pinned to the tested version instead of accepting
-automatic minor upgrades. If an incompatible Pixi runtime is supplied, custom
-mesh rendering throws a focused compatibility error naming the missing filter
-system fields. Standard `[1, 1]` filter geometry does not use this internal
-path.
+The subdivided mesh path integrates with Pixi's filter geometry internals
+behind one versioned internal adapter. `pixi.js` is therefore pinned to the
+adapter's tested version instead of accepting automatic minor upgrades.
+Architecture tests reject a version mismatch and reject private FilterSystem
+access anywhere else in production code. An intentional Pixi upgrade changes
+that adapter and its tests, not the authored shader ABI. Standard `[1, 1]`
+filter geometry does not use this internal path.
 
 ## Validation And Diagnostics
 

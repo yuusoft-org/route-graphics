@@ -1370,12 +1370,12 @@ describe("shader filter resources", () => {
         {
           skip: false,
           bounds: { minX: 20, minY: 30 },
-          inputTexture: { source: { _resolution: 2 } },
+          inputTexture: { source: { resolution: 2 } },
         },
         {
           skip: true,
           bounds: { minX: 999, minY: 999 },
-          inputTexture: { source: { _resolution: 3 } },
+          inputTexture: { source: { resolution: 3 } },
         },
         {
           skip: false,
@@ -1391,7 +1391,7 @@ describe("shader filter resources", () => {
         renderTarget: {
           rootRenderTarget: {
             colorTexture: {
-              source: { _resolution: 1, width: 800, height: 600 },
+              source: { resolution: 1, width: 800, height: 600 },
             },
           },
           getRenderTarget: () => ({ width: 100, height: 50, isRoot: false }),
@@ -1445,7 +1445,7 @@ describe("shader filter resources", () => {
         false,
       ),
     ).toThrow(
-      /Custom shader meshes require the pinned Pixi FilterSystem internals; incompatible runtime is missing _filterGlobalUniforms, _globalFilterBindGroup/,
+      /Custom shader meshes are incompatible with the installed Pixi runtime.*_filterGlobalUniforms, _globalFilterBindGroup/,
     );
 
     filter.destroy();

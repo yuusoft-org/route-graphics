@@ -56,8 +56,8 @@ element rendering
 -> final output
 ```
 
-For `input`, the Pixi element is filtered. The HTML editor temporarily shown
-while the input is focused is a DOM overlay and is not shader-filtered.
+For `input`, the GPU-rendered element is filtered. The HTML editor temporarily
+shown while the input is focused is a DOM overlay and is not shader-filtered.
 
 ## Single-Pass Filter
 
@@ -392,7 +392,7 @@ seven shared plus local custom textures; a compositor pass supports six.
 ## WebGL Contract
 
 `source.webgl.fragment` is required. `source.webgl.vertex` is optional. When it
-is omitted, Route Graphics provides the standard Pixi filter vertex shader and
+is omitted, Route Graphics provides its standard filter vertex shader and
 the fragment shader can consume `vTextureCoord`:
 
 ```glsl
@@ -416,7 +416,8 @@ Custom mesh deformation requires a custom vertex shader accepting
 
 ## WebGPU Contract
 
-WGSL must define `mainVertex` and `mainFragment` and use Pixi's filter groups:
+WGSL must define `mainVertex` and `mainFragment` and use the Route Graphics
+shader groups:
 
 ```wgsl
 @group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
@@ -449,6 +450,11 @@ Always use the custom sampler for its texture. Group 0's `uSampler` belongs to
 the filter input and does not contain the custom texture's `wrap` or `mipmap`
 settings.
 
+These bindings and uniform ordering are the stable Route Graphics shader ABI.
+They currently map onto Pixi internally, but authored shaders must not depend
+on any additional Pixi globals or objects. Renderer upgrades are handled by
+the internal adapter without changing this contract.
+
 The repository's `bun run test:webgpu` command disables renderer fallback and
 compiles/renders representative timed, multipass, textured-mesh, and compositor
 effects through an actual WebGPU browser. This is separate from the default
@@ -460,15 +466,16 @@ WebGL visual-test run.
 does not change layout or semantic hit-test bounds.
 
 Subdivided filter geometry depends on the tested Pixi filter system internals,
-so Route Graphics pins its Pixi version. An incompatible runtime reports a
-focused custom-mesh compatibility error instead of failing later inside a draw
-call.
+so Route Graphics pins its Pixi version and contains all private access in one
+versioned adapter. Architecture tests prevent that access from spreading into
+the shader runtime. An intentional Pixi upgrade updates the adapter while the
+authored shader contract remains unchanged.
 
 Use `padding` for effects that draw outside the source bounds. Transition
 overlays include compositor padding.
 
-Pixi expects premultiplied alpha. When constructing color from unpremultiplied
-values, return `vec4(rgb * alpha, alpha)`.
+Route Graphics shader output uses premultiplied alpha. When constructing color
+from unpremultiplied values, return `vec4(rgb * alpha, alpha)`.
 
 The last compositor frame is shown before Route Graphics reveals the live next
 target. Make the final shader result converge on `uNextTexture` to avoid a
@@ -478,7 +485,7 @@ visible handoff jump.
 
 Changing only parameter values updates existing effects in place. Source,
 passes, static uniforms, textures, pipeline, mesh, or pass-option changes
-rebuild the effect. Pixi caches compiled programs by source.
+rebuild the effect. The renderer caches compiled programs by source.
 
 The intentional boundaries are:
 

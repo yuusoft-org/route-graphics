@@ -274,6 +274,12 @@ User payloads should not try to mirror renderer-native event objects.
 
 Renderer-native and browser-native input events are implementation details.
 
+The same boundary applies to shaders. The documented shader bindings and
+uniform ordering belong to Route Graphics even when the current adapter maps
+them directly onto Pixi. Public state, animation, and event payloads must remain
+plain serializable data and must never contain Pixi applications, containers,
+filters, textures, geometry, or events.
+
 Examples of internal-only event names:
 
 - `pointerdown`
