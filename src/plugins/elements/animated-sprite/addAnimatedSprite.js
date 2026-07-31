@@ -10,6 +10,7 @@ import {
 import {
   getShaderFilterTargetState,
   hasShaderProgressUpdateAnimation,
+  setShaderTime,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
 import {
@@ -36,6 +37,8 @@ export const addAnimatedSprite = async ({
   completionTracker,
   zIndex,
   signal,
+  shaderTime = 0,
+  getShaderTime,
 }) => {
   if (signal?.aborted) return;
 
@@ -102,6 +105,10 @@ export const addAnimatedSprite = async ({
       height,
       force: shouldForceShaderProgress,
     });
+    setShaderTime(
+      animatedSprite,
+      typeof getShaderTime === "function" ? getShaderTime() : shaderTime,
+    );
 
     parent.addChild(animatedSprite);
 

@@ -1045,7 +1045,13 @@ const getAnimatedShaderFilterValues = (displayObject, animations, targetId) => {
       for (const parameter of Object.keys(tween)) {
         const value = getShaderEffectParameter(runtime, parameter);
         if (value !== undefined) {
-          values.push({ filterId, parameter, value });
+          values.push({
+            filterId,
+            parameter,
+            value,
+            hasExplicitInitialValue:
+              tween[parameter]?.initialValue !== undefined,
+          });
         }
       }
     }
@@ -1054,10 +1060,31 @@ const getAnimatedShaderFilterValues = (displayObject, animations, targetId) => {
   return values;
 };
 
-const restoreAnimatedShaderFilterValues = (displayObject, values) => {
-  for (const { filterId, parameter, value } of values) {
+const canRestoreShaderFilterValue = (runtime, parameter, value) => {
+  try {
+    return validateShaderEffectParameterValue(runtime, parameter, value);
+  } catch {
+    return false;
+  }
+};
+
+const restoreAnimatedShaderFilterValues = (
+  displayObject,
+  values,
+  { skipExplicitInitialValues = false } = {},
+) => {
+  for (const {
+    filterId,
+    parameter,
+    value,
+    hasExplicitInitialValue,
+  } of values) {
+    if (skipExplicitInitialValues && hasExplicitInitialValue) {
+      continue;
+    }
+
     const runtime = findShaderEffectRuntime(displayObject, filterId);
-    if (runtime && getShaderEffectParameter(runtime, parameter) !== undefined) {
+    if (canRestoreShaderFilterValue(runtime, parameter, value)) {
       setShaderEffectParameter(runtime, parameter, value);
     }
   }
@@ -1136,7 +1163,9 @@ export const syncShaderFilters = (
     effects: nextEffects,
     filters: nextFilters,
   });
-  restoreAnimatedShaderFilterValues(displayObject, animatedValues);
+  restoreAnimatedShaderFilterValues(displayObject, animatedValues, {
+    skipExplicitInitialValues: true,
+  });
   setManagedFilter(displayObject, "shader", nextFilters);
 };
 

@@ -1295,17 +1295,11 @@ const createCompositorOverlay = ({
   const sprite = new Sprite(prevTexture);
   sprite.x = unionBounds.x;
   sprite.y = unionBounds.y;
-  const compositorPadding = Math.max(
-    0,
-    ...(animation.compositor.passes ?? [animation.compositor]).map(
-      (pass) => pass.padding ?? 0,
-    ),
-  );
   sprite.filterArea = new Rectangle(
-    -compositorPadding,
-    -compositorPadding,
-    unionBounds.width + compositorPadding * 2,
-    unionBounds.height + compositorPadding * 2,
+    0,
+    0,
+    unionBounds.width,
+    unionBounds.height,
   );
   overlay.addChild(sprite);
 

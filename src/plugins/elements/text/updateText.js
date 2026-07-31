@@ -120,6 +120,8 @@ export const updateText = ({
       width: prevTextComputedNode.width,
       height: prevTextComputedNode.height,
       force: true,
+      animations,
+      targetId: prevTextComputedNode.id,
     });
   } else {
     resetShaderFilterProgress(textElement);

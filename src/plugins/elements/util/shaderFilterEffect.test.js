@@ -474,6 +474,99 @@ describe("shader filter resources", () => {
     displayObject.destroy();
   });
 
+  it("does not restore an incompatible old value when a parameter shape changes", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      destroy() {},
+    };
+    const initialFilters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0.2 },
+        source: shaderSource,
+      },
+    ]);
+    const nextFilters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: [0.1, 0.2, 0.3] },
+        source: shaderSource,
+      },
+    ]);
+    const animations = [
+      {
+        id: "animate-vector-grade",
+        targetId: "shader-target",
+        type: "update",
+        filterTweens: {
+          grade: {
+            amount: {
+              initialValue: [0.3, 0.4, 0.5],
+              keyframes: [
+                {
+                  duration: 100,
+                  value: [0.8, 0.9, 1],
+                  easing: "linear",
+                },
+              ],
+            },
+          },
+        },
+      },
+    ];
+
+    syncShaderFilters(displayObject, initialFilters, {
+      width: 32,
+      height: 32,
+    });
+    getShaderFilterAnimationTarget(
+      displayObject,
+      "grade",
+      "animate-vector-grade",
+    ).amount = 0.7;
+
+    expect(() =>
+      prepareShaderFilterAnimationTargets({
+        displayObject,
+        element: {
+          id: "shader-target",
+          width: 32,
+          height: 32,
+          filters: nextFilters,
+        },
+        animations,
+      }),
+    ).not.toThrow();
+
+    const animationBus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations,
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      element: displayObject,
+      targetState: {},
+    });
+    animationBus.flush();
+
+    expect(
+      getShaderFilterAnimationTarget(
+        displayObject,
+        "grade",
+        "animate-vector-grade",
+      ).amount,
+    ).toEqual([0.3, 0.4, 0.5]);
+
+    displayObject.destroy();
+  });
+
   it("prepares a newly added destination filter before animation dispatch", () => {
     const displayObject = {
       label: "shader-target",

@@ -72,6 +72,8 @@ export const updateAnimatedSprite = async ({
       width: prevElement.width,
       height: prevElement.height,
       force: true,
+      animations,
+      targetId: prevElement.id,
     });
   } else {
     resetShaderFilterProgress(animatedSpriteElement);

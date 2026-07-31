@@ -847,6 +847,7 @@ describe("runReplaceAnimation", () => {
     const animatedCompositor = {
       ...passthroughCompositor,
       time: true,
+      padding: 12,
       parameters: [amountParameter, tintParameter],
       uniforms: [amountParameter, tintParameter],
       tween: {
@@ -945,6 +946,13 @@ describe("runReplaceAnimation", () => {
 
     compositorFilter.apply(filterManager, Texture.EMPTY, Texture.EMPTY, true);
 
+    expect(compositorFilter.padding).toBe(12);
+    expect(compositorSprite.filterArea).toMatchObject({
+      x: 0,
+      y: 0,
+      width: compositorSprite.texture.width,
+      height: compositorSprite.texture.height,
+    });
     expect(shaderUniforms.uniforms.uProgress).toBeCloseTo(0.5);
     expect(shaderUniforms.uniforms.uTime).toBeCloseTo(7.5);
     expect(shaderUniforms.uniforms.uAmount).toBeCloseTo(0.35);

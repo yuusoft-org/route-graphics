@@ -1,6 +1,7 @@
 import { isDeepEqual } from "../../util/isDeepEqual.js";
 import {
   hasInstalledShaderFilters,
+  setShaderTime,
   syncShaderFilters,
 } from "./util/shaderFilterEffect.js";
 
@@ -71,7 +72,7 @@ const getAddedChild = (parent, element, childrenBefore) => {
 const markMountedElement = (
   child,
   element,
-  { animations, targetId = element?.id } = {},
+  { animations, targetId = element?.id, shaderTime = 0, getShaderTime } = {},
 ) => {
   if (child) {
     const hasRuntimeReadyFilters =
@@ -87,6 +88,10 @@ const markMountedElement = (
         animations,
         targetId,
       });
+      setShaderTime(
+        child,
+        typeof getShaderTime === "function" ? getShaderTime() : shaderTime,
+      );
     }
     setElementRenderState(child, element);
   }
@@ -99,6 +104,8 @@ export const addElementWithRenderState = ({ plugin, ...options }) => {
   let mountedChild = getAddedChild(parent, element, childrenBefore);
   markMountedElement(mountedChild, element, {
     animations: options.animations,
+    shaderTime: options.shaderTime,
+    getShaderTime: options.getShaderTime,
   });
 
   if (!isPromise(operation)) {
@@ -111,6 +118,8 @@ export const addElementWithRenderState = ({ plugin, ...options }) => {
     }
     markMountedElement(mountedChild, element, {
       animations: options.animations,
+      shaderTime: options.shaderTime,
+      getShaderTime: options.getShaderTime,
     });
   });
 };
