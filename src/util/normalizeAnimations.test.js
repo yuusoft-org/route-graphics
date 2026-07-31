@@ -731,3 +731,233 @@ describe("normalizeAnimations shader support", () => {
     ).toThrow(/keyframes must be a non-empty array/);
   });
 });
+
+describe("normalizeAnimations rect style support", () => {
+  it("flattens complete rect style timelines into internal animation paths", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "reshape",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          width: { auto: { duration: 300 } },
+          height: {
+            initialValue: 80,
+            keyframes: [{ duration: 300, value: 120 }],
+          },
+          fill: {
+            start: {
+              x: { auto: { duration: 300 } },
+            },
+            stops: [
+              {
+                index: 1,
+                offset: { auto: { duration: 300 } },
+                color: {
+                  initialValue: "#ff0000",
+                  keyframes: [{ duration: 300, value: "#0000ff" }],
+                },
+              },
+            ],
+          },
+          border: {
+            width: { auto: { duration: 300 } },
+            color: { auto: { duration: 300 } },
+            alpha: { auto: { duration: 300 } },
+          },
+          cornerRadius: {
+            topLeft: { auto: { duration: 300 } },
+            bottomRight: { auto: { duration: 300 } },
+          },
+        },
+      },
+    ]);
+
+    expect(Object.keys(animation.tween)).toEqual([
+      "rect.width",
+      "rect.height",
+      "rect.fill.start.x",
+      "rect.fill.stops.1.offset",
+      "rect.fill.stops.1.color",
+      "rect.border.width",
+      "rect.border.color",
+      "rect.border.alpha",
+      "rect.cornerRadius.topLeft",
+      "rect.cornerRadius.bottomRight",
+    ]);
+    expect(animation.tween["rect.fill.stops.1.color"].initialValue).toEqual([
+      1, 0, 0, 1,
+    ]);
+    expect(
+      animation.tween["rect.fill.stops.1.color"].keyframes[0].value,
+    ).toEqual([0, 0, 1, 1]);
+  });
+
+  it("expands a uniform corner radius timeline to every corner", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "round",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          cornerRadius: {
+            auto: { duration: 200, easing: "easeOutQuad" },
+          },
+        },
+      },
+    ]);
+
+    expect(Object.keys(animation.tween)).toEqual([
+      "rect.cornerRadius.topLeft",
+      "rect.cornerRadius.topRight",
+      "rect.cornerRadius.bottomRight",
+      "rect.cornerRadius.bottomLeft",
+    ]);
+    expect(animation.tween["rect.cornerRadius.bottomLeft"].auto).toEqual({
+      duration: 200,
+      easing: "easeOutQuad",
+    });
+  });
+
+  it.each([
+    [
+      "unknown fill field",
+      { fill: { opacity: { auto: { duration: 100 } } } },
+      "animations[0].tween.fill.opacity is not supported",
+    ],
+    ["empty fill", { fill: {} }, "animations[0].tween.fill must define"],
+    [
+      "empty gradient point",
+      { fill: { start: {} } },
+      "animations[0].tween.fill.start must define x or y",
+    ],
+    [
+      "unknown gradient point field",
+      {
+        fill: {
+          start: {
+            z: { auto: { duration: 100 } },
+          },
+        },
+      },
+      "animations[0].tween.fill.start.z is not supported",
+    ],
+    [
+      "empty stops",
+      { fill: { stops: [] } },
+      "animations[0].tween.fill.stops must be a non-empty array",
+    ],
+    ["empty border", { border: {} }, "animations[0].tween.border must define"],
+    [
+      "unknown border field",
+      { border: { placement: { auto: { duration: 100 } } } },
+      "animations[0].tween.border.placement is not supported",
+    ],
+    [
+      "invalid stop index",
+      {
+        fill: {
+          stops: [
+            {
+              index: -1,
+              color: { auto: { duration: 100 } },
+            },
+          ],
+        },
+      },
+      "index must be a non-negative integer",
+    ],
+    [
+      "non-integer stop index",
+      {
+        fill: {
+          stops: [
+            {
+              index: 0.5,
+              color: { auto: { duration: 100 } },
+            },
+          ],
+        },
+      },
+      "index must be a non-negative integer",
+    ],
+    [
+      "stop without an animated channel",
+      {
+        fill: {
+          stops: [{ index: 0 }],
+        },
+      },
+      "must define offset or color",
+    ],
+    [
+      "duplicate stop index",
+      {
+        fill: {
+          stops: [
+            { index: 0, offset: { auto: { duration: 100 } } },
+            { index: 0, color: { auto: { duration: 100 } } },
+          ],
+        },
+      },
+      "cannot target stop 0 twice",
+    ],
+    [
+      "invalid color",
+      {
+        fill: {
+          color: {
+            keyframes: [{ duration: 100, value: "invalid()" }],
+          },
+        },
+      },
+      "must be a valid color",
+    ],
+    [
+      "relative color",
+      {
+        border: {
+          color: {
+            keyframes: [{ duration: 100, value: "#ffffff", relative: true }],
+          },
+        },
+      },
+      "relative is not supported for colors",
+    ],
+    [
+      "empty per-corner map",
+      { cornerRadius: {} },
+      "animations[0].tween.cornerRadius must define at least one corner",
+    ],
+    [
+      "unknown corner",
+      {
+        cornerRadius: {
+          upperLeft: { auto: { duration: 100 } },
+        },
+      },
+      "animations[0].tween.cornerRadius.upperLeft is not supported",
+    ],
+    [
+      "mixed uniform and per-corner timelines",
+      {
+        cornerRadius: {
+          auto: { duration: 100 },
+          topLeft: { auto: { duration: 100 } },
+        },
+      },
+      "animations[0].tween.cornerRadius.topLeft is not supported",
+    ],
+  ])("rejects %s", (_name, tween, message) => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "invalid-rect",
+          targetId: "panel",
+          type: "update",
+          tween,
+        },
+      ]),
+    ).toThrow(message);
+  });
+});

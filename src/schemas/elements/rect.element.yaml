@@ -2,6 +2,7 @@ $schema: http://json-schema.org/draft-07/schema#
 title: Rect Element
 description: Schema for rectangle element raw input
 type: object
+additionalProperties: false
 $def:
   point:
     type: object
@@ -71,13 +72,14 @@ $def:
             type: string
             enum: [local, global]
             description: Whether gradient coordinates are relative to the rect or the world
-          textureSize:
+          resolution:
             type: number
-            description: Gradient texture resolution hint
-          wrapMode:
+            exclusiveMinimum: 0
+            description: Gradient sampling resolution in pixels
+          spread:
             type: string
-            enum: [clamp-to-edge, repeat]
-            description: Gradient wrap mode
+            enum: [pad, repeat]
+            description: Behavior outside the gradient range
       - type: object
         additionalProperties: false
         required:
@@ -108,13 +110,14 @@ $def:
             type: string
             enum: [local, global]
             description: Whether gradient coordinates are relative to the rect or the world
-          textureSize:
+          resolution:
             type: number
-            description: Gradient texture resolution hint
-          wrapMode:
+            exclusiveMinimum: 0
+            description: Gradient sampling resolution in pixels
+          spread:
             type: string
-            enum: [clamp-to-edge, repeat]
-            description: Gradient wrap mode
+            enum: [pad, repeat]
+            description: Behavior outside the gradient range
           scale:
             type: number
             description: Radial gradient ellipse scale
@@ -135,9 +138,11 @@ properties:
     description: Element type, must be 'rect'
   width:
     type: number
+    exclusiveMinimum: 0
     description: Width of the rectangle in pixels
   height:
     type: number
+    exclusiveMinimum: 0
     description: Height of the rectangle in pixels
   x:
     type: number
@@ -159,6 +164,14 @@ properties:
   originY:
     type: number
     description: Vertical transform origin in pixels from the element's top edge. Defaults to the anchor-derived Y origin.
+  scaleX:
+    type: number
+    exclusiveMinimum: 0
+    description: Horizontal scale baked into rect geometry
+  scaleY:
+    type: number
+    exclusiveMinimum: 0
+    description: Vertical scale baked into rect geometry
   alpha:
     type: number
     description: Opacity/transparency of the rectangle (0-1)
@@ -170,10 +183,12 @@ properties:
     description: Optional fill of the rectangle. Supports solid colors and structured gradient fills. When omitted, the rect renders transparent.
   border:
     type: object
+    additionalProperties: false
     description: Border properties
     properties:
       width:
         type: number
+        minimum: 0
         description: Border width in pixels
         default: 0
       color:
@@ -186,14 +201,57 @@ properties:
         minimum: 0
         maximum: 1
         default: 1
+  cornerRadius:
+    description: Uniform radius or independent corner radii in pixels
+    oneOf:
+      - type: number
+        minimum: 0
+      - type: object
+        additionalProperties: false
+        properties:
+          topLeft:
+            type: number
+            minimum: 0
+          topRight:
+            type: number
+            minimum: 0
+          bottomRight:
+            type: number
+            minimum: 0
+          bottomLeft:
+            type: number
+            minimum: 0
   rotation:
     type: number
     description: Rotation in degrees
     default: 0
   filters:
     $ref: "../shader-config.yaml#/definitions/elementFilters"
+  blur:
+    type: object
+    additionalProperties: false
+    required: [x, y]
+    properties:
+      x:
+        type: number
+        minimum: 0
+      y:
+        type: number
+        minimum: 0
+      quality:
+        type: number
+        minimum: 1
+        default: 4
+      kernelSize:
+        type: number
+        enum: [5, 7, 9, 11, 13, 15]
+        default: 5
+      repeatEdgePixels:
+        type: boolean
+        default: false
   hover:
     type: object
+    additionalProperties: false
     properties:
       soundSrc:
         type: string
@@ -212,6 +270,7 @@ properties:
         description: Payload for hover action event
   click:
     type: object
+    additionalProperties: false
     properties:
       soundSrc:
         type: string
@@ -227,36 +286,55 @@ properties:
         description: Payload for click action event
   drag:
     type: object
+    additionalProperties: false
+    minProperties: 1
     properties:
       start:
-        payload:
-          type: object
-          description: Payload for click action event
+        type: object
+        additionalProperties: false
+        properties:
+          payload:
+            type: object
+            description: Payload for drag start event
       end:
-        payload:
-          type: object
-          description: Payload for click action event
+        type: object
+        additionalProperties: false
+        properties:
+          payload:
+            type: object
+            description: Payload for drag end event
       move:
-        payload:
-          type: object
-          description: Payload for click action event
+        type: object
+        additionalProperties: false
+        properties:
+          payload:
+            type: object
+            description: Payload for drag move event
   rightClick:
     type: object
+    additionalProperties: false
     properties:
       soundSrc:
         type: string
         description: source of sound to be played when the rect is right-clicked
+      soundVolume:
+        type: number
+        minimum: 0
+        maximum: 100
+        default: 100
       payload:
         type: object
         description: Payload for right-click action event
   scrollUp:
     type: object
+    additionalProperties: false
     properties:
       payload:
         type: object
         description: Payload for scroll up action event
   scrollDown:
     type: object
+    additionalProperties: false
     properties:
       payload:
         type: object

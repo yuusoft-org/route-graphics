@@ -1,0 +1,54 @@
+---
+title: Rect Independent Corner Radii
+description: Rects support uniform and independent corner radii with oversized radii normalized safely
+specs:
+  - the first rect should have four equal rounded corners
+  - the second rect should have four visibly different corners
+  - the third rect should reduce oversized radii without overlap
+---
+states:
+  - elements:
+      - id: uniform-rounded
+        type: rect
+        x: 80
+        "y": 100
+        width: 280
+        height: 180
+        fill: "#2563eb"
+        border:
+          width: 6
+          color: "#ffffff"
+          alpha: 0.9
+        cornerRadius: 36
+      - id: independent-rounded
+        type: rect
+        x: 500
+        "y": 100
+        width: 280
+        height: 180
+        fill:
+          type: linear-gradient
+          start: { x: 0, y: 0 }
+          end: { x: 1, y: 1 }
+          stops:
+            - offset: 0
+              color: "#7c3aed"
+            - offset: 1
+              color: "#ec4899"
+        cornerRadius:
+          topLeft: 64
+          topRight: 8
+          bottomRight: 48
+          bottomLeft: 20
+      - id: normalized-rounded
+        type: rect
+        x: 920
+        "y": 100
+        width: 220
+        height: 180
+        fill: "#059669"
+        cornerRadius:
+          topLeft: 180
+          topRight: 180
+          bottomRight: 40
+          bottomLeft: 40

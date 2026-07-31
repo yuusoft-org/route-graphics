@@ -5,7 +5,8 @@ tags: documentation
 sidebarId: node-rect
 ---
 
-`rect` renders a Pixi graphics rectangle with optional border, interaction, drag, and scroll hooks.
+`rect` renders a rectangle with solid or gradient fill, independent corner
+radii, optional border and blur, shader filters, animation, and pointer hooks.
 
 Try it in the [Playground](/playground/?template=basic-shapes).
 
@@ -15,29 +16,33 @@ Try it in the [Playground](/playground/?template=basic-shapes).
 
 ## Field Reference
 
-| Field        | Type             | Required | Default     | Notes                                   |
-| ------------ | ---------------- | -------- | ----------- | --------------------------------------- |
-| `id`         | string           | Yes      | -           | Element id.                             |
-| `type`       | string           | Yes      | -           | Must be `rect`.                         |
-| `width`      | number           | Yes      | -           | Render width.                           |
-| `height`     | number           | Yes      | -           | Render height.                          |
-| `x`          | number           | No       | `0`         | Position before anchor transform.       |
-| `y`          | number           | No       | `0`         | Position before anchor transform.       |
-| `anchorX`    | number           | No       | `0`         | Anchor offset ratio.                    |
-| `anchorY`    | number           | No       | `0`         | Anchor offset ratio.                    |
-| `originX`    | number           | No       | anchor      | Transform origin X in pixels.           |
-| `originY`    | number           | No       | anchor      | Transform origin Y in pixels.           |
-| `alpha`      | number           | No       | `1`         | Opacity `0..1`.                         |
-| `fill`       | string \| object | No       | transparent | Fill color or structured gradient fill. |
-| `border`     | object           | No       | -           | Border config.                          |
-| `rotation`   | number           | No       | `0`         | Degrees.                                |
-| `filters`    | array            | No       | `[]`        | Ordered custom shader filters.          |
-| `hover`      | object           | No       | -           | Hover event config.                     |
-| `click`      | object           | No       | -           | Click event config.                     |
-| `rightClick` | object           | No       | -           | Right click event config.               |
-| `drag`       | object           | No       | -           | `start`/`move`/`end` payload hooks.     |
-| `scrollUp`   | object           | No       | -           | Wheel-up payload hook.                  |
-| `scrollDown` | object           | No       | -           | Wheel-down payload hook.                |
+| Field          | Type             | Required | Default     | Notes                                   |
+| -------------- | ---------------- | -------- | ----------- | --------------------------------------- |
+| `id`           | string           | Yes      | -           | Element id.                             |
+| `type`         | string           | Yes      | -           | Must be `rect`.                         |
+| `width`        | number           | Yes      | -           | Render width.                           |
+| `height`       | number           | Yes      | -           | Render height.                          |
+| `x`            | number           | No       | `0`         | Position before anchor transform.       |
+| `y`            | number           | No       | `0`         | Position before anchor transform.       |
+| `anchorX`      | number           | No       | `0`         | Anchor offset ratio.                    |
+| `anchorY`      | number           | No       | `0`         | Anchor offset ratio.                    |
+| `originX`      | number           | No       | anchor      | Transform origin X in pixels.           |
+| `originY`      | number           | No       | anchor      | Transform origin Y in pixels.           |
+| `alpha`        | number           | No       | `1`         | Opacity `0..1`.                         |
+| `fill`         | string \| object | No       | transparent | Fill color or structured gradient fill. |
+| `border`       | object           | No       | -           | Border config.                          |
+| `cornerRadius` | number \| object | No       | `0`         | Uniform or per-corner radii.            |
+| `rotation`     | number           | No       | `0`         | Degrees.                                |
+| `scaleX`       | number           | No       | `1`         | Horizontal geometry scale.              |
+| `scaleY`       | number           | No       | `1`         | Vertical geometry scale.                |
+| `blur`         | object           | No       | -           | Directional Gaussian blur.              |
+| `filters`      | array            | No       | `[]`        | Ordered custom shader filters.          |
+| `hover`        | object           | No       | -           | Hover event config.                     |
+| `click`        | object           | No       | -           | Click event config.                     |
+| `rightClick`   | object           | No       | -           | Right click event config.               |
+| `drag`         | object           | No       | -           | `start`/`move`/`end` payload hooks.     |
+| `scrollUp`     | object           | No       | -           | Wheel-up payload hook.                  |
+| `scrollDown`   | object           | No       | -           | Wheel-down payload hook.                |
 
 `filters` runs after built-in rendering effects. See
 [Shaders](/docs/guides/shaders/) for source, uniform, texture, pipeline, and
@@ -50,6 +55,29 @@ filter parameter animation rules.
 | `width` | number | `0`     |
 | `color` | string | `black` |
 | `alpha` | number | `1`     |
+
+The stroke is centered on the rect outline.
+
+### `cornerRadius`
+
+A number applies the same radius to every corner:
+
+```yaml
+cornerRadius: 20
+```
+
+Use an object to control all four corners independently:
+
+```yaml
+cornerRadius:
+  topLeft: 32
+  topRight: 8
+  bottomRight: 32
+  bottomLeft: 8
+```
+
+Missing corners default to `0`. If adjacent radii are too large for the
+rectangle, they are reduced proportionally so they never overlap.
 
 ### `fill`
 
@@ -98,9 +126,86 @@ fill:
 Gradient notes:
 
 - `stops` must include at least 2 items.
-- Each stop `offset` must be between `0` and `1`.
+- Stop offsets must be strictly increasing values between `0` and `1`.
 - `coordinateSpace` can be `local` or `global`.
-- `textureSize` and `wrapMode` are optional advanced Pixi gradient controls.
+- `resolution` optionally controls gradient sampling resolution in pixels.
+- `spread` can be `pad` (default) or `repeat`.
+
+The public fill contract is renderer-independent. Renderer resources and
+sampling objects are managed internally.
+
+## Rect Style Animation
+
+Rect style timelines live directly below `tween`, beside normal transform
+timelines. Numeric properties support manual keyframes or `auto`. Color
+timelines accept color strings and interpolate their RGBA channels.
+
+```yaml
+animations:
+  - id: reshape-panel
+    targetId: panel
+    type: update
+    tween:
+      width:
+        auto: { duration: 600, easing: easeInOutCubic }
+      height:
+        auto: { duration: 600, easing: easeInOutCubic }
+      fill:
+        color:
+          keyframes:
+            - duration: 600
+              value: "#7c3aed"
+              easing: easeInOutCubic
+      border:
+        width:
+          auto: { duration: 600 }
+        color:
+          auto: { duration: 600 }
+        alpha:
+          auto: { duration: 600 }
+      cornerRadius:
+        topLeft:
+          auto: { duration: 600 }
+        topRight:
+          auto: { duration: 600 }
+        bottomRight:
+          auto: { duration: 600 }
+        bottomLeft:
+          auto: { duration: 600 }
+```
+
+Gradient geometry and stops can also be animated:
+
+```yaml
+tween:
+  fill:
+    start:
+      x:
+        auto: { duration: 800 }
+    end:
+      y:
+        auto: { duration: 800 }
+    stops:
+      - index: 0
+        offset:
+          auto: { duration: 800 }
+        color:
+          auto: { duration: 800 }
+```
+
+The current and destination fills must have compatible types. `fill.color`
+requires a solid fill; gradient point/radius properties require the matching
+gradient type; and stop indices must exist in the destination.
+
+## Validation and Pixel Alignment
+
+Rect input is validated before rendering. Unknown properties, invalid colors,
+non-positive dimensions or scales, malformed gradients, invalid event shapes,
+and non-finite numbers fail with a field-specific error.
+
+Computed rect geometry is aligned to whole logical pixels. Fractional authored
+dimensions, positions, origins, and scaled dimensions are rounded during
+parsing; animation samples may still be fractional between frames.
 
 ## Emitted Events
 

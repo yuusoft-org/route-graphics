@@ -1,4 +1,4 @@
-import { Container } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import hotkeys from "hotkeys-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { addRect } from "../../src/plugins/elements/rect/addRect.js";
@@ -7,6 +7,7 @@ import { addText } from "../../src/plugins/elements/text/addText.js";
 import { addContainer } from "../../src/plugins/elements/container/addContainer.js";
 import { addSlider } from "../../src/plugins/elements/slider/addSlider.js";
 import { createKeyboardManager } from "../../src/util/keyboardManager.js";
+import { bindRectInteractions } from "../../src/plugins/elements/rect/rectInteractions.js";
 
 const createSharedParams = () => ({
   app: {
@@ -47,6 +48,133 @@ afterEach(() => {
 });
 
 describe("event semantics", () => {
+  it("rect emits configured events even when their payload is omitted", () => {
+    const parent = new Container();
+    const eventHandler = vi.fn();
+    const shared = createSharedParams();
+
+    addRect({
+      ...shared,
+      parent,
+      eventHandler,
+      zIndex: 0,
+      element: {
+        id: "rect-no-payload",
+        type: "rect",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 60,
+        alpha: 1,
+        fill: "#ffffff",
+        hover: {},
+        click: {},
+        rightClick: {},
+      },
+    });
+
+    const rect = parent.getChildByLabel("rect-no-payload");
+    rect.emit("pointerover");
+    rect.emit("pointerup");
+    rect.emit("rightclick");
+
+    expect(eventHandler.mock.calls).toEqual([
+      ["hover", { _event: { id: "rect-no-payload" } }],
+      ["click", { _event: { id: "rect-no-payload" } }],
+      ["rightClick", { _event: { id: "rect-no-payload" } }],
+    ]);
+  });
+
+  it("fully resets rect interaction state when handlers are removed", () => {
+    const rect = new Graphics();
+    rect.label = "interactive";
+    const eventHandler = vi.fn();
+    const app = {
+      audioStage: { add: vi.fn() },
+      canvas: {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    };
+
+    bindRectInteractions({
+      app,
+      rect,
+      eventHandler,
+      element: {
+        id: "interactive",
+        width: 100,
+        height: 60,
+        hover: { cursor: "pointer" },
+        click: {},
+        drag: { start: {} },
+        scrollUp: {},
+      },
+    });
+    rect.emit("pointerover");
+    rect.emit("pointerdown");
+
+    expect(rect.eventMode).toBe("static");
+    expect(rect.cursor).toBe("pointer");
+    expect(rect._isDragging).toBe(true);
+
+    bindRectInteractions({
+      app,
+      rect,
+      eventHandler,
+      element: { id: "interactive", width: 100, height: 60 },
+    });
+
+    expect(rect.eventMode).toBe("auto");
+    expect(rect.cursor).toBe("auto");
+    expect(rect._isDragging).toBe(false);
+    expect(rect.hitArea).toBeNull();
+    expect(app.canvas.removeEventListener).toHaveBeenCalledWith(
+      "wheel",
+      expect.any(Function),
+    );
+
+    eventHandler.mockClear();
+    rect.emit("pointerover");
+    rect.emit("pointerup");
+    expect(eventHandler).not.toHaveBeenCalled();
+  });
+
+  it("applies right-click sound volume consistently", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+
+    addRect({
+      ...shared,
+      parent,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+      element: {
+        id: "rect-context-sound",
+        type: "rect",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 60,
+        alpha: 1,
+        fill: "#ffffff",
+        rightClick: {
+          soundSrc: "context.mp3",
+          soundVolume: 35,
+        },
+      },
+    });
+
+    parent.getChildByLabel("rect-context-sound").emit("rightclick");
+
+    expect(shared.app.audioStage.add).toHaveBeenCalledWith({
+      id: expect.stringMatching(/^rightClick-/),
+      url: "context.mp3",
+      loop: false,
+      volume: 0.35,
+    });
+  });
+
   it("rect emits hover/click/rightClick/scroll payload events", () => {
     const parent = new Container();
     const eventHandler = vi.fn();

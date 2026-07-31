@@ -35,8 +35,8 @@ describe("rectFill", () => {
         { offset: 0, color: "#ff0000" },
       ],
       coordinateSpace: "global",
-      textureSize: 128,
-      wrapMode: "repeat",
+      resolution: 128,
+      spread: "repeat",
     });
 
     expect(fill).toBeInstanceOf(FillGradient);
@@ -44,6 +44,8 @@ describe("rectFill", () => {
     expect(fill.start).toEqual({ x: 1, y: 0 });
     expect(fill.end).toEqual({ x: 0, y: 1 });
     expect(fill.textureSpace).toBe("global");
+    expect(fill._textureSize).toBe(128);
+    expect(fill._wrapMode).toBe("repeat");
     expect(fill.colorStops.map((stop) => stop.offset)).toEqual([0, 1]);
     fill.destroy();
   });
@@ -138,8 +140,8 @@ describe("rectFill", () => {
         { offset: 1, color: "#000000" },
       ],
       coordinateSpace: "local",
-      textureSize: 512,
-      wrapMode: "clamp-to-edge",
+      resolution: 512,
+      spread: "pad",
       scale: 0.8,
       rotation: 0.4,
     });
@@ -152,6 +154,8 @@ describe("rectFill", () => {
     expect(fill.outerRadius).toBe(0.9);
     expect(fill.scale).toBe(0.8);
     expect(fill.rotation).toBe(0.4);
+    expect(fill._textureSize).toBe(512);
+    expect(fill._wrapMode).toBe("clamp-to-edge");
     fill.destroy();
   });
 

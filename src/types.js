@@ -97,6 +97,7 @@
 /**
  * @typedef {Object} HoverProps
  * @property {string} soundSrc
+ * @property {number} [soundVolume]
  * @property {string} cursor
  * @property {Object} payload
  */
@@ -104,6 +105,7 @@
 /**
  * @typedef {Object} ClickProps
  * @property {string} soundSrc
+ * @property {number} [soundVolume]
  * @property {Object} payload
  */
 
@@ -471,8 +473,8 @@
  * @property {RectFillPoint} [end]
  * @property {RectFillStop[]} stops
  * @property {'local' | 'global'} [coordinateSpace]
- * @property {number} [textureSize]
- * @property {'clamp-to-edge' | 'repeat'} [wrapMode]
+ * @property {number} [resolution]
+ * @property {'pad' | 'repeat'} [spread]
  */
 
 /**
@@ -484,8 +486,8 @@
  * @property {number} [outerRadius]
  * @property {RectFillStop[]} stops
  * @property {'local' | 'global'} [coordinateSpace]
- * @property {number} [textureSize]
- * @property {'clamp-to-edge' | 'repeat'} [wrapMode]
+ * @property {number} [resolution]
+ * @property {'pad' | 'repeat'} [spread]
  * @property {number} [scale]
  * @property {number} [rotation]
  */
@@ -502,6 +504,8 @@
  * @property {number} border.width
  * @property {string} border.color
  * @property {number} border.alpha
+ * @property {{topLeft: number, topRight: number, bottomRight: number, bottomLeft: number}} [cornerRadius]
+ * @property {BlurConfig} [blur]
  * @property {string} cursor - Cursor style (e.g., "pointer")
  * @property {string} pointerDown - Event name for pointer down
  * @property {string} pointerUp - Event name for pointer up
@@ -803,6 +807,17 @@ export const WhiteListAnimationProps = {
   blurY: "blurY",
   uProgress: "uProgress",
 };
+
+const RECT_STYLE_ANIMATION_PROPERTY_PATTERN =
+  /^rect\.(?:width|height|fill\.(?:color|(?:start|end|innerCenter|outerCenter)\.(?:x|y)|(?:innerRadius|outerRadius|scale|rotation)|stops\.\d+\.(?:offset|color))|border\.(?:width|color|alpha)|cornerRadius\.(?:topLeft|topRight|bottomRight|bottomLeft))$/;
+
+export const isRectStyleAnimationProperty = (property) =>
+  typeof property === "string" &&
+  RECT_STYLE_ANIMATION_PROPERTY_PATTERN.test(property);
+
+export const isSupportedAnimationProperty = (property) =>
+  Boolean(WhiteListAnimationProps[property]) ||
+  isRectStyleAnimationProperty(property);
 
 export const WhiteListTransitionProps = WhiteListAnimationProps;
 

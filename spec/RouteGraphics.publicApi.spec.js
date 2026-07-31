@@ -132,16 +132,39 @@ const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
       this.scale = { x: 1, y: 1, set: vi.fn() };
       this.rotation = 0;
       this.sortableChildren = false;
+      this.pathCommands = [];
     }
 
     clear() {
       this.lastFill = undefined;
       this.drawnRect = undefined;
+      this.pathCommands = [];
       return this;
     }
 
     rect(x, y, width, height) {
       this.drawnRect = { x, y, width, height };
+      this.pathCommands.push(["rect", x, y, width, height]);
+      return this;
+    }
+
+    moveTo(x, y) {
+      this.pathCommands.push(["moveTo", x, y]);
+      return this;
+    }
+
+    lineTo(x, y) {
+      this.pathCommands.push(["lineTo", x, y]);
+      return this;
+    }
+
+    quadraticCurveTo(controlX, controlY, x, y) {
+      this.pathCommands.push(["quadraticCurveTo", controlX, controlY, x, y]);
+      return this;
+    }
+
+    closePath() {
+      this.pathCommands.push(["closePath"]);
       return this;
     }
 
@@ -439,6 +462,8 @@ const setupRouteGraphics = async ({
   },
 } = {}) => {
   const pixiMock = createPixiModuleMock({ rendererOverrides });
+  const { Color } = await vi.importActual("pixi.js");
+  pixiMock.Color = Color;
 
   vi.doMock("pixi.js", () => pixiMock);
   vi.doMock("../src/AudioStage.js", () => ({
@@ -2123,6 +2148,109 @@ describe("RouteGraphics public API", () => {
     app.setAnimationTime(150);
 
     expect(app.findElementByLabel("preview-rect")?.x).toBeCloseTo(37.5);
+  });
+
+  it("animates rect styles through the public tween interface", async () => {
+    const { app } = await setupRouteGraphics({
+      pluginsFactory: async () => {
+        const [{ rectPlugin }, { tweenPlugin }] = await Promise.all([
+          import("../src/plugins/elements/rect/index.js"),
+          import("../src/plugins/animations/tween/index.js"),
+        ]);
+
+        return {
+          elements: [rectPlugin],
+          animations: [tweenPlugin],
+          audio: [],
+        };
+      },
+    });
+
+    app.render({
+      id: "rect-style-baseline",
+      elements: [
+        {
+          id: "panel",
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 40,
+          height: 20,
+          fill: "#ff0000",
+          border: { width: 2, color: "#ffffff", alpha: 1 },
+          cornerRadius: 0,
+        },
+      ],
+    });
+
+    app.setAnimationPlaybackMode("manual");
+    app.render({
+      id: "rect-style-animated",
+      elements: [
+        {
+          id: "panel",
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 80,
+          height: 60,
+          fill: "#0000ff",
+          border: { width: 6, color: "#00ff00", alpha: 0.5 },
+          cornerRadius: {
+            topLeft: 10,
+            topRight: 20,
+            bottomRight: 30,
+            bottomLeft: 40,
+          },
+        },
+      ],
+      animations: [
+        {
+          id: "panel-style",
+          targetId: "panel",
+          type: "update",
+          tween: {
+            width: { auto: { duration: 500 } },
+            height: { auto: { duration: 500 } },
+            fill: {
+              color: { auto: { duration: 500 } },
+            },
+            border: {
+              width: { auto: { duration: 500 } },
+              color: { auto: { duration: 500 } },
+              alpha: { auto: { duration: 500 } },
+            },
+            cornerRadius: {
+              topLeft: { auto: { duration: 500 } },
+              topRight: { auto: { duration: 500 } },
+              bottomRight: { auto: { duration: 500 } },
+              bottomLeft: { auto: { duration: 500 } },
+            },
+          },
+        },
+      ],
+    });
+
+    app.setAnimationTime(250);
+
+    const panel = app.findElementByLabel("panel");
+    expect(panel.pathCommands.slice(0, 2)).toEqual([
+      ["moveTo", 5, 0],
+      ["lineTo", 50, 0],
+    ]);
+    expect(panel.pathCommands).toContainEqual([
+      "quadraticCurveTo",
+      60,
+      40,
+      45,
+      40,
+    ]);
+    expect(panel.lastFill).toEqual([0.5, 0, 0.5, 1]);
+    expect(panel.lastStroke).toEqual({
+      color: [0.5, 1, 0.5, 1],
+      alpha: 0.75,
+      width: 4,
+    });
   });
 
   it("continues persistent update animations across unrelated renders without restarting", async () => {

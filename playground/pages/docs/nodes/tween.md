@@ -65,24 +65,33 @@ compositor are present, the mask executes before the custom compositor passes.
 
 These properties are valid under `type: update`:
 
-| Property     | Meaning                                                 |
-| ------------ | ------------------------------------------------------- |
-| `x`, `y`     | Absolute position in the parent coordinate space.       |
-| `translateX` | Offset in units of the target's own width.              |
-| `translateY` | Offset in units of the target's own height.             |
-| `alpha`      | Opacity.                                                |
-| `scaleX`     | Horizontal scale.                                       |
-| `scaleY`     | Vertical scale.                                         |
-| `rotation`   | Rotation in degrees.                                    |
-| `blurX`      | Horizontal `blur.x` strength.                           |
-| `blurY`      | Vertical `blur.y` strength.                             |
-| `filters`    | Parameter timelines grouped by inline shader filter id. |
+| Property       | Meaning                                                 |
+| -------------- | ------------------------------------------------------- |
+| `x`, `y`       | Absolute position in the parent coordinate space.       |
+| `translateX`   | Offset in units of the target's own width.              |
+| `translateY`   | Offset in units of the target's own height.             |
+| `alpha`        | Opacity.                                                |
+| `scaleX`       | Horizontal scale.                                       |
+| `scaleY`       | Vertical scale.                                         |
+| `rotation`     | Rotation in degrees.                                    |
+| `blurX`        | Horizontal `blur.x` strength.                           |
+| `blurY`        | Vertical `blur.y` strength.                             |
+| `width`        | Rect geometry width.                                    |
+| `height`       | Rect geometry height.                                   |
+| `fill`         | Rect fill color, gradient geometry, or gradient stops.  |
+| `border`       | Rect border width, color, or alpha.                     |
+| `cornerRadius` | Rect uniform or independent corner radii.               |
+| `filters`      | Parameter timelines grouped by inline shader filter id. |
 
 `x` cannot be combined with `translateX` in one tween, and `y` cannot be
 combined with `translateY`.
 
 `blurX` and `blurY` animate only blur strength. Static blur settings such as
 `quality`, `kernelSize`, and `repeatEdgePixels` are not tween targets.
+
+`width`, `height`, `fill`, `border`, and `cornerRadius` are valid only for
+`rect` targets. See [Rect Node](/docs/nodes/rect/) for their nested timeline
+shape and gradient-stop indexing.
 
 ## Shader Parameter Tweens
 

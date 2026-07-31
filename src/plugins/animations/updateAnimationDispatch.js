@@ -1,6 +1,6 @@
 import {
   TRANSITION_PROPERTY_PATH_MAP,
-  WhiteListAnimationProps,
+  isSupportedAnimationProperty,
 } from "../../types.js";
 import {
   applyAnimationProperty,
@@ -9,6 +9,10 @@ import {
   isTranslateAnimationProperty,
 } from "./animationPropertyUtils.js";
 import { validateShaderFilterAnimationTarget } from "../elements/util/shaderFilterEffect.js";
+import {
+  getRectStyleAnimationBatchHooks,
+  validateRectStyleAnimationTarget,
+} from "../elements/rect/rectStyleRuntime.js";
 
 const getLiveTweenProperty = (property) => {
   if (property === "translateX") {
@@ -140,8 +144,9 @@ export const applyInitialUpdateAnimationState = (
   let subjectState = animationBaseState;
 
   for (const animation of animations) {
+    validateRectStyleAnimationTarget(element, animation);
     for (const [property, config] of Object.entries(animation.tween ?? {})) {
-      if (!WhiteListAnimationProps[property]) {
+      if (!isSupportedAnimationProperty(property)) {
         throw new Error(
           `${property} is not a supported property for animation.`,
         );
@@ -199,6 +204,7 @@ export const dispatchUpdateAnimationsNow = ({
   );
 
   for (const animation of animationsToDispatch) {
+    validateRectStyleAnimationTarget(element, animation);
     for (const [property, config] of Object.entries(animation.tween ?? {})) {
       if (
         config.auto &&
@@ -231,6 +237,7 @@ export const dispatchUpdateAnimationsNow = ({
         properties: animation.tween ?? {},
         targetState,
         animationBaseState: dispatchAnimationBaseState,
+        ...getRectStyleAnimationBatchHooks(dispatchElement),
       },
     ];
     for (const [filterId, tween] of Object.entries(

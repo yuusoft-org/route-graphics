@@ -1,6 +1,6 @@
 import {
   TRANSITION_PROPERTY_PATH_MAP,
-  WhiteListAnimationProps,
+  isSupportedAnimationProperty,
 } from "../../types.js";
 import {
   applyAnimationProperty,
@@ -19,6 +19,30 @@ const DEFAULT_PLAYBACK_LOOP = false;
 
 const hasTranslateProperties = (properties = {}) =>
   Object.keys(properties).some(isTranslateAnimationProperty);
+
+const applyWithGroupFrameHooks = (groups, apply) => {
+  const startedGroups = [];
+  for (const group of groups) {
+    try {
+      group.beforeApplyFrame?.();
+      startedGroups.push(group);
+    } catch {
+      // Frame hooks are an internal optimization and must not stop playback.
+    }
+  }
+
+  try {
+    apply();
+  } finally {
+    for (let index = startedGroups.length - 1; index >= 0; index--) {
+      try {
+        startedGroups[index].afterApplyFrame?.();
+      } catch {
+        // Keep other groups consistent even if one hook fails.
+      }
+    }
+  }
+};
 
 const resolveAutoTargetValue = (targetState, property, animationId) => {
   if (
@@ -45,7 +69,7 @@ const buildPropertyTimelines = (
 ) =>
   Object.entries(properties)
     .map(([property, config]) => {
-      if (validateProperty && !WhiteListAnimationProps[property]) {
+      if (validateProperty && !isSupportedAnimationProperty(property)) {
         throw new Error(
           `${property} is not a supported property for animation.`,
         );
@@ -283,6 +307,7 @@ export const createAnimationBus = () => {
         group.validateProperty !== false,
       ).map((timeline) => ({ ...timeline, group })),
     );
+    const timelineGroups = [...new Set(timelines.map(({ group }) => group))];
 
     if (timelines.length === 0) {
       fireCompleteEvent({ id, onComplete });
@@ -302,35 +327,9 @@ export const createAnimationBus = () => {
       onComplete,
       onCancel,
       applyFrame: (time) => {
-        for (const { property, timeline, group } of timelines) {
-          const value = getValueAtTime(timeline, time);
-          try {
-            applyAnimationProperty({
-              object: group.element,
-              property,
-              propertyPathMap: group.propertyPathMap,
-              subjectState: isTranslateAnimationProperty(property)
-                ? group.getSubjectState()
-                : group.subjectState,
-              value,
-            });
-          } catch (_error) {
-            // Element might be mid-destroy or otherwise invalid.
-          }
-        }
-      },
-      applyTargetState: () => {
-        for (const group of propertyGroups) {
-          if (!group.element || group.element.destroyed) continue;
-
-          if (group.targetState === null) {
-            group.element.destroy?.();
-            continue;
-          }
-
-          if (!group.targetState) continue;
-
-          for (const [property, value] of Object.entries(group.targetState)) {
+        applyWithGroupFrameHooks(timelineGroups, () => {
+          for (const { property, timeline, group } of timelines) {
+            const value = getValueAtTime(timeline, time);
             try {
               applyAnimationProperty({
                 object: group.element,
@@ -342,10 +341,40 @@ export const createAnimationBus = () => {
                 value,
               });
             } catch (_error) {
-              // Skip properties that fail to apply.
+              // Element might be mid-destroy or otherwise invalid.
             }
           }
-        }
+        });
+      },
+      applyTargetState: () => {
+        applyWithGroupFrameHooks(propertyGroups, () => {
+          for (const group of propertyGroups) {
+            if (!group.element || group.element.destroyed) continue;
+
+            if (group.targetState === null) {
+              group.element.destroy?.();
+              continue;
+            }
+
+            if (!group.targetState) continue;
+
+            for (const [property, value] of Object.entries(group.targetState)) {
+              try {
+                applyAnimationProperty({
+                  object: group.element,
+                  property,
+                  propertyPathMap: group.propertyPathMap,
+                  subjectState: isTranslateAnimationProperty(property)
+                    ? group.getSubjectState()
+                    : group.subjectState,
+                  value,
+                });
+              } catch (_error) {
+                // Skip properties that fail to apply.
+              }
+            }
+          }
+        });
       },
       isValid: () =>
         propertyGroups.every(

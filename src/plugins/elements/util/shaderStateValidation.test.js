@@ -429,3 +429,122 @@ describe("shader state validation", () => {
     ).not.toThrow();
   });
 });
+
+describe("rect style animation binding validation", () => {
+  const createRectAnimation = (tween) =>
+    normalizeAnimations([
+      {
+        id: "rect-style",
+        targetId: "card",
+        type: "update",
+        tween,
+      },
+    ]);
+
+  it("accepts style properties compatible with the destination rect", () => {
+    const animations = createRectAnimation({
+      width: { auto: { duration: 100 } },
+      fill: {
+        stops: [
+          {
+            index: 1,
+            color: { auto: { duration: 100 } },
+          },
+        ],
+      },
+    });
+
+    expect(() =>
+      validateShaderAnimationBindings({
+        elements: [
+          {
+            id: "card",
+            type: "rect",
+            width: 100,
+            height: 60,
+            fill: {
+              type: "linear-gradient",
+              stops: [
+                { offset: 0, color: "#000000" },
+                { offset: 1, color: "#ffffff" },
+              ],
+            },
+          },
+        ],
+        animations,
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects rect style properties on another element type", () => {
+    expect(() =>
+      validateShaderAnimationBindings({
+        elements: [{ id: "card", type: "sprite" }],
+        animations: createRectAnimation({
+          width: { auto: { duration: 100 } },
+        }),
+      }),
+    ).toThrow(
+      'Animation "rect-style" can only target rect style properties on a rect element.',
+    );
+  });
+
+  it("rejects solid fill color animation on a gradient destination", () => {
+    expect(() =>
+      validateShaderAnimationBindings({
+        elements: [
+          {
+            id: "card",
+            type: "rect",
+            width: 100,
+            height: 60,
+            fill: {
+              type: "linear-gradient",
+              stops: [
+                { offset: 0, color: "#000000" },
+                { offset: 1, color: "#ffffff" },
+              ],
+            },
+          },
+        ],
+        animations: createRectAnimation({
+          fill: {
+            color: { auto: { duration: 100 } },
+          },
+        }),
+      }),
+    ).toThrow('property "fill.color" is incompatible with rect "card"');
+  });
+
+  it("rejects a missing destination gradient stop", () => {
+    expect(() =>
+      validateShaderAnimationBindings({
+        elements: [
+          {
+            id: "card",
+            type: "rect",
+            width: 100,
+            height: 60,
+            fill: {
+              type: "linear-gradient",
+              stops: [
+                { offset: 0, color: "#000000" },
+                { offset: 1, color: "#ffffff" },
+              ],
+            },
+          },
+        ],
+        animations: createRectAnimation({
+          fill: {
+            stops: [
+              {
+                index: 4,
+                color: { auto: { duration: 100 } },
+              },
+            ],
+          },
+        }),
+      }),
+    ).toThrow('property "fill.stops.4.color" is incompatible with rect "card"');
+  });
+});

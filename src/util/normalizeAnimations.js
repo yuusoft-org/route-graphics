@@ -1,5 +1,6 @@
 import { SUPPORTED_EASING_NAMES } from "./animationTimeline.js";
 import { normalizeShaderCompositor } from "../plugins/elements/util/shaderConfig.js";
+import { Color } from "pixi.js";
 
 const ANIMATION_TYPES = new Set(["update", "transition"]);
 const CONTINUITY_MODES = new Set(["render", "persistent"]);
@@ -33,6 +34,13 @@ const MASK_CHANNELS = new Set(["red", "green", "blue", "alpha"]);
 const MASK_SEQUENCE_SAMPLE_MODES = new Set(["hold", "linear"]);
 const SUPPORTED_EASINGS = new Set(SUPPORTED_EASING_NAMES);
 const SHADER_PARAMETER_PATTERN = /^[a-z][A-Za-z0-9]*$/;
+const RECT_STYLE_TWEEN_FIELDS = new Set([
+  "width",
+  "height",
+  "fill",
+  "border",
+  "cornerRadius",
+]);
 
 const assertPlainObject = (value, path) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -43,6 +51,14 @@ const assertPlainObject = (value, path) => {
 const assertString = (value, path) => {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${path} must be a non-empty string.`);
+  }
+};
+
+const assertKnownFields = (value, fields, path) => {
+  for (const key of Object.keys(value)) {
+    if (!fields.has(key)) {
+      throw new Error(`${path}.${key} is not supported.`);
+    }
   }
 };
 
@@ -142,6 +158,7 @@ const normalizeKeyframes = (
   propertyConfig,
   path,
   assertValue = assertNumber,
+  normalizeValue = (value) => (Array.isArray(value) ? [...value] : value),
 ) => {
   assertPlainObject(propertyConfig, path);
 
@@ -149,9 +166,7 @@ const normalizeKeyframes = (
 
   if (propertyConfig.initialValue !== undefined) {
     assertValue(propertyConfig.initialValue, `${path}.initialValue`);
-    normalized.initialValue = Array.isArray(propertyConfig.initialValue)
-      ? [...propertyConfig.initialValue]
-      : propertyConfig.initialValue;
+    normalized.initialValue = normalizeValue(propertyConfig.initialValue);
   }
 
   if (
@@ -188,9 +203,7 @@ const normalizeKeyframes = (
     }
 
     return {
-      value: Array.isArray(keyframe.value)
-        ? [...keyframe.value]
-        : keyframe.value,
+      value: normalizeValue(keyframe.value),
       duration: keyframe.duration,
       easing: keyframe.easing ?? "linear",
       ...(keyframe.relative !== undefined
@@ -273,6 +286,258 @@ const normalizeUpdatePropertyConfig = (propertyConfig, path) => {
   return normalizeKeyframes(propertyConfig, path);
 };
 
+const normalizeColorValue = (value, path) => {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${path} must be a non-empty color string.`);
+  }
+
+  try {
+    return new Color(value).toArray();
+  } catch {
+    throw new Error(`${path} must be a valid color.`);
+  }
+};
+
+const normalizeColorPropertyConfig = (propertyConfig, path) => {
+  assertPlainObject(propertyConfig, path);
+
+  if (propertyConfig.auto !== undefined) {
+    return normalizeUpdatePropertyConfig(propertyConfig, path);
+  }
+
+  for (const [index, keyframe] of (propertyConfig.keyframes ?? []).entries()) {
+    if (keyframe?.relative === true) {
+      throw new Error(
+        `${path}.keyframes[${index}].relative is not supported for colors.`,
+      );
+    }
+  }
+
+  return normalizeKeyframes(
+    propertyConfig,
+    path,
+    (value, valuePath) => {
+      normalizeColorValue(value, valuePath);
+    },
+    normalizeColorValue,
+  );
+};
+
+const normalizeRectPointTween = (point, path, prefix) => {
+  assertPlainObject(point, path);
+  assertKnownFields(point, new Set(["x", "y"]), path);
+  const entries = Object.entries(point);
+  if (entries.length === 0) {
+    throw new Error(`${path} must define x or y.`);
+  }
+  return Object.fromEntries(
+    entries.map(([axis, config]) => [
+      `${prefix}.${axis}`,
+      normalizeUpdatePropertyConfig(config, `${path}.${axis}`),
+    ]),
+  );
+};
+
+const normalizeRectFillStopsTween = (stops, path) => {
+  if (!Array.isArray(stops) || stops.length === 0) {
+    throw new Error(`${path} must be a non-empty array.`);
+  }
+
+  const indices = new Set();
+  return Object.assign(
+    {},
+    ...stops.map((stop, itemIndex) => {
+      const itemPath = `${path}[${itemIndex}]`;
+      assertPlainObject(stop, itemPath);
+      assertKnownFields(stop, new Set(["index", "offset", "color"]), itemPath);
+      if (!Number.isInteger(stop.index) || stop.index < 0) {
+        throw new Error(`${itemPath}.index must be a non-negative integer.`);
+      }
+      if (indices.has(stop.index)) {
+        throw new Error(`${path} cannot target stop ${stop.index} twice.`);
+      }
+      indices.add(stop.index);
+      if (stop.offset === undefined && stop.color === undefined) {
+        throw new Error(`${itemPath} must define offset or color.`);
+      }
+
+      return {
+        ...(stop.offset === undefined
+          ? {}
+          : {
+              [`rect.fill.stops.${stop.index}.offset`]:
+                normalizeUpdatePropertyConfig(
+                  stop.offset,
+                  `${itemPath}.offset`,
+                ),
+            }),
+        ...(stop.color === undefined
+          ? {}
+          : {
+              [`rect.fill.stops.${stop.index}.color`]:
+                normalizeColorPropertyConfig(stop.color, `${itemPath}.color`),
+            }),
+      };
+    }),
+  );
+};
+
+const normalizeRectFillTween = (fill, path) => {
+  assertPlainObject(fill, path);
+  assertKnownFields(
+    fill,
+    new Set([
+      "color",
+      "start",
+      "end",
+      "innerCenter",
+      "innerRadius",
+      "outerCenter",
+      "outerRadius",
+      "stops",
+      "scale",
+      "rotation",
+    ]),
+    path,
+  );
+  if (Object.keys(fill).length === 0) {
+    throw new Error(`${path} must define at least one property.`);
+  }
+
+  return {
+    ...(fill.color === undefined
+      ? {}
+      : {
+          "rect.fill.color": normalizeColorPropertyConfig(
+            fill.color,
+            `${path}.color`,
+          ),
+        }),
+    ...(fill.start === undefined
+      ? {}
+      : normalizeRectPointTween(
+          fill.start,
+          `${path}.start`,
+          "rect.fill.start",
+        )),
+    ...(fill.end === undefined
+      ? {}
+      : normalizeRectPointTween(fill.end, `${path}.end`, "rect.fill.end")),
+    ...(fill.innerCenter === undefined
+      ? {}
+      : normalizeRectPointTween(
+          fill.innerCenter,
+          `${path}.innerCenter`,
+          "rect.fill.innerCenter",
+        )),
+    ...(fill.outerCenter === undefined
+      ? {}
+      : normalizeRectPointTween(
+          fill.outerCenter,
+          `${path}.outerCenter`,
+          "rect.fill.outerCenter",
+        )),
+    ...Object.fromEntries(
+      ["innerRadius", "outerRadius", "scale", "rotation"]
+        .filter((property) => fill[property] !== undefined)
+        .map((property) => [
+          `rect.fill.${property}`,
+          normalizeUpdatePropertyConfig(fill[property], `${path}.${property}`),
+        ]),
+    ),
+    ...(fill.stops === undefined
+      ? {}
+      : normalizeRectFillStopsTween(fill.stops, `${path}.stops`)),
+  };
+};
+
+const normalizeRectBorderTween = (border, path) => {
+  assertPlainObject(border, path);
+  assertKnownFields(border, new Set(["width", "color", "alpha"]), path);
+  const entries = Object.entries(border);
+  if (entries.length === 0) {
+    throw new Error(`${path} must define width, color, or alpha.`);
+  }
+
+  return Object.fromEntries(
+    entries.map(([property, config]) => [
+      `rect.border.${property}`,
+      property === "color"
+        ? normalizeColorPropertyConfig(config, `${path}.${property}`)
+        : normalizeUpdatePropertyConfig(config, `${path}.${property}`),
+    ]),
+  );
+};
+
+const normalizeRectCornerRadiusTween = (cornerRadius, path) => {
+  assertPlainObject(cornerRadius, path);
+  const isUniformTimeline =
+    cornerRadius.keyframes !== undefined || cornerRadius.auto !== undefined;
+  const cornerNames = ["topLeft", "topRight", "bottomRight", "bottomLeft"];
+
+  if (isUniformTimeline) {
+    assertKnownFields(
+      cornerRadius,
+      new Set(["initialValue", "keyframes", "auto"]),
+      path,
+    );
+    const normalized = normalizeUpdatePropertyConfig(cornerRadius, path);
+    return Object.fromEntries(
+      cornerNames.map((corner) => [`rect.cornerRadius.${corner}`, normalized]),
+    );
+  }
+
+  assertKnownFields(cornerRadius, new Set(cornerNames), path);
+  const entries = Object.entries(cornerRadius);
+  if (entries.length === 0) {
+    throw new Error(`${path} must define at least one corner.`);
+  }
+  return Object.fromEntries(
+    entries.map(([corner, config]) => [
+      `rect.cornerRadius.${corner}`,
+      normalizeUpdatePropertyConfig(config, `${path}.${corner}`),
+    ]),
+  );
+};
+
+const normalizeRectStyleTween = (rectTween, path) => {
+  const normalized = {};
+  if (rectTween.width !== undefined) {
+    normalized["rect.width"] = normalizeUpdatePropertyConfig(
+      rectTween.width,
+      `${path}.width`,
+    );
+  }
+  if (rectTween.height !== undefined) {
+    normalized["rect.height"] = normalizeUpdatePropertyConfig(
+      rectTween.height,
+      `${path}.height`,
+    );
+  }
+  if (rectTween.fill !== undefined) {
+    Object.assign(
+      normalized,
+      normalizeRectFillTween(rectTween.fill, `${path}.fill`),
+    );
+  }
+  if (rectTween.border !== undefined) {
+    Object.assign(
+      normalized,
+      normalizeRectBorderTween(rectTween.border, `${path}.border`),
+    );
+  }
+  if (rectTween.cornerRadius !== undefined) {
+    Object.assign(
+      normalized,
+      normalizeRectCornerRadiusTween(
+        rectTween.cornerRadius,
+        `${path}.cornerRadius`,
+      ),
+    );
+  }
+  return normalized;
+};
+
 const normalizeTweenMap = (
   tween,
   path,
@@ -324,7 +589,17 @@ const normalizeFilterTweens = (filters, path) => {
 const normalizeUpdateTween = (tween, path) => {
   assertPlainObject(tween, path);
 
-  const { filters, ...elementTween } = tween;
+  const { filters, ...nonFilterTween } = tween;
+  const rectTween = Object.fromEntries(
+    Object.entries(nonFilterTween).filter(([property]) =>
+      RECT_STYLE_TWEEN_FIELDS.has(property),
+    ),
+  );
+  const elementTween = Object.fromEntries(
+    Object.entries(nonFilterTween).filter(
+      ([property]) => !RECT_STYLE_TWEEN_FIELDS.has(property),
+    ),
+  );
   const normalized = {};
 
   if (Object.keys(elementTween).length > 0) {
@@ -334,6 +609,12 @@ const normalizeUpdateTween = (tween, path) => {
       UPDATE_TWEEN_PROPERTIES,
       normalizeUpdatePropertyConfig,
     );
+  }
+  if (Object.keys(rectTween).length > 0) {
+    normalized.tween = {
+      ...normalized.tween,
+      ...normalizeRectStyleTween(rectTween, path),
+    };
   }
 
   if (filters !== undefined) {

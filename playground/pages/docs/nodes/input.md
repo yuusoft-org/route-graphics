@@ -85,6 +85,9 @@ fill:
       color: "#0F766E"
 ```
 
+Gradient fills use renderer-independent options: `resolution` controls
+sampling resolution, and `spread` is `pad` or `repeat`.
+
 ## Example
 
 ```yaml
