@@ -57,6 +57,8 @@ properties:
     minimum: 0
     maximum: 1
     default: 1
+  filters:
+    $ref: "../shader-config.yaml#/definitions/elementFilters"
   min:
     type: number
     description: Minimum value of the slider

@@ -17,6 +17,7 @@ import {
 import {
   getShaderFilterTargetState,
   hasShaderProgressUpdateAnimation,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
@@ -75,10 +76,18 @@ export const updateVideo = ({
       width: prevElement.width,
       height: prevElement.height,
       force: true,
+      animations,
+      targetId: prevElement.id,
     });
   } else {
     resetShaderFilterProgress(videoElement);
   }
+  prepareShaderFilterAnimationTargets({
+    displayObject: videoElement,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
 
   let currentSrc = prevElement.src;
   let didSyncResourceBeforeAnimation = false;
@@ -149,6 +158,8 @@ export const updateVideo = ({
         width,
         height,
         force: shouldForceShaderProgress,
+        animations,
+        targetId: prevElement.id,
       });
 
       if (!didSyncResourceBeforeAnimation) {

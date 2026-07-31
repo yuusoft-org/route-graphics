@@ -46,19 +46,19 @@ states:
       - id: shader-crossfade
         targetId: compositor-rect
         type: transition
-        tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
         compositor:
           type: shader
           mesh:
             grid: [4, 2]
           uniforms:
             vignette: 0.18
+          tween:
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear
           source:
             webgl:
               fragment: |

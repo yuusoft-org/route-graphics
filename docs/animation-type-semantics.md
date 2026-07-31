@@ -1,5 +1,10 @@
 # Animation Type Semantics
 
+> Historical design note. The `live` / `replace` terminology described below
+> has been removed from the public API. For the current implemented contract,
+> use `docs/animation-model.md` and the hosted Tween documentation. This file is
+> retained to explain the reasoning behind the `update` / `transition` rename.
+
 ## Purpose
 
 This note captures a proposed cleanup of animation type semantics in `route-graphics`, based on the current engine behavior and the needs of script-driven scene transitions.
@@ -10,7 +15,7 @@ The immediate motivation is correct support for transitions like:
 - hiding an image with dissolve
 - replacing one shown visual with another using the same transition
 
-## Current Behavior
+## Historical Behavior
 
 The current public animation types are:
 

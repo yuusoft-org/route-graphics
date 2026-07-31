@@ -36,6 +36,10 @@ Try it in the [Playground](/playground/?template=spritesheet-animation-demo).
 | `rotation` | number | No       | `0`     | Degrees.                           |
 | `alpha`    | number | No       | `1`     | Opacity `0..1`.                    |
 | `blur`     | object | No       | -       | Directional Gaussian blur.         |
+| `filters`  | array  | No       | `[]`    | Ordered custom shader filters.     |
+
+`filters` post-processes the currently displayed animation frame after
+built-in blur. See [Shaders](/docs/guides/shaders/) for the shader interface.
 
 ## Blur
 
@@ -189,18 +193,19 @@ elements:
 animations:
   - id: enemy-enter
     targetId: enemy
-    type: live
-    tween:
-      x:
-        initialValue: 1180
-        keyframes:
-          - value: 840
-            duration: 500
-            easing: linear
-      alpha:
-        initialValue: 0
-        keyframes:
-          - value: 1
-            duration: 500
-            easing: linear
+    type: transition
+    next:
+      tween:
+        x:
+          initialValue: 1180
+          keyframes:
+            - value: 840
+              duration: 500
+              easing: linear
+        alpha:
+          initialValue: 0
+          keyframes:
+            - value: 1
+              duration: 500
+              easing: linear
 ```

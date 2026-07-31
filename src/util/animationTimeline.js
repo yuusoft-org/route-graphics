@@ -122,6 +122,44 @@ export const getEasingFunction = (name = "linear") => {
   return easing;
 };
 
+const isNumericSequence = (value) =>
+  Array.isArray(value) || ArrayBuffer.isView(value);
+
+const addTweenValues = (left, right) => {
+  if (!isNumericSequence(left) && !isNumericSequence(right)) {
+    return left + right;
+  }
+
+  if (
+    !isNumericSequence(left) ||
+    !isNumericSequence(right) ||
+    left.length !== right.length
+  ) {
+    throw new Error("Relative tween values must have matching numeric shapes.");
+  }
+
+  return Array.from(left, (value, index) => value + right[index]);
+};
+
+const interpolateTweenValues = (start, end, amount) => {
+  if (!isNumericSequence(start) && !isNumericSequence(end)) {
+    return start + (end - start) * amount;
+  }
+
+  if (
+    !isNumericSequence(start) ||
+    !isNumericSequence(end) ||
+    start.length !== end.length
+  ) {
+    throw new Error("Tween keyframe values must have matching numeric shapes.");
+  }
+
+  return Array.from(
+    start,
+    (value, index) => value + (end[index] - value) * amount,
+  );
+};
+
 export const buildTimeline = (keyframesInput) => {
   const timeline = [];
   let accumulatedTime = 0;
@@ -140,7 +178,7 @@ export const buildTimeline = (keyframesInput) => {
       }
 
       accumulatedTime += duration;
-      latestValue = relative ? latestValue + value : value;
+      latestValue = relative ? addTweenValues(latestValue, value) : value;
       timeline.push({ time: accumulatedTime, value: latestValue, easing });
     },
   );
@@ -174,8 +212,10 @@ export const getValueAtTime = (timeline, currentTime) => {
 
     if (currentTime >= startTime && currentTime <= endTime) {
       const t = (currentTime - startTime) / (endTime - startTime);
-      return (
-        startValue + (endValue - startValue) * getEasingFunction(easing)(t)
+      return interpolateTweenValues(
+        startValue,
+        endValue,
+        getEasingFunction(easing)(t),
       );
     }
   }

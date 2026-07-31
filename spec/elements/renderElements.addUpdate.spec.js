@@ -2,11 +2,22 @@ import { Container } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderElements } from "../../src/plugins/elements/renderElements.js";
+import { createRenderContext } from "../../src/plugins/elements/renderContext.js";
+import { addRect } from "../../src/plugins/elements/rect/addRect.js";
+import { parseRect } from "../../src/plugins/elements/rect/parseRect.js";
 import {
   getElementRenderState,
   setElementRenderState,
 } from "../../src/plugins/elements/elementRenderState.js";
+import {
+  getShaderFilterAnimationTarget,
+  syncShaderFilters,
+} from "../../src/plugins/elements/util/shaderFilterEffect.js";
 import { hitTestElementBounds } from "../../src/util/hitTestElementBounds.js";
+import {
+  createAnimatedShaderFilterFixture,
+  createFilterAnimationFixture,
+} from "../util/shaderFilterFixtures.js";
 
 describe("renderElements add-time update animations", () => {
   const createSharedOptions = (parent, elementPlugins) => ({
@@ -133,6 +144,124 @@ describe("renderElements add-time update animations", () => {
     await result;
 
     expect(settled).toBe(true);
+  });
+
+  it("seeds a late asynchronous shader mount from the live clock", async () => {
+    const parent = new Container();
+    let releaseMount;
+    const mountGate = new Promise((resolve) => {
+      releaseMount = resolve;
+    });
+    const timedFilters = createAnimatedShaderFilterFixture().map((effect) => ({
+      ...effect,
+      time: true,
+      passes: effect.passes.map((pass) => ({ ...pass, time: true })),
+    }));
+    const element = {
+      id: "async-shader",
+      type: "async-shader",
+      width: 32,
+      height: 32,
+      filters: timedFilters,
+    };
+    const plugin = {
+      type: "async-shader",
+      add: vi.fn(async ({ parent: targetParent }) => {
+        await mountGate;
+        const child = new Container({ label: element.id });
+        syncShaderFilters(child, timedFilters, { width: 32, height: 32 });
+        targetParent.addChild(child);
+      }),
+      update: vi.fn(),
+      delete: vi.fn(),
+    };
+    let shaderTime = 1;
+
+    const result = renderElements({
+      app: { renderer: { width: 1280, height: 720 } },
+      parent,
+      prevComputedTree: [],
+      nextComputedTree: [element],
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {
+        getVersion: () => 3,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      eventHandler: vi.fn(),
+      elementPlugins: [plugin],
+      shaderTime,
+      getShaderTime: () => shaderTime,
+      signal: new AbortController().signal,
+    });
+
+    shaderTime = 6.25;
+    releaseMount();
+    await result;
+
+    const child = parent.getChildByLabel(element.id);
+    expect(
+      child.filters[0].resources.shaderUniforms.uniforms.uTime,
+    ).toBeCloseTo(6.25);
+
+    child.destroy();
+  });
+
+  it("preserves deferred shader initial values through post-mount synchronization", () => {
+    const parent = new Container();
+    const element = parseRect({
+      state: {
+        id: "deferred-filter",
+        type: "rect",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        fill: "#ffffff",
+      },
+    });
+    element.filters = createAnimatedShaderFilterFixture();
+    const animations = createFilterAnimationFixture(element.id).get(element.id);
+    const renderContext = createRenderContext({
+      suppressAnimations: true,
+    });
+
+    renderElements({
+      app: {
+        audioStage: { add: vi.fn() },
+        renderer: { width: 1280, height: 720 },
+      },
+      parent,
+      prevComputedTree: [],
+      nextComputedTree: [element],
+      animations,
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {
+        getVersion: () => 3,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      eventHandler: vi.fn(),
+      elementPlugins: [
+        {
+          type: "rect",
+          add: addRect,
+          update: vi.fn(),
+          delete: vi.fn(),
+        },
+      ],
+      renderContext,
+      signal: new AbortController().signal,
+    });
+
+    const displayObject = parent.getChildByLabel(element.id);
+    expect(
+      getShaderFilterAnimationTarget(displayObject, "grade").amount,
+    ).toBeCloseTo(0.4);
+    expect(renderContext.deferredMountOperations).toHaveLength(1);
+
+    displayObject.destroy();
   });
 
   it("refreshes semantic bounds after a custom plugin update", () => {

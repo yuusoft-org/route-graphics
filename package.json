@@ -1,6 +1,6 @@
 {
   "name": "route-graphics",
-  "version": "1.33.0",
+  "version": "1.34.0",
   "description": "A 2D graphics rendering interface that takes JSON input and renders pixels using PixiJS",
   "main": "dist/RouteGraphics.js",
   "type": "module",
@@ -43,6 +43,7 @@
     "vt:report": "bun run vt:screenshot && docker run --rm --user $(id -u):$(id -g) -e RTGL_VT_DEBUG=true -v \"$PWD:/workspace\" docker.io/han4wluc/rtgl:playwright-v1.57.0-rtgl-v1.1.0 rtgl vt report",
     "vt:accept": "docker run --rm --user $(id -u):$(id -g) -e RTGL_VT_DEBUG=true -v \"$PWD:/workspace\" docker.io/han4wluc/rtgl:playwright-v1.57.0-rtgl-v1.1.0 rtgl vt accept",
     "test": "vitest run",
+    "test:webgpu": "bun run build && node ./scripts/testWebGPUShaders.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "serve": "bunx serve -p 3005 .rettangoli/vt/_site"
@@ -53,8 +54,8 @@
     "hotkeys-js": "^4.0.0-beta.7",
     "js-yaml": "^4.1.0",
     "ogg-opus-decoder": "^1.7.3",
-    "pixi.js": "^8.7.1",
-    "playwright": "^1.44.0"
+    "pixi.js": "8.9.2",
+    "playwright": "1.57.0"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.8",

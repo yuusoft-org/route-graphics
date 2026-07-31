@@ -1,6 +1,6 @@
 ---
 title: Rect Shader Filter Progress Animation
-description: update tween uProgress should drive every shader filter on the target element
+description: tween.filters should target one shader filter's authored progress track
 specs:
   - the shader filter should start from the unmodified rect color
   - at 500ms uProgress should partially shift the rect color
@@ -189,9 +189,11 @@ states:
         targetId: shader-progress-rect
         type: update
         tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          filters:
+            progress-tint:
+              progress:
+                initialValue: 0
+                keyframes:
+                  - duration: 1000
+                    value: 1
+                    easing: linear

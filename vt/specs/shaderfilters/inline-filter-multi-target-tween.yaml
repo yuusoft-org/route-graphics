@@ -1,0 +1,237 @@
+---
+title: Inline Filter Multi-Target Tween
+description: One update tween should drive ordinary properties, scalar/vector parameters, and progress on two independently targeted filters.
+specs:
+  - x and alpha should advance on the same deterministic clock as both filters
+  - the tone filter should infer scalar and vector initial values from its parameters
+  - the band filter should receive only its own authored progress track
+  - navigating backward should remove the filters and restore the original element state
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 16
+  - action: screenshot
+  - action: keypress
+    key: b
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: multi-target-rect
+        type: rect
+        x: 160
+        "y": 150
+        width: 700
+        height: 340
+        alpha: 0.4
+        fill: "#D9D9D9"
+  - elements:
+      - id: multi-target-rect
+        type: rect
+        x: 260
+        "y": 150
+        width: 700
+        height: 340
+        alpha: 1
+        fill: "#D9D9D9"
+        filters:
+          - id: tone
+            type: shader
+            parameters:
+              amount: 0.2
+              levels: [0.7, 1]
+            source:
+              webgl:
+                fragment: |
+                  precision mediump float;
+
+                  in vec2 vTextureCoord;
+                  out vec4 finalColor;
+
+                  uniform sampler2D uTexture;
+                  uniform float uAmount;
+                  uniform vec2 uLevels;
+
+                  void main(void)
+                  {
+                      vec4 color = texture(uTexture, vTextureCoord);
+                      float gain = mix(uLevels.x, uLevels.y, vTextureCoord.x);
+                      finalColor = vec4(color.rgb * mix(1.0, gain, uAmount), color.a);
+                  }
+              webgpu:
+                source: |
+                  struct GlobalFilterUniforms {
+                    uInputSize: vec4<f32>,
+                    uInputPixel: vec4<f32>,
+                    uInputClamp: vec4<f32>,
+                    uOutputFrame: vec4<f32>,
+                    uGlobalFrame: vec4<f32>,
+                    uOutputTexture: vec4<f32>,
+                  };
+
+                  struct ShaderUniforms {
+                    uProgress: f32,
+                    uResolution: vec2<f32>,
+                    uAmount: f32,
+                    uLevels: vec2<f32>,
+                  };
+
+                  @group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+                  @group(0) @binding(1) var uTexture: texture_2d<f32>;
+                  @group(0) @binding(2) var uSampler: sampler;
+                  @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
+
+                  struct VSOutput {
+                    @builtin(position) position: vec4<f32>,
+                    @location(0) uv: vec2<f32>,
+                  };
+
+                  fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+                  {
+                    var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+                    position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+                    position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+                    return vec4<f32>(position, 0.0, 1.0);
+                  }
+
+                  fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+                  {
+                    return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+                  }
+
+                  @vertex
+                  fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput
+                  {
+                    return VSOutput(filterVertexPosition(aPosition), filterTextureCoord(aPosition));
+                  }
+
+                  @fragment
+                  fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
+                  {
+                    let color = textureSample(uTexture, uSampler, uv);
+                    let gain = mix(shaderUniforms.uLevels.x, shaderUniforms.uLevels.y, uv.x);
+                    return vec4<f32>(color.rgb * mix(1.0, gain, shaderUniforms.uAmount), color.a);
+                  }
+          - id: band
+            type: shader
+            source:
+              webgl:
+                fragment: |
+                  precision mediump float;
+
+                  in vec2 vTextureCoord;
+                  out vec4 finalColor;
+
+                  uniform sampler2D uTexture;
+                  uniform float uProgress;
+
+                  void main(void)
+                  {
+                      vec4 color = texture(uTexture, vTextureCoord);
+                      float band = 1.0 - smoothstep(0.025, 0.08, abs(vTextureCoord.x - uProgress));
+                      finalColor = vec4(mix(color.rgb, vec3(1.0), band * 0.7), color.a);
+                  }
+              webgpu:
+                source: |
+                  struct GlobalFilterUniforms {
+                    uInputSize: vec4<f32>,
+                    uInputPixel: vec4<f32>,
+                    uInputClamp: vec4<f32>,
+                    uOutputFrame: vec4<f32>,
+                    uGlobalFrame: vec4<f32>,
+                    uOutputTexture: vec4<f32>,
+                  };
+
+                  struct ShaderUniforms {
+                    uProgress: f32,
+                    uResolution: vec2<f32>,
+                  };
+
+                  @group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+                  @group(0) @binding(1) var uTexture: texture_2d<f32>;
+                  @group(0) @binding(2) var uSampler: sampler;
+                  @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
+
+                  struct VSOutput {
+                    @builtin(position) position: vec4<f32>,
+                    @location(0) uv: vec2<f32>,
+                  };
+
+                  fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+                  {
+                    var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+                    position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+                    position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+                    return vec4<f32>(position, 0.0, 1.0);
+                  }
+
+                  fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+                  {
+                    return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+                  }
+
+                  @vertex
+                  fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput
+                  {
+                    return VSOutput(filterVertexPosition(aPosition), filterTextureCoord(aPosition));
+                  }
+
+                  @fragment
+                  fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
+                  {
+                    let color = textureSample(uTexture, uSampler, uv);
+                    let band = 1.0 - smoothstep(0.025, 0.08, abs(uv.x - shaderUniforms.uProgress));
+                    return vec4<f32>(mix(color.rgb, vec3<f32>(1.0, 1.0, 1.0), band * 0.7), color.a);
+                  }
+    animations:
+      - id: mixed-element-and-filters
+        targetId: multi-target-rect
+        type: update
+        tween:
+          x:
+            initialValue: 160
+            keyframes:
+              - duration: 500
+                value: 260
+                easing: linear
+          alpha:
+            initialValue: 0.4
+            keyframes:
+              - duration: 500
+                value: 1
+                easing: linear
+          filters:
+            tone:
+              amount:
+                keyframes:
+                  - duration: 500
+                    value: 1
+                    easing: linear
+              levels:
+                keyframes:
+                  - duration: 500
+                    value: [1, 0.2]
+                    easing: linear
+            band:
+              progress:
+                initialValue: 0
+                keyframes:
+                  - duration: 250
+                    value: 1
+                    easing: linear
+                  - duration: 250
+                    value: 0.25
+                    easing: linear

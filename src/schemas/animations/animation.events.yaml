@@ -1,21 +1,14 @@
 $schema: http://json-schema.org/draft-07/schema#
-title: Animation Events
-description: Events emitted by animations
+title: Animation Completion Configuration
+description: Reserved per-animation completion configuration. The runtime currently reports completion through the global renderComplete event instead of emitting a public per-animation event.
 type: object
 properties:
   complete:
     type: object
-    description: Fired when an animation completes.
+    description: Parsed and retained for future per-animation completion support; not currently emitted through eventHandler.
     properties:
-      _event:
+      payload:
         type: object
-        properties:
-          id:
-            type: string
-            description: The ID of the animation that completed
-          targetId:
-            type: string
-            description: The ID of the element targeted by the animation
-        additionalProperties: true
+        description: Reserved user payload for a future completion event.
     additionalProperties: true
 additionalProperties: false

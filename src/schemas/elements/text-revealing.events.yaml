@@ -1,15 +1,14 @@
 $schema: http://json-schema.org/draft-07/schema#
-title: Text Revealing Events
-description: Events emitted by text-revealing
+title: Text Revealing Completion Configuration
+description: Reserved text-revealing completion configuration. Completion currently contributes to the global renderComplete event instead of emitting a dedicated public event.
 type: object
 properties:
   complete:
     type: object
-    description: This event type is called "complete" and will be invoked when text-revealing completes.
+    description: Parsed and retained for future per-node completion support; not currently emitted through eventHandler.
     properties:
-      _event:
+      payload:
         type: object
-        properties:
-          id:
-            type: string
-            description: The ID of the text-revealing that completed
+        description: Reserved user payload for a future completion event.
+    additionalProperties: true
+additionalProperties: false

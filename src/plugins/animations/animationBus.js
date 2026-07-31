@@ -41,10 +41,11 @@ const buildPropertyTimelines = (
   animationId,
   subjectState,
   preserveNoopAuto,
+  validateProperty = true,
 ) =>
   Object.entries(properties)
     .map(([property, config]) => {
-      if (!WhiteListAnimationProps[property]) {
+      if (validateProperty && !WhiteListAnimationProps[property]) {
         throw new Error(
           `${property} is not a supported property for animation.`,
         );
@@ -240,28 +241,47 @@ export const createAnimationBus = () => {
       playbackSpeed: normalizePlaybackSpeed(payload.playbackSpeed, id),
       loop: normalizePlaybackLoop(payload.loop, id),
     };
-    let subjectState =
-      animationBaseState ??
-      (hasTranslateProperties(properties)
-        ? createAnimationSubjectState(element)
-        : null);
+    const propertyGroups = (
+      payload.propertyGroups ?? [
+        {
+          element,
+          properties,
+          targetState,
+          propertyPathMap,
+          animationBaseState,
+        },
+      ]
+    ).map((group) => {
+      let subjectState =
+        group.animationBaseState ??
+        (hasTranslateProperties(group.properties)
+          ? createAnimationSubjectState(group.element)
+          : null);
 
-    const getSubjectState = () => {
-      if (!subjectState) {
-        subjectState = createAnimationSubjectState(element);
-      }
+      return {
+        ...group,
+        propertyPathMap: group.propertyPathMap ?? TRANSITION_PROPERTY_PATH_MAP,
+        subjectState,
+        getSubjectState: () => {
+          if (!subjectState) {
+            subjectState = createAnimationSubjectState(group.element);
+          }
+          return subjectState;
+        },
+      };
+    });
 
-      return subjectState;
-    };
-
-    const timelines = buildPropertyTimelines(
-      element,
-      properties,
-      propertyPathMap,
-      targetState,
-      id,
-      subjectState,
-      normalizedPayload.loop,
+    const timelines = propertyGroups.flatMap((group) =>
+      buildPropertyTimelines(
+        group.element,
+        group.properties,
+        group.propertyPathMap,
+        group.targetState,
+        id,
+        group.subjectState,
+        normalizedPayload.loop,
+        group.validateProperty !== false,
+      ).map((timeline) => ({ ...timeline, group })),
     );
 
     if (timelines.length === 0) {
@@ -282,16 +302,16 @@ export const createAnimationBus = () => {
       onComplete,
       onCancel,
       applyFrame: (time) => {
-        for (const { property, timeline } of timelines) {
+        for (const { property, timeline, group } of timelines) {
           const value = getValueAtTime(timeline, time);
           try {
             applyAnimationProperty({
-              object: element,
+              object: group.element,
               property,
-              propertyPathMap,
+              propertyPathMap: group.propertyPathMap,
               subjectState: isTranslateAnimationProperty(property)
-                ? getSubjectState()
-                : subjectState,
+                ? group.getSubjectState()
+                : group.subjectState,
               value,
             });
           } catch (_error) {
@@ -300,32 +320,40 @@ export const createAnimationBus = () => {
         }
       },
       applyTargetState: () => {
-        if (!element || element.destroyed) return;
+        for (const group of propertyGroups) {
+          if (!group.element || group.element.destroyed) continue;
 
-        if (targetState === null) {
-          element.destroy();
-          return;
-        }
+          if (group.targetState === null) {
+            group.element.destroy?.();
+            continue;
+          }
 
-        if (!targetState) return;
+          if (!group.targetState) continue;
 
-        for (const [property, value] of Object.entries(targetState)) {
-          try {
-            applyAnimationProperty({
-              object: element,
-              property,
-              propertyPathMap,
-              subjectState: isTranslateAnimationProperty(property)
-                ? getSubjectState()
-                : subjectState,
-              value,
-            });
-          } catch (_error) {
-            // Skip properties that fail to apply.
+          for (const [property, value] of Object.entries(group.targetState)) {
+            try {
+              applyAnimationProperty({
+                object: group.element,
+                property,
+                propertyPathMap: group.propertyPathMap,
+                subjectState: isTranslateAnimationProperty(property)
+                  ? group.getSubjectState()
+                  : group.subjectState,
+                value,
+              });
+            } catch (_error) {
+              // Skip properties that fail to apply.
+            }
           }
         }
       },
-      isValid: () => Boolean(element) && !element.destroyed,
+      isValid: () =>
+        propertyGroups.every(
+          (group) =>
+            Boolean(group.element) &&
+            !group.element.destroyed &&
+            (group.isValid?.() ?? true),
+        ),
     };
 
     registerAnimation(attachAnimationMetadata(context, normalizedPayload));

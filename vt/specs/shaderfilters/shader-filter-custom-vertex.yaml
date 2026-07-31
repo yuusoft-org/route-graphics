@@ -251,9 +251,11 @@ states:
         targetId: custom-vertex-filter
         type: update
         tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: easeInOutCubic
+          filters:
+            vertex-wave:
+              progress:
+                initialValue: 0
+                keyframes:
+                  - duration: 1000
+                    value: 1
+                    easing: easeInOutCubic

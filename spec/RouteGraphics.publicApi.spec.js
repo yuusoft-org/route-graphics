@@ -10,6 +10,55 @@ const createMockBounds = (width, height) => ({
   },
 });
 
+const createRejectingWebGLCompiler = () => {
+  const gl = {
+    VERTEX_SHADER: 1,
+    FRAGMENT_SHADER: 2,
+    COMPILE_STATUS: 3,
+    LINK_STATUS: 4,
+    createShader: vi.fn((type) => ({ type })),
+    shaderSource: vi.fn(),
+    compileShader: vi.fn((shader) => {
+      shader.compiled = shader.type !== gl.FRAGMENT_SHADER;
+    }),
+    getShaderParameter: vi.fn((shader) => shader.compiled),
+    getShaderInfoLog: vi.fn(() => "intentional fragment compiler failure"),
+    deleteShader: vi.fn(),
+    createProgram: vi.fn(() => ({})),
+    attachShader: vi.fn(),
+    linkProgram: vi.fn(),
+    getProgramParameter: vi.fn(() => true),
+    getProgramInfoLog: vi.fn(() => ""),
+    deleteProgram: vi.fn(),
+  };
+  return gl;
+};
+
+const validShaderSource = {
+  webgl: {
+    fragment: `
+      in vec2 vTextureCoord;
+      out vec4 finalColor;
+      uniform sampler2D uTexture;
+      void main() { finalColor = texture(uTexture, vTextureCoord); }
+    `,
+  },
+  webgpu: {
+    source: `
+      struct VSOutput {
+        @builtin(position) position: vec4<f32>,
+        @location(0) uv: vec2<f32>,
+      };
+      @vertex fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput {
+        return VSOutput(vec4<f32>(aPosition, 0.0, 1.0), aPosition);
+      }
+      @fragment fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+        return vec4<f32>(uv, 0.0, 1.0);
+      }
+    `,
+  },
+};
+
 const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
   let lastApplication = null;
   const assetCache = new Map();
@@ -267,7 +316,9 @@ const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
       this.canvas = document.createElement("canvas");
     }
 
-    async init({ width, height, backgroundColor }) {
+    async init(options) {
+      const { width, height, backgroundColor } = options;
+      this.initOptions = options;
       this.renderer.width = width;
       this.renderer.height = height;
       this.renderer.background.color = backgroundColor;
@@ -457,6 +508,281 @@ describe("RouteGraphics public API", () => {
     const { app } = await setupRouteGraphics();
 
     expect(app.hitTestElementBounds({ x: 10, y: 10 })).toEqual([]);
+  });
+
+  it("selects the requested renderer backend and exposes the result", async () => {
+    const { app, pixiMock } = await setupRouteGraphics({
+      initOptions: {
+        rendererPreference: "webgpu",
+      },
+      rendererOverrides: {
+        gpu: { device: {} },
+      },
+    });
+
+    expect(pixiMock.__getLastApplication().initOptions.preference).toBe(
+      "webgpu",
+    );
+    expect(app.rendererType).toBe("webgpu");
+  });
+
+  it("rejects renderer fallback when the requested backend is unavailable", async () => {
+    await expect(
+      setupRouteGraphics({
+        initOptions: {
+          rendererPreference: "webgpu",
+          rendererFallback: false,
+        },
+      }),
+    ).rejects.toThrow(
+      'Renderer "webgpu" is unavailable and rendererFallback is false.',
+    );
+  });
+
+  it("rejects unknown renderer preferences", async () => {
+    await expect(
+      setupRouteGraphics({
+        initOptions: {
+          rendererPreference: "canvas",
+        },
+      }),
+    ).rejects.toThrow(/Expected "webgl" or "webgpu"/);
+  });
+
+  it("keeps the last good scene when shader preflight fails", async () => {
+    const gl = createRejectingWebGLCompiler();
+    const { app } = await setupRouteGraphics({
+      rendererOverrides: { gl },
+      pluginsFactory: async () => {
+        const { rectPlugin } =
+          await import("../src/plugins/elements/rect/index.js");
+        return {
+          elements: [rectPlugin],
+          animations: [],
+          audio: [],
+        };
+      },
+    });
+    app.render({
+      id: "good",
+      elements: [
+        {
+          id: "card",
+          type: "rect",
+          x: 10,
+          y: 20,
+          width: 100,
+          height: 50,
+          fill: "#ffffff",
+        },
+      ],
+    });
+
+    expect(() =>
+      app.render({
+        id: "invalid-shader",
+        elements: [
+          {
+            id: "card",
+            type: "rect",
+            x: 99,
+            y: 20,
+            width: 100,
+            height: 50,
+            fill: "#ffffff",
+            filters: [
+              {
+                id: "broken",
+                type: "shader",
+                source: validShaderSource,
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(
+      /element "card" shader filter "broken".*intentional fragment compiler failure/,
+    );
+    expect(app.findElementByLabel("card")?.x).toBe(10);
+  });
+
+  it.each([
+    {
+      name: "configuration validation",
+      expected: /filters\[0\]\.paddding is not supported/,
+      createInvalidState: () => ({
+        filters: [
+          {
+            id: "strict",
+            type: "shader",
+            paddding: 4,
+            source: validShaderSource,
+          },
+        ],
+      }),
+    },
+    {
+      name: "animation binding validation",
+      expected: /could not find shader filter "missing"/,
+      createInvalidState: () => ({
+        filters: [
+          {
+            id: "grade",
+            type: "shader",
+            parameters: { amount: 0 },
+            source: validShaderSource,
+          },
+        ],
+        animations: [
+          {
+            id: "invalid-binding",
+            targetId: "card",
+            type: "update",
+            tween: {
+              filters: {
+                missing: {
+                  progress: {
+                    keyframes: [{ duration: 100, value: 1 }],
+                  },
+                },
+              },
+            },
+          },
+        ],
+      }),
+    },
+    {
+      name: "texture preflight",
+      expected: /references unloaded texture "missing-texture"/,
+      createInvalidState: () => ({
+        filters: [
+          {
+            id: "textured",
+            type: "shader",
+            textures: { noise: "missing-texture" },
+            source: validShaderSource,
+          },
+        ],
+      }),
+    },
+  ])(
+    "keeps the last good scene after $name fails",
+    async ({ createInvalidState, expected }) => {
+      const gl = createRejectingWebGLCompiler();
+      const { app } = await setupRouteGraphics({
+        rendererOverrides: { gl },
+        pluginsFactory: async () => {
+          const { rectPlugin } =
+            await import("../src/plugins/elements/rect/index.js");
+          return {
+            elements: [rectPlugin],
+            animations: [],
+            audio: [],
+          };
+        },
+      });
+
+      app.render({
+        id: "good",
+        elements: [
+          {
+            id: "card",
+            type: "rect",
+            x: 10,
+            y: 20,
+            width: 100,
+            height: 50,
+            fill: "#ffffff",
+          },
+        ],
+      });
+      const { animations = [], ...elementOverrides } = createInvalidState();
+
+      expect(() =>
+        app.render({
+          id: "invalid",
+          elements: [
+            {
+              id: "card",
+              type: "rect",
+              x: 99,
+              y: 20,
+              width: 100,
+              height: 50,
+              fill: "#ffffff",
+              ...elementOverrides,
+            },
+          ],
+          animations,
+        }),
+      ).toThrow(expected);
+      expect(app.findElementByLabel("card")?.x).toBe(10);
+      expect(gl.compileShader).not.toHaveBeenCalled();
+    },
+  );
+
+  it("parse validates shader bindings without compiling or mounting", async () => {
+    const gl = createRejectingWebGLCompiler();
+    const { app } = await setupRouteGraphics({
+      rendererOverrides: { gl },
+      pluginsFactory: async () => {
+        const { rectPlugin } =
+          await import("../src/plugins/elements/rect/index.js");
+        return {
+          elements: [rectPlugin],
+          animations: [],
+          audio: [],
+        };
+      },
+    });
+    const state = {
+      id: "parse-only",
+      elements: [
+        {
+          id: "card",
+          type: "rect",
+          width: 100,
+          height: 50,
+          fill: "#ffffff",
+          filters: [
+            {
+              id: "grade",
+              type: "shader",
+              parameters: { amount: 0 },
+              source: validShaderSource,
+            },
+          ],
+        },
+      ],
+      animations: [],
+    };
+
+    expect(app.parse(state).elements[0].filters[0].id).toBe("grade");
+    expect(gl.compileShader).not.toHaveBeenCalled();
+    expect(app.findElementByLabel("card")).toBeNull();
+
+    expect(() =>
+      app.parse({
+        ...state,
+        animations: [
+          {
+            id: "bad-binding",
+            targetId: "card",
+            type: "update",
+            tween: {
+              filters: {
+                missing: {
+                  progress: {
+                    keyframes: [{ duration: 100, value: 1 }],
+                  },
+                },
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrow(/could not find shader filter "missing"/);
+    expect(gl.compileShader).not.toHaveBeenCalled();
   });
 
   it("unloads and reloads buffer-backed textures", async () => {

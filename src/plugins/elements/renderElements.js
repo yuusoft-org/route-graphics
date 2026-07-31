@@ -12,6 +12,7 @@ import {
   updateElementWithRenderState,
 } from "./elementRenderState.js";
 import { createRenderContext } from "./renderContext.js";
+import { shouldUpdateUnchangedShaderFilterParameters } from "./util/shaderFilterEffect.js";
 
 /**
  * Render elements using plugin system.
@@ -27,6 +28,8 @@ import { createRenderContext } from "./renderContext.js";
  * @param {Function} params.eventHandler - Event handler function
  * @param {Object} [params.renderContext] - Render context flags for nested mounts
  * @param {AbortSignal} [params.signal] - Render cancellation signal
+ * @param {number} [params.shaderTime] - Current deterministic shader time in seconds
+ * @param {Function} [params.getShaderTime] - Returns the current deterministic shader time in seconds
  */
 export const renderElements = ({
   app,
@@ -40,6 +43,8 @@ export const renderElements = ({
   elementPlugins,
   renderContext = createRenderContext(),
   signal,
+  shaderTime = 0,
+  getShaderTime,
 }) => {
   // Enable PixiJS built-in sorting by zIndex
   parent.sortableChildren = true;
@@ -80,6 +85,8 @@ export const renderElements = ({
       renderContext,
       zIndex,
       signal,
+      shaderTime,
+      getShaderTime,
       plugin,
     });
   const deleteElement = ({ parent: targetParent = parent, element }) =>
@@ -115,6 +122,8 @@ export const renderElements = ({
       renderContext,
       zIndex,
       signal,
+      shaderTime,
+      getShaderTime,
       plugin,
     });
   };
@@ -228,7 +237,7 @@ export const renderElements = ({
 
     const plugin = getPlugin(element.type);
 
-    if (
+    const shouldUpdatePlugin =
       plugin.shouldUpdateUnchanged?.({
         app,
         parent,
@@ -242,8 +251,17 @@ export const renderElements = ({
         renderContext,
         zIndex: nextIndexById.get(element.id) ?? -1,
         signal,
-      }) !== true
-    ) {
+        shaderTime,
+        getShaderTime,
+      }) === true;
+    const shouldResetShaderParameters =
+      shouldUpdateUnchangedShaderFilterParameters({
+        parent,
+        nextElement: element,
+        animations: animationsByTarget,
+      });
+
+    if (!shouldUpdatePlugin && !shouldResetShaderParameters) {
       continue;
     }
 
@@ -296,6 +314,8 @@ export const renderElements = ({
           resolveParent: () => resolveRenderParent(element.id),
           zIndex: getExistingChildZIndex(element.id),
           signal,
+          shaderTime,
+          getShaderTime,
         }),
       );
       continue;
@@ -356,6 +376,8 @@ export const renderElements = ({
           resolveParent: () => resolveRenderParent(element.id),
           zIndex,
           signal,
+          shaderTime,
+          getShaderTime,
         }),
       );
       continue;
@@ -415,6 +437,8 @@ export const renderElements = ({
           resolveParent: () => resolveRenderParent(next.id),
           zIndex,
           signal,
+          shaderTime,
+          getShaderTime,
         }),
       );
       continue;

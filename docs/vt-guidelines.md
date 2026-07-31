@@ -141,6 +141,15 @@ not sufficient.
   matching precision in both stages.
 - For `uProgress` or other stateful animation behavior, include forward and
   backward navigation steps when reset/continuity is part of the contract.
+- For a targeted parameter animation, include the filter id and at least one
+  independently animated scalar or vector value in the visual checkpoints.
+- For `time: true`, sample through `setAnimationTime(timeMS)` so references are
+  deterministic; do not accept ticker-wall-clock screenshots as baselines.
+- For multi-pass effects, ensure each pass makes a visually observable
+  contribution and test pass-order changes when order is part of the contract.
+- When a transition combines `mask` and `compositor`, verify the built-in mask
+  result feeds the first custom pass and that later custom passes retain
+  `uNextTexture`.
 - For transition compositors, inspect a near-completion frame and the
   post-completion frame. The compositor should visually settle into the final
   target before overlay teardown so there is no end-of-transition handoff jump.
@@ -159,6 +168,24 @@ not sufficient.
   The auto-play path is the one that exercises ticker-driven overlay teardown.
 - Run screenshot capture and report after manual browser inspection, then accept
   only the expected reference diffs.
+
+The generated VT pages use WebGL by default. To exercise the same page through
+WebGPU, open it with `?renderer=webgpu`. A spec can also set top-level
+`rendererPreference: webgpu` and `rendererFallback: false` when its normal VT
+run is hosted on a WebGPU-capable worker. The selected backend is available to
+behavior assertions as `vtAssert.rendererType()`.
+
+Run the dedicated browser integration suite for every shader runtime change:
+
+```sh
+bun run test:webgpu
+```
+
+This command requires WebGPU rather than accepting WebGL fallback. It reuses
+the shader VT state fixtures to compile and render a timed update, a multipass
+filter, a custom-texture subdivided compositor, and a mask plus multipass
+compositor. A missing adapter, shader compilation error, browser console error,
+transparent output, or unchanged screenshot fails the command.
 
 ### Transition Compositor Handoff Regression
 
@@ -195,6 +222,7 @@ snapshot coordinate mapping before accepting references.
 Recommended command sequence for shader VT changes:
 
 ```sh
+bun run test:webgpu
 bun run vt:generate
 # Open the changed page in a browser and inspect console output.
 bun run vt:screenshot

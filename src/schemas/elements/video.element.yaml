@@ -96,3 +96,5 @@ properties:
         type: boolean
         description: Clamp edge pixels instead of padding the blur bounds.
         default: false
+  filters:
+    $ref: "../shader-config.yaml#/definitions/elementFilters"

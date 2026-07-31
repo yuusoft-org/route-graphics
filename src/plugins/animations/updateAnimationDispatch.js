@@ -8,6 +8,7 @@ import {
   getAnimationProperty,
   isTranslateAnimationProperty,
 } from "./animationPropertyUtils.js";
+import { validateShaderFilterAnimationTarget } from "../elements/util/shaderFilterEffect.js";
 
 const getLiveTweenProperty = (property) => {
   if (property === "translateX") {
@@ -56,7 +57,7 @@ const captureLiveTweenValues = (
   const values = new Map();
 
   for (const animation of animations) {
-    for (const property of Object.keys(animation.tween)) {
+    for (const property of Object.keys(animation.tween ?? {})) {
       const liveProperty = getLiveTweenProperty(property);
       if (values.has(liveProperty)) {
         continue;
@@ -139,7 +140,7 @@ export const applyInitialUpdateAnimationState = (
   let subjectState = animationBaseState;
 
   for (const animation of animations) {
-    for (const [property, config] of Object.entries(animation.tween)) {
+    for (const [property, config] of Object.entries(animation.tween ?? {})) {
       if (!WhiteListAnimationProps[property]) {
         throw new Error(
           `${property} is not a supported property for animation.`,
@@ -162,6 +163,23 @@ export const applyInitialUpdateAnimationState = (
         value: config.initialValue,
       });
     }
+
+    for (const [filterId, tween] of Object.entries(
+      animation.filterTweens ?? {},
+    )) {
+      const filterTarget = validateShaderFilterAnimationTarget(
+        element,
+        filterId,
+        animation.id,
+        tween,
+      );
+
+      for (const [property, config] of Object.entries(tween)) {
+        if (config.initialValue !== undefined) {
+          filterTarget[property] = config.initialValue;
+        }
+      }
+    }
   }
 };
 
@@ -181,7 +199,7 @@ export const dispatchUpdateAnimationsNow = ({
   );
 
   for (const animation of animationsToDispatch) {
-    for (const [property, config] of Object.entries(animation.tween)) {
+    for (const [property, config] of Object.entries(animation.tween ?? {})) {
       if (
         config.auto &&
         (!targetState ||
@@ -207,6 +225,30 @@ export const dispatchUpdateAnimationsNow = ({
       : animationBaseState;
 
   for (const animation of animationsToDispatch) {
+    const propertyGroups = [
+      {
+        element: dispatchElement,
+        properties: animation.tween ?? {},
+        targetState,
+        animationBaseState: dispatchAnimationBaseState,
+      },
+    ];
+    for (const [filterId, tween] of Object.entries(
+      animation.filterTweens ?? {},
+    )) {
+      propertyGroups.push({
+        element: validateShaderFilterAnimationTarget(
+          dispatchElement,
+          filterId,
+          animation.id,
+          tween,
+        ),
+        properties: tween,
+        propertyPathMap: {},
+        validateProperty: false,
+      });
+    }
+
     const trackCompletion =
       animation.playback?.continuity !== "persistent" &&
       animation.playback?.loop !== true;
@@ -232,10 +274,12 @@ export const dispatchUpdateAnimationsNow = ({
           JSON.stringify({
             type: animation.type,
             tween: animation.tween,
+            filterTweens: animation.filterTweens ?? null,
             playback: animation.playback ?? null,
           }),
         element: dispatchElement,
-        properties: animation.tween,
+        properties: animation.tween ?? {},
+        propertyGroups,
         targetState,
         animationBaseState: dispatchAnimationBaseState,
         onComplete: () => {

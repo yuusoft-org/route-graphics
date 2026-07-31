@@ -4,9 +4,75 @@
  */
 
 /**
+ * @typedef {number | number[] | {type: string, value: number | number[]}} ShaderParameterValue
+ */
+
+/**
+ * @typedef {Object} ShaderTextureDescriptor
+ * @property {string} src - Texture asset alias or URL
+ * @property {"clamp" | "repeat"} [wrap] - Per-texture wrap override
+ * @property {boolean} [mipmap] - Per-texture mipmap override
+ */
+
+/**
+ * @typedef {Object} ShaderSource
+ * @property {{vertex?: string, fragment: string}} webgl - Pixi v8 GLSL source
+ * @property {{source: string}} webgpu - WGSL source defining mainVertex and mainFragment
+ */
+
+/**
+ * @typedef {Object} ShaderPass
+ * @property {string} [id] - Pass id within a multi-pass effect
+ * @property {ShaderSource} source - Inline WebGL and WebGPU source
+ * @property {Object<string, ShaderParameterValue>} [uniforms] - Pass-local static uniforms
+ * @property {Object<string, string | ShaderTextureDescriptor>} [textures] - Pass-local texture inputs
+ * @property {{blend?: "normal" | "add" | "multiply" | "screen", textureWrap?: "clamp" | "repeat", mipmap?: boolean}} [pipeline] - Blend and default texture sampling
+ * @property {{grid: [number, number]}} [mesh] - Geometry subdivision
+ * @property {number} [padding] - Extra output bounds in logical pixels
+ * @property {number | "inherit"} [resolution] - Filter render resolution
+ * @property {boolean | "on" | "off" | "inherit"} [antialias] - Pass antialiasing
+ * @property {boolean} [clipToViewport] - Whether output is clipped to the viewport
+ * @property {boolean} [time] - Whether this pass receives deterministic uTime
+ */
+
+/**
+ * @typedef {Object} ShaderFilter
+ * @property {string} [id] - Stable id; required for element filters and optional for compositors
+ * @property {"shader"} type - Inline shader effect type
+ * @property {Object<string, ShaderParameterValue>} [parameters] - Mutable public parameters
+ * @property {Object<string, ShaderParameterValue>} [uniforms] - Legacy alias for parameters
+ * @property {ShaderSource} [source] - Inline single-pass WebGL and WebGPU source
+ * @property {ShaderPass[]} [passes] - Inline multi-pass effect chain
+ * @property {Object<string, string | ShaderTextureDescriptor>} [textures] - Texture inputs shared by every pass
+ * @property {{blend?: "normal" | "add" | "multiply" | "screen", textureWrap?: "clamp" | "repeat", mipmap?: boolean}} [pipeline] - Pass defaults
+ * @property {{grid: [number, number]}} [mesh] - Default geometry subdivision
+ * @property {number} [padding] - Default pass padding
+ * @property {number | "inherit"} [resolution] - Default pass resolution
+ * @property {boolean | "on" | "off" | "inherit"} [antialias] - Default pass antialiasing
+ * @property {boolean} [clipToViewport] - Default viewport clipping
+ * @property {boolean} [time] - Whether passes receive deterministic uTime
+ */
+
+/**
+ * @typedef {Object} ShaderTweenProperty
+ * @property {number | number[]} [initialValue] - Optional override; otherwise inferred from the current parameter value
+ * @property {Array<{value: number | number[], duration: number, easing?: string, relative?: boolean}>} keyframes - Parameter keyframes
+ */
+
+/**
+ * @typedef {Object<string, ShaderTweenProperty>} ShaderTween
+ * The `progress` key targets the built-in uProgress input; other keys target declared parameters.
+ */
+
+/**
+ * @typedef {ShaderFilter & {tween: ShaderTween}} ShaderCompositor
+ */
+
+/**
  * @typedef {Object} BaseElement
  * @property {string} id - Unique identifier for the element
  * @property {string} type - Type of the element
+ * @property {ShaderFilter[]} [filters] - Ordered inline shader effects
  */
 
 /**
@@ -839,6 +905,11 @@ export const DEFAULT_TEXT_STYLE = {
  * @property {string} targetId - ID of the element
  * @property {AnimationType[keyof AnimationType]} type - Animation structure
  * @property {AnimationPlayback} [playback] - Playback behavior
+ * @property {Object & {filters?: Object<string, ShaderTween>}} [tween] - Standard update properties plus filter parameter timelines grouped by filter id
+ * @property {Object} [prev] - Previous transition surface motion
+ * @property {Object} [next] - Next transition surface motion
+ * @property {Object} [mask] - Transition mask configuration
+ * @property {ShaderCompositor} [compositor] - Inline transition compositor effect with co-located parameter timelines
  */
 
 /**
@@ -884,6 +955,8 @@ export const DEFAULT_TEXT_STYLE = {
  * @property {boolean} [debug] - Whether debug mode is enabled
  * @property {Function} [onFirstRender] - Callback fired after the first render completes
  * @property {"auto" | "manual"} [animationPlaybackMode] - Initial animation playback mode
+ * @property {"webgl" | "webgpu"} [rendererPreference="webgl"] - Preferred Pixi renderer backend
+ * @property {boolean} [rendererFallback=true] - Whether initialization may fall back to the other backend
  */
 
 /**

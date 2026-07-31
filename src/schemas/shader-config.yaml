@@ -1,0 +1,452 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: Inline Shader Effect Configuration
+description: Shared schemas for inline element filters and transition compositors.
+definitions:
+  numericArray:
+    type: array
+    items:
+      type: number
+    anyOf:
+      - minItems: 2
+        maxItems: 2
+      - minItems: 3
+        maxItems: 3
+      - minItems: 4
+        maxItems: 4
+      - minItems: 9
+        maxItems: 9
+      - minItems: 16
+        maxItems: 16
+  typedUniformValue:
+    type: object
+    required: [type, value]
+    additionalProperties: false
+    properties:
+      type:
+        type: string
+        enum:
+          - f32
+          - vec2
+          - vec2<f32>
+          - vec3
+          - vec3<f32>
+          - vec4
+          - vec4<f32>
+          - mat3
+          - mat3x3<f32>
+          - mat4
+          - mat4x4<f32>
+      value:
+        oneOf:
+          - type: number
+          - $ref: "#/definitions/numericArray"
+    oneOf:
+      - properties:
+          type:
+            const: f32
+          value:
+            type: number
+      - properties:
+          type:
+            enum: [vec2, vec2<f32>]
+          value:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+      - properties:
+          type:
+            enum: [vec3, vec3<f32>]
+          value:
+            type: array
+            items:
+              type: number
+            minItems: 3
+            maxItems: 3
+      - properties:
+          type:
+            enum: [vec4, vec4<f32>]
+          value:
+            type: array
+            items:
+              type: number
+            minItems: 4
+            maxItems: 4
+      - properties:
+          type:
+            enum: [mat3, mat3x3<f32>]
+          value:
+            type: array
+            items:
+              type: number
+            minItems: 9
+            maxItems: 9
+      - properties:
+          type:
+            enum: [mat4, mat4x4<f32>]
+          value:
+            type: array
+            items:
+              type: number
+            minItems: 16
+            maxItems: 16
+  uniformValue:
+    oneOf:
+      - type: number
+      - $ref: "#/definitions/numericArray"
+      - $ref: "#/definitions/typedUniformValue"
+  easing:
+    type: string
+    enum:
+      - linear
+      - easeInQuad
+      - easeOutQuad
+      - easeInOutQuad
+      - easeInCubic
+      - easeOutCubic
+      - easeInOutCubic
+      - easeInQuart
+      - easeOutQuart
+      - easeInOutQuart
+      - easeInQuint
+      - easeOutQuint
+      - easeInOutQuint
+      - easeInSine
+      - easeOutSine
+      - easeInOutSine
+      - easeInExpo
+      - easeOutExpo
+      - easeInOutExpo
+      - easeInCirc
+      - easeOutCirc
+      - easeInOutCirc
+      - easeInBack
+      - easeOutBack
+      - easeInOutBack
+      - easeInBounce
+      - easeOutBounce
+      - easeInOutBounce
+      - easeInElastic
+      - easeOutElastic
+      - easeInOutElastic
+  shaderTweenKeyframe:
+    type: object
+    required: [value, duration]
+    additionalProperties: false
+    properties:
+      value:
+        oneOf:
+          - type: number
+          - $ref: "#/definitions/numericArray"
+      duration:
+        type: number
+      easing:
+        $ref: "#/definitions/easing"
+      relative:
+        type: boolean
+        default: false
+  shaderTweenProperty:
+    type: object
+    required: [keyframes]
+    additionalProperties: false
+    properties:
+      initialValue:
+        oneOf:
+          - type: number
+          - $ref: "#/definitions/numericArray"
+      keyframes:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/definitions/shaderTweenKeyframe"
+  shaderProgressKeyframe:
+    allOf:
+      - $ref: "#/definitions/shaderTweenKeyframe"
+      - properties:
+          value:
+            type: number
+  shaderProgressProperty:
+    type: object
+    required: [keyframes]
+    additionalProperties: false
+    properties:
+      initialValue:
+        type: number
+      keyframes:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/definitions/shaderProgressKeyframe"
+  shaderTween:
+    type: object
+    minProperties: 1
+    properties:
+      progress:
+        $ref: "#/definitions/shaderProgressProperty"
+    patternProperties:
+      "^(?!progress$|uProgress$|uTime$|time$)[a-z][A-Za-z0-9]*$":
+        $ref: "#/definitions/shaderTweenProperty"
+    additionalProperties: false
+  compositorTween:
+    allOf:
+      - $ref: "#/definitions/shaderTween"
+      - required: [progress]
+  uniforms:
+    type: object
+    description: Numeric values keyed by lower-camel-case names.
+    patternProperties:
+      "^[a-z][A-Za-z0-9]*$":
+        $ref: "#/definitions/uniformValue"
+    additionalProperties: false
+  textureDescriptor:
+    type: object
+    required: [src]
+    additionalProperties: false
+    properties:
+      src:
+        type: string
+        minLength: 1
+      wrap:
+        type: string
+        enum: [clamp, repeat]
+      mipmap:
+        type: boolean
+  textureValue:
+    oneOf:
+      - type: string
+        minLength: 1
+      - $ref: "#/definitions/textureDescriptor"
+  textures:
+    type: object
+    description: Custom texture asset references and optional per-texture sampling.
+    patternProperties:
+      "^[a-z][A-Za-z0-9]*$":
+        $ref: "#/definitions/textureValue"
+    additionalProperties: false
+  filterTextures:
+    allOf:
+      - $ref: "#/definitions/textures"
+      - maxProperties: 7
+  compositorTextures:
+    allOf:
+      - $ref: "#/definitions/textures"
+      - maxProperties: 6
+  pipeline:
+    type: object
+    additionalProperties: false
+    properties:
+      blend:
+        type: string
+        enum: [normal, add, multiply, screen]
+        default: normal
+      textureWrap:
+        type: string
+        enum: [clamp, repeat]
+        default: clamp
+      mipmap:
+        type: boolean
+        default: false
+  webglSource:
+    type: object
+    additionalProperties: false
+    required: [fragment]
+    properties:
+      vertex:
+        type: string
+        description: Optional Pixi v8 GLSL vertex shader.
+      fragment:
+        type: string
+        minLength: 1
+        description: Required Pixi v8 GLSL fragment shader.
+  webgpuSource:
+    type: object
+    additionalProperties: false
+    required: [source]
+    properties:
+      source:
+        type: string
+        minLength: 1
+        description: WGSL source defining mainVertex and mainFragment.
+  source:
+    type: object
+    additionalProperties: false
+    required: [webgl, webgpu]
+    properties:
+      webgl:
+        $ref: "#/definitions/webglSource"
+      webgpu:
+        $ref: "#/definitions/webgpuSource"
+  mesh:
+    type: object
+    additionalProperties: false
+    required: [grid]
+    properties:
+      grid:
+        type: array
+        minItems: 2
+        maxItems: 2
+        description: Positive integer [columns, rows] subdivision.
+        items:
+          type: integer
+          minimum: 1
+          maximum: 512
+  resolution:
+    oneOf:
+      - type: number
+        exclusiveMinimum: 0
+      - const: inherit
+  antialias:
+    oneOf:
+      - type: boolean
+      - type: string
+        enum: [on, off, inherit]
+  shaderPass:
+    type: object
+    additionalProperties: false
+    required: [source]
+    properties:
+      id:
+        type: string
+        minLength: 1
+      uniforms:
+        $ref: "#/definitions/uniforms"
+      textures:
+        $ref: "#/definitions/textures"
+      pipeline:
+        $ref: "#/definitions/pipeline"
+      source:
+        $ref: "#/definitions/source"
+      mesh:
+        $ref: "#/definitions/mesh"
+      padding:
+        type: number
+        minimum: 0
+      resolution:
+        $ref: "#/definitions/resolution"
+      antialias:
+        $ref: "#/definitions/antialias"
+      clipToViewport:
+        type: boolean
+      time:
+        type: boolean
+        description: Opt in to the deterministic uTime built-in for this pass.
+  filterPass:
+    allOf:
+      - $ref: "#/definitions/shaderPass"
+      - properties:
+          textures:
+            $ref: "#/definitions/filterTextures"
+  compositorPass:
+    allOf:
+      - $ref: "#/definitions/shaderPass"
+      - properties:
+          textures:
+            $ref: "#/definitions/compositorTextures"
+  filter:
+    type: object
+    additionalProperties: false
+    required: [id, type]
+    properties:
+      id:
+        type: string
+        minLength: 1
+        description: Stable filter instance id, unique within the element.
+      type:
+        const: shader
+      parameters:
+        $ref: "#/definitions/uniforms"
+      uniforms:
+        $ref: "#/definitions/uniforms"
+        description: Legacy alias for parameters.
+      textures:
+        $ref: "#/definitions/filterTextures"
+      pipeline:
+        $ref: "#/definitions/pipeline"
+      source:
+        $ref: "#/definitions/source"
+      passes:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/definitions/filterPass"
+      mesh:
+        $ref: "#/definitions/mesh"
+      padding:
+        type: number
+        minimum: 0
+      resolution:
+        $ref: "#/definitions/resolution"
+      antialias:
+        $ref: "#/definitions/antialias"
+      clipToViewport:
+        type: boolean
+      time:
+        type: boolean
+        description: Opt in to the deterministic uTime built-in.
+    allOf:
+      - oneOf:
+          - required: [source]
+            not:
+              required: [passes]
+          - required: [passes]
+            not:
+              required: [source]
+      - not:
+          required: [parameters, uniforms]
+  elementFilters:
+    type: array
+    description: Ordered inline shader effects applied after built-in managed effects.
+    items:
+      $ref: "#/definitions/filter"
+  compositor:
+    type: object
+    additionalProperties: false
+    required: [type, tween]
+    properties:
+      id:
+        type: string
+        minLength: 1
+      type:
+        const: shader
+      parameters:
+        $ref: "#/definitions/uniforms"
+      uniforms:
+        $ref: "#/definitions/uniforms"
+        description: Legacy alias for parameters.
+      textures:
+        $ref: "#/definitions/compositorTextures"
+      pipeline:
+        $ref: "#/definitions/pipeline"
+      source:
+        $ref: "#/definitions/source"
+      passes:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/definitions/compositorPass"
+      mesh:
+        $ref: "#/definitions/mesh"
+      padding:
+        type: number
+        minimum: 0
+      resolution:
+        $ref: "#/definitions/resolution"
+      antialias:
+        $ref: "#/definitions/antialias"
+      clipToViewport:
+        type: boolean
+      time:
+        type: boolean
+      tween:
+        $ref: "#/definitions/compositorTween"
+    allOf:
+      - oneOf:
+          - required: [source]
+            not:
+              required: [passes]
+          - required: [passes]
+            not:
+              required: [source]
+      - not:
+          required: [parameters, uniforms]

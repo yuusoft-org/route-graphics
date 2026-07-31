@@ -19,10 +19,54 @@ import {
   flushDeferredMountOperations,
 } from "../../src/plugins/elements/renderContext.js";
 import { addTextRevealing } from "../../src/plugins/elements/text-revealing/addTextRevealing.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import {
+  createAnimatedShaderFilterFixture,
+  createFilterAnimationFixture,
+} from "../util/shaderFilterFixtures.js";
 
 describe("addTextRevealing", () => {
   beforeEach(() => {
     mocks.runTextReveal.mockClear();
+  });
+
+  it("installs shader filters before dispatching mount animations", async () => {
+    const parent = new Container();
+    const animationBus = createAnimationBus();
+    const element = {
+      id: "animated-line",
+      type: "text-revealing",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 44,
+      alpha: 1,
+      speed: 100,
+      revealEffect: "typewriter",
+      content: [],
+      filters: createAnimatedShaderFilterFixture(),
+    };
+
+    await addTextRevealing({
+      parent,
+      element,
+      animations: createFilterAnimationFixture(element.id),
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 0,
+      signal: new AbortController().signal,
+    });
+    animationBus.flush();
+
+    const text = parent.getChildByLabel(element.id);
+    expect(
+      text.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.4);
+    text.destroy({ children: true });
   });
 
   it("applies degree rotation around the configured origin", async () => {

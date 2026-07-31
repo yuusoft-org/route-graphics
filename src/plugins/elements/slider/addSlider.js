@@ -11,6 +11,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { syncShaderFilters } from "../util/shaderFilterEffect.js";
 
 /**
  * Add slider element to the stage
@@ -81,6 +82,10 @@ export const addSlider = ({
   });
 
   parent.addChild(sliderContainer);
+  syncShaderFilters(sliderContainer, sliderComputedNode.filters, {
+    width,
+    height,
+  });
 
   dispatchLiveAnimations({
     animations,

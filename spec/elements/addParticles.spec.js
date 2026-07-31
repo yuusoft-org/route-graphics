@@ -2,6 +2,11 @@ import { Container, Texture } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { addParticle } from "../../src/plugins/elements/particles/addParticles.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import {
+  createAnimatedShaderFilterFixture,
+  createFilterAnimationFixture,
+} from "../util/shaderFilterFixtures.js";
 
 function createApp() {
   return {
@@ -28,6 +33,54 @@ function collectPositions(emitter) {
 }
 
 describe("addParticle", () => {
+  it("installs shader filters before dispatching mount animations", () => {
+    const parent = new Container();
+    const app = createApp();
+    const animationBus = createAnimationBus();
+    const element = {
+      id: "animated-particles",
+      type: "particles",
+      width: 100,
+      height: 100,
+      count: 1,
+      texture: {
+        shape: "circle",
+        radius: 2,
+        color: "#ffffff",
+      },
+      behaviors: [],
+      emitter: {
+        lifetime: { min: 1, max: 1 },
+        frequency: 0.1,
+        maxParticles: 1,
+      },
+      filters: createAnimatedShaderFilterFixture(),
+    };
+
+    addParticle({
+      app,
+      parent,
+      element,
+      animations: createFilterAnimationFixture(element.id),
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      renderContext: {},
+      zIndex: 0,
+    });
+    animationBus.flush();
+
+    const particles = parent.getChildByLabel(element.id);
+    expect(
+      particles.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.4);
+    particles.emitter.destroy();
+    particles.destroy({ children: true });
+  });
+
   it("emits burst particles immediately on mount without weather-style prefill", () => {
     const parent = new Container();
     const app = createApp();

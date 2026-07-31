@@ -1,6 +1,6 @@
 # Animation Model
 
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 See also:
 
@@ -28,6 +28,9 @@ The runtime now exposes:
 - optional `playback.continuity: render | persistent` on `update` and `transition`
 - optional positive `playback.speed` on `update` and `transition`
 - optional infinite `playback.loop` on `update`
+- independently targeted shader parameter timelines
+- inline single-pass and multi-pass transition compositors
+- composable mask plus compositor transitions
 
 Current known runtime limitations are tracked in
 `docs/animation-implementation-plan.md`.
@@ -94,15 +97,19 @@ Use it for:
 - fading a persistent element
 - scaling a portrait in place
 - changing properties on an already-mounted element
-- simple "in" animations on a newly mounted live element
-- simple "out" animations before a live element is removed
 
 Do not use `update` for:
 
 - prev/next replacement handoffs
+- authored enter or exit lifecycles
 
 Use `transition` instead when the animation needs a previous/next visual
 handoff, including masked reveals, dissolves, exits, and replacements.
+
+Some current element plugins still dispatch `update` animations during add and
+delete paths for legacy compatibility. New authoring should not rely on that
+behavior; lifecycle tightening remains tracked in
+`docs/animation-implementation-plan.md`.
 
 `update` supports:
 
@@ -110,11 +117,13 @@ handoff, including masked reveals, dissolves, exits, and replacements.
 - `playback.continuity`
 - `playback.speed`
 - `playback.loop`
+- ordinary properties and `filters.<filterId>` parameter timelines inside
+  `tween`
 
 `update` does not support:
 
 - `mask`
-- `shader`
+- inline compositor source
 - `prev`
 - `next`
 
@@ -144,6 +153,7 @@ Use it for:
 - `playback.continuity`
 - `playback.speed`
 - `compositor`
+- `compositor.tween` for progress and custom compositor parameters
 
 `transition` may define:
 
@@ -151,6 +161,8 @@ Use it for:
 - `next` only
 - both `prev` and `next`
 - `mask` with no explicit `prev`/`next` tween overrides
+- `compositor` with no explicit `prev`/`next` tween overrides
+- `mask` followed by a `compositor`
 
 The missing side is treated as transparent.
 
@@ -330,7 +342,7 @@ of these remain true:
 
 - the animation `id` is the same
 - the `targetId` is the same
-- the normalized `tween` and `playback` config are the same
+- the normalized `tween`, `shader`, and `playback` config are the same
 - the target element still exists as the same live display object
 
 ### Meaning For `transition`
@@ -347,8 +359,8 @@ of these remain true:
 
 - the animation `id` is the same
 - the `targetId` is the same
-- the normalized `prev`, `next`, `mask`, `compositor`, top-level
-  `tween.uProgress`, and `playback` config are the same
+- the normalized `prev`, `next`, `mask`, `compositor`, and `playback` config are
+  the same
 - the transition still owns the same target subtree handoff
 
 This is continuity of one already-started transition.
@@ -363,10 +375,10 @@ That means:
 ### Restart And Stop Rules
 
 - if a later render omits that animation, it stops
-- if a later render changes that animation's `tween` or `playback` config, it restarts from the beginning
+- if a later render changes that animation's `tween` or `playback` config, it
+  restarts from the beginning
 - if a later render changes a persistent transition's `prev`, `next`, `mask`,
-  `compositor`, or top-level `tween.uProgress` config, it restarts from the
-  beginning
+  or `compositor` config, it restarts from the beginning
 - if the target element or target subtree is deleted, replaced, or otherwise no longer matches the active handoff, it stops or restarts
 
 ### Transition Ownership Rule
@@ -572,20 +584,49 @@ Sequence rules:
 
 ## Shader Compositor
 
-Shader compositor support is `transition`-only.
+Inline shader compositor source is `transition`-only. A compositor can be one
+pass or an ordered multi-pass chain. It lives next to `mask`; the two can be
+combined, with the built-in mask pass executing before custom compositor
+passes.
 
-It lives next to `mask`, not on `update`.
+Element shader filter source lives on `elements[].filters[]`. An update
+animation targets filters by id inside its normal `tween`:
 
-Element shader filters are outside the animation object and live on elements.
-`update` animations may tween `uProgress`, but they do not define shader source
-or shader filter configuration.
+```yaml
+tween:
+  filters:
+    glow:
+      strength:
+        keyframes:
+          - duration: 500
+            value: 1
+      progress:
+        initialValue: 0
+        keyframes:
+          - duration: 500
+            value: 1
+```
 
-The v1 shader interface is tracked in `docs/shader-interface.md`.
+An update may combine ordinary properties and multiple filter ids in the same
+`tween`. Filter `progress` maps to that filter's `uProgress`.
+
+A transition compositor owns `compositor.tween`. Its required `progress` track
+maps to `uProgress`; other tracks target declared compositor parameters.
+Missing initial values are inferred from the current filter or compositor
+parameter.
+
+Scalar, vector, and matrix values interpolate through the same manual-keyframe
+model. `uTime` is a deterministic read-only clock, not an animation property.
+The complete shader contract is in `docs/shader-interface.md`.
 
 ## Validation Rules
 
 - `update` requires `tween`
 - `update` may optionally define `playback.continuity: render | persistent`
+- `update` and `transition` may define a positive `playback.speed`
+- `update` may define `playback.loop: true`
+- `transition` cannot loop
+- looping animations cannot define `complete`
 - `update` cannot define `prev`, `next`, or `mask`
 - `transition` may optionally define `playback.continuity: render | persistent`
 - `transition` requires at least one of:
@@ -595,17 +636,21 @@ The v1 shader interface is tracked in `docs/shader-interface.md`.
   - `compositor`
 - `mask` is transition-only
 - transition `compositor` is transition-only
-- transition `compositor` is mutually exclusive with `mask` in v1
-- top-level `transition.tween` is valid only for `uProgress` when `compositor`
-  is present
-- `compositor` requires top-level `tween.uProgress`
+- transition `compositor` may follow `mask`
+- top-level `transition.tween` is not valid; surface motion stays under
+  `prev.tween` and `next.tween`
+- `compositor` requires `compositor.tween.progress`
+- update filter tracks live under `tween.filters.<filterId>`
+- `uTime`/`time` cannot be tweened
 
 ## Summary
 
 - keep `animations` as the top-level field
 - use required `type: update | transition`
 - use `tween` instead of generic `properties`
-- allow optional `playback.continuity: render | persistent`
+- allow optional playback continuity and speed on both animation types
+- allow non-blocking infinite loops on `update`
 - let `transition` define `prev` and/or `next`
 - keep `mask` as a transition-only primitive
 - keep transition `compositor` transition-only as well
+- allow filter and compositor parameters to use the animation timeline model

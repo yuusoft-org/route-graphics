@@ -110,7 +110,7 @@ $def:
         default: 0
   indicatorVisual:
     type: object
-    description: Indicator visual. Use `kind: image` for a static texture or `kind: spritesheet` for frame animation.
+    description: "Indicator visual. Use `kind: image` for a static texture or `kind: spritesheet` for frame animation."
     properties:
       kind:
         type: string

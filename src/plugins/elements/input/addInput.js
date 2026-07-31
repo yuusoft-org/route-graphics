@@ -13,6 +13,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { syncShaderFilters } from "../util/shaderFilterEffect.js";
 
 const emitInputEvent = ({
   eventHandler,
@@ -343,6 +344,10 @@ export const addInput = ({
   });
 
   parent.addChild(container);
+  syncShaderFilters(container, element.filters, {
+    width: element.width,
+    height: element.height,
+  });
 
   dispatchLiveAnimations({
     animations,

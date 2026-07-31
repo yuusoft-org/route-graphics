@@ -11,6 +11,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { prepareShaderFilterAnimationTargets } from "../util/shaderFilterEffect.js";
 
 const emitInputEvent = ({
   eventHandler,
@@ -202,6 +203,13 @@ export const updateInput = ({
   }
   const adoptedExternalValue =
     shouldAdoptExternalValue && runtime.composing !== true;
+
+  prepareShaderFilterAnimationTargets({
+    displayObject: container,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
 
   const updateElement = () => {
     if (adoptedExternalValue) {

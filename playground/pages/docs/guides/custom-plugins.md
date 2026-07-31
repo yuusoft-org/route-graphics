@@ -15,6 +15,13 @@ Route Graphics is built around plugin groups registered in `init(...)`:
 
 Element plugins are the main extension point. They own parsing plus add/update/delete behavior for a single node type.
 
+Element plugin implementations are an advanced, renderer-coupled extension
+surface: their lifecycle receives the current Pixi application/container
+objects. That boundary is separate from the stable declarative state, shader,
+animation, event, and Route Graphics instance APIs. Portable consumers should
+use built-in elements and inline shaders; custom element plugin implementations
+must be retested when Pixi is intentionally upgraded.
+
 ```js
 import { createElementPlugin } from "route-graphics";
 
@@ -68,6 +75,10 @@ Use `createAudioPlugin(...)` when you want a custom sound source or scheduling s
 ## Animation Plugins
 
 `createAnimationPlugin(...)` currently registers an animation type so the runtime accepts that animation family. The built-in `tween` plugin is the reference implementation. In practice, most custom behavior today is built through element and audio plugins.
+
+Custom element filters and transition compositors do not require a plugin.
+Author single-pass or multi-pass effects, textures, and animated parameters
+through the built-in [Shaders](/docs/guides/shaders/) interface.
 
 ## Design Advice
 

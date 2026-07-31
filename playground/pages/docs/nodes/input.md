@@ -39,10 +39,15 @@ Try it in the [Playground](/playground/).
 | `focusRing`   | object           | No       | see below     | Stroke drawn while focused.                                                                  |
 | `textStyle`   | object           | No       | default text  | Text style for value and placeholder; `fontFamily` accepts a string or ordered string array. |
 | `padding`     | number \| object | No       | `10 12 10 12` | Inner content padding.                                                                       |
+| `filters`     | array            | No       | `[]`          | Ordered inline shader effects.                                                               |
 | `change`      | object           | No       | -             | Change event config.                                                                         |
 | `submit`      | object           | No       | -             | Submit event config.                                                                         |
 | `focusEvent`  | object           | No       | -             | Focus event config.                                                                          |
 | `blurEvent`   | object           | No       | -             | Blur event config.                                                                           |
+
+`filters` post-processes the Pixi-rendered input. The temporary HTML editor
+shown while the input is focused is a DOM overlay and is not shader-filtered.
+See [Shaders](/docs/guides/shaders/).
 
 ### `border`
 

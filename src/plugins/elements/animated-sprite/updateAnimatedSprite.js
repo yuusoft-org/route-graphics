@@ -13,6 +13,7 @@ import {
 import {
   getShaderFilterTargetState,
   hasShaderProgressUpdateAnimation,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
@@ -71,10 +72,18 @@ export const updateAnimatedSprite = async ({
       width: prevElement.width,
       height: prevElement.height,
       force: true,
+      animations,
+      targetId: prevElement.id,
     });
   } else {
     resetShaderFilterProgress(animatedSpriteElement);
   }
+  prepareShaderFilterAnimationTargets({
+    displayObject: animatedSpriteElement,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
 
   const prevAtlas = normalizeAnimatedSpriteAtlas(prevElement.atlas);
   const prevClips = normalizeAnimatedSpriteClips(
@@ -205,6 +214,8 @@ export const updateAnimatedSprite = async ({
         width: nextElement.width,
         height: nextElement.height,
         force: shouldForceShaderProgress,
+        animations,
+        targetId: prevElement.id,
       });
 
       await syncFrameResource();

@@ -604,6 +604,13 @@
       const vtState = Object.assign({}, ...vtDocuments);
       const states = vtState.states ?? [];
       const useBrowserScreenshot = vtState.useBrowserScreenshot === true;
+      const rendererQuery = new URLSearchParams(window.location.search).get(
+        "renderer",
+      );
+      const rendererPreference =
+        rendererQuery ?? vtState.rendererPreference ?? "webgl";
+      const rendererFallback =
+        vtState.rendererFallback ?? rendererPreference === "webgl";
       const elementHasRevealSound = (element) =>
         Boolean(element?.revealSound) ||
         (Array.isArray(element?.children) &&
@@ -710,6 +717,7 @@
           Array.from(vtDeferredRectAdds.keys()).sort(),
         mountedVtElementType: (elementId) =>
           app.findElementByLabel(elementId)?.__vtElementPluginType ?? null,
+        rendererType: () => app.rendererType,
         pluginDispatchMismatches: () =>
           structuredClone(vtPluginDispatchMismatches),
       };
@@ -845,6 +853,8 @@
           void signalVtReady();
         },
         debug: window?.RTGL_VT_DEBUG ?? false,
+        rendererPreference,
+        rendererFallback,
       });
       window.__VT_ROUTE_GRAPHICS__ = app;
       const assetBufferMap = assetBufferManager.getBufferMap();

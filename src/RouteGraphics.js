@@ -29,6 +29,9 @@ import {
   restoreManagedVideoSpriteSizes,
 } from "./plugins/elements/video/managedVideoTextureSizing.js";
 import { hitTestElementBounds as hitTestElementBoundsInTree } from "./util/hitTestElementBounds.js";
+import { setShaderTimeInTree } from "./plugins/elements/util/shaderFilterEffect.js";
+import { validateShaderAnimationBindings } from "./plugins/elements/util/shaderStateValidation.js";
+import { validateShaderProgramsForRenderer } from "./renderer/pixi/shaderProgramValidation.js";
 
 /**
  * @typedef {import('./types.js').RouteGraphicsInitOptions} RouteGraphicsInitOptions
@@ -253,6 +256,14 @@ const createRouteGraphics = () => {
     }
   };
 
+  const assertRendererPreference = (preference) => {
+    if (preference !== "webgl" && preference !== "webgpu") {
+      throw new Error(
+        `Invalid renderer preference "${preference}". Expected "webgl" or "webgpu".`,
+      );
+    }
+  };
+
   /**
    * @type {ApplicationWithAudioStage}
    */
@@ -338,6 +349,19 @@ const createRouteGraphics = () => {
    * @type {number | null}
    */
   let animationPlaybackTimeMS = null;
+
+  /**
+   * Deterministic shader clock, in milliseconds.
+   * @type {number}
+   */
+  let shaderTimeMS = 0;
+
+  /**
+   * Requested and selected renderer backend.
+   * @type {"webgl" | "webgpu"}
+   */
+  let rendererPreference = "webgl";
+  let selectedRendererType = "webgl";
 
   /**
    * @type {Function[]}
@@ -1230,6 +1254,8 @@ const createRouteGraphics = () => {
       completionTracker,
       eventHandler: handler,
       signal,
+      shaderTime: shaderTimeMS / 1000,
+      getShaderTime: () => shaderTimeMS / 1000,
     });
 
     // Flush animation commands to apply initial values immediately
@@ -1253,13 +1279,15 @@ const createRouteGraphics = () => {
       eventHandler: handler,
     });
 
-    state = nextState;
-
     // Present the updated stage immediately instead of relying on Pixi's
     // implicit auto-render loop, which can fail in VT/manual browser runs.
     if (typeof appInstance.render === "function") {
+      setShaderTimeInTree(appInstance.stage, shaderTimeMS / 1000);
       appInstance.render();
     }
+
+    // Commit logical state only after the renderer accepts the frame.
+    state = nextState;
 
     // Fire stateComplete immediately if no animations/reveals to track
     completionTracker.completeIfEmpty();
@@ -1274,6 +1302,10 @@ const createRouteGraphics = () => {
 
   const routeGraphicsInstance = {
     rendererName: "pixi",
+
+    get rendererType() {
+      return selectedRendererType;
+    },
 
     get canvas() {
       return app.canvas;
@@ -1292,6 +1324,7 @@ const createRouteGraphics = () => {
 
     extractBase64: async (label) => {
       if (typeof app.render === "function") {
+        setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
         app.render();
       }
 
@@ -1339,6 +1372,8 @@ const createRouteGraphics = () => {
         animationPlaybackTimeMS = nextTime;
       }
 
+      shaderTimeMS = Math.max(0, nextTime);
+      setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
       animationBus.flush();
       animationBus.setTime(nextTime);
 
@@ -1367,12 +1402,20 @@ const createRouteGraphics = () => {
         debug = false,
         onFirstRender,
         animationPlaybackMode: nextAnimationPlaybackMode = "auto",
+        rendererPreference: nextRendererPreference = "webgl",
+        rendererFallback = true,
       } = options;
 
       onFirstRenderCallback = onFirstRender;
       assertAnimationPlaybackMode(nextAnimationPlaybackMode);
+      assertRendererPreference(nextRendererPreference);
+      if (typeof rendererFallback !== "boolean") {
+        throw new Error("rendererFallback must be a boolean.");
+      }
       animationPlaybackMode = nextAnimationPlaybackMode;
       animationPlaybackTimeMS = null;
+      shaderTimeMS = 0;
+      rendererPreference = nextRendererPreference;
       animationBusListenerCleanup.forEach((cleanup) => cleanup());
       animationBusListenerCleanup = [];
 
@@ -1405,9 +1448,16 @@ const createRouteGraphics = () => {
         width,
         height,
         backgroundColor,
-        preference: "webgl",
+        preference: rendererPreference,
         preserveDrawingBuffer: debug === true,
       });
+      selectedRendererType = app.renderer?.gpu != null ? "webgpu" : "webgl";
+      if (!rendererFallback && selectedRendererType !== rendererPreference) {
+        app.destroy();
+        throw new Error(
+          `Renderer "${rendererPreference}" is unavailable and rendererFallback is false.`,
+        );
+      }
       if (typeof app.ticker?.remove === "function") {
         app.ticker.remove(app.render, app);
       }
@@ -1502,6 +1552,8 @@ const createRouteGraphics = () => {
             return;
           }
 
+          shaderTimeMS += time.deltaMS;
+          setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
           animationBus.tick(time.deltaMS);
           if (typeof app.render === "function") {
             app.render();
@@ -1515,7 +1567,10 @@ const createRouteGraphics = () => {
           }
 
           if (event?.detail?.deltaMS) {
-            animationBus.tick(Number(event.detail.deltaMS));
+            const deltaMS = Number(event.detail.deltaMS);
+            shaderTimeMS += deltaMS;
+            setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
+            animationBus.tick(deltaMS);
             if (typeof app.render === "function") {
               app.render();
             }
@@ -1603,6 +1658,9 @@ const createRouteGraphics = () => {
       if (app) app.destroy();
       animationPlaybackMode = "auto";
       animationPlaybackTimeMS = null;
+      shaderTimeMS = 0;
+      rendererPreference = "webgl";
+      selectedRendererType = "webgl";
       backgroundGraphic = undefined;
     },
 
@@ -2114,6 +2172,11 @@ const createRouteGraphics = () => {
         parserPlugins: plugins.parsers,
       });
       const parsedState = { ...normalizedState, elements: parsedElements };
+      validateShaderAnimationBindings(parsedState);
+      validateShaderProgramsForRenderer({
+        renderer: app.renderer,
+        state: parsedState,
+      });
       renderInternal(app, app.stage, parsedState, eventHandler);
     },
 
@@ -2128,6 +2191,7 @@ const createRouteGraphics = () => {
         parserPlugins: plugins.parsers,
       });
       const parsedState = { ...normalizedState, elements: parsedElements };
+      validateShaderAnimationBindings(parsedState);
       return parsedState;
     },
   };

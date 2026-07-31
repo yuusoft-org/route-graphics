@@ -586,6 +586,149 @@ out:
   audio: []
   audioEffects: []
 ---
+case: Normalize filter-only update animation
+in:
+  - id: state-filter-only
+    animations:
+      - id: animate-grade
+        targetId: portrait
+        type: update
+        tween:
+          filters:
+            grade:
+              progress:
+                initialValue: 0
+                keyframes:
+                  - duration: 400
+                    value: 1
+              amount:
+                keyframes:
+                  - duration: 400
+                    value: 0.8
+out:
+  id: state-filter-only
+  elements: []
+  animations:
+    - id: animate-grade
+      targetId: portrait
+      type: update
+      filterTweens:
+        grade:
+          uProgress:
+            initialValue: 0
+            keyframes:
+              - duration: 400
+                value: 1
+                easing: linear
+          amount:
+            keyframes:
+              - duration: 400
+                value: 0.8
+                easing: linear
+  audio: []
+  audioEffects: []
+---
+case: Normalize mixed ordinary and multi-filter update animation
+in:
+  - id: state-mixed-filter-animation
+    animations:
+      - id: animate-scene
+        targetId: scene
+        type: update
+        tween:
+          alpha:
+            initialValue: 0
+            keyframes:
+              - duration: 500
+                value: 1
+          filters:
+            tone:
+              levels:
+                initialValue: [0.5, 1]
+                keyframes:
+                  - duration: 500
+                    value: [1, 0.2]
+                    relative: true
+            band:
+              progress:
+                keyframes:
+                  - duration: 250
+                    value: 1
+                    easing: easeOutCubic
+out:
+  id: state-mixed-filter-animation
+  elements: []
+  animations:
+    - id: animate-scene
+      targetId: scene
+      type: update
+      tween:
+        alpha:
+          initialValue: 0
+          keyframes:
+            - duration: 500
+              value: 1
+              easing: linear
+      filterTweens:
+        tone:
+          levels:
+            initialValue: [0.5, 1]
+            keyframes:
+              - duration: 500
+                value: [1, 0.2]
+                easing: linear
+                relative: true
+        band:
+          uProgress:
+            keyframes:
+              - duration: 250
+                value: 1
+                easing: easeOutCubic
+  audio: []
+  audioEffects: []
+---
+case: Throw when two updates animate the same filter channel
+in:
+  - id: state-duplicate-filter-channel
+    animations:
+      - id: grade-a
+        targetId: portrait
+        type: update
+        tween:
+          filters:
+            grade:
+              amount:
+                keyframes:
+                  - duration: 100
+                    value: 1
+      - id: grade-b
+        targetId: portrait
+        type: update
+        tween:
+          filters:
+            grade:
+              amount:
+                keyframes:
+                  - duration: 100
+                    value: 0
+throws: Animations targeting shader filter "grade" on "portrait" cannot both animate parameter "amount".
+---
+case: Throw when filter progress uses its internal uniform name
+in:
+  - id: state-internal-filter-progress
+    animations:
+      - id: bad-progress
+        targetId: portrait
+        type: update
+        tween:
+          filters:
+            grade:
+              uProgress:
+                keyframes:
+                  - duration: 100
+                    value: 1
+throws: animations[0].tween.filters.grade.uProgress is no longer supported.
+---
 case: Throw when transitions field is provided
 in:
   - id: state-3
@@ -605,7 +748,7 @@ in:
                 value: 20
 throws: animations[0].type must be a non-empty string.
 ---
-case: Throw when transition shader is provided
+case: Throw when transition shader is provided without a compositor
 in:
   - id: state-3b
     animations:
@@ -613,8 +756,12 @@ in:
         targetId: scene-root
         type: transition
         shader:
-          name: burn-dissolve
-throws: animations[0].shader is not supported.
+          tween:
+            edgeWidth:
+              keyframes:
+                - duration: 100
+                  value: 0.1
+throws: animations[0].shader is no longer supported.
 ---
 case: Throw when update animation defines prev
 in:

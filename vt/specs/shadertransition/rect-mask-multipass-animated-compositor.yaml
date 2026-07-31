@@ -1,0 +1,309 @@
+---
+title: Rect Mask Multipass Animated Compositor
+description: A mask should feed an inline multipass compositor whose progress, scalar, and vector parameters animate from compositor.tween.
+specs:
+  - the built-in diagonal mask should run before both custom compositor passes
+  - edgeWidth should infer its initial value from compositor.parameters
+  - tone should interpolate as a vector while progress advances independently
+  - every compositor pass should retain access to the mapped next texture
+  - the deterministic final overlay and post-completion live target should match
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 400
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 360
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 40
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 16
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: masked-compositor-rect
+        type: rect
+        x: 190
+        "y": 130
+        width: 720
+        height: 400
+        fill: "#4D4D4D"
+  - elements:
+      - id: masked-compositor-rect
+        type: rect
+        x: 190
+        "y": 130
+        width: 720
+        height: 400
+        fill: "#D9D9D9"
+    animations:
+      - id: masked-multipass-compositor
+        targetId: masked-compositor-rect
+        type: transition
+        mask:
+          kind: single
+          texture: mask-diagonal
+          progress:
+            initialValue: 0
+            keyframes:
+              - duration: 800
+                value: 1
+                easing: linear
+        compositor:
+          type: shader
+          parameters:
+            edgeWidth: 0.03
+            tone: [0.15, 0.15, 0.15]
+          passes:
+            - id: reveal
+              source:
+                webgl:
+                  fragment: |
+                    precision mediump float;
+
+                    in vec2 vTextureCoord;
+                    out vec4 finalColor;
+
+                    uniform sampler2D uTexture;
+                    uniform sampler2D uNextTexture;
+                    uniform mat3 uNextTextureMatrix;
+                    uniform vec4 uNextTextureClamp;
+                    uniform float uProgress;
+                    uniform float uEdgeWidth;
+                    uniform vec3 uTone;
+
+                    void main(void)
+                    {
+                        vec2 nextUv = clamp((uNextTextureMatrix * vec3(vTextureCoord, 1.0)).xy, uNextTextureClamp.xy, uNextTextureClamp.zw);
+                        vec4 currentColor = texture(uTexture, vTextureCoord);
+                        vec4 nextColor = texture(uNextTexture, nextUv);
+                        float progress = clamp(uProgress, 0.0, 1.0);
+                        if (progress >= 1.0) {
+                            finalColor = vec4(nextColor.rgb * nextColor.a, nextColor.a);
+                            return;
+                        }
+                        float reveal = 1.0 - smoothstep(progress - uEdgeWidth, progress + uEdgeWidth, vTextureCoord.x);
+                        vec3 tonedCurrent = currentColor.rgb * mix(vec3(1.0), uTone, 0.85);
+                        finalColor = vec4(mix(tonedCurrent, nextColor.rgb, reveal), mix(currentColor.a, nextColor.a, reveal));
+                    }
+                webgpu:
+                  source: |
+                    struct GlobalFilterUniforms {
+                      uInputSize: vec4<f32>,
+                      uInputPixel: vec4<f32>,
+                      uInputClamp: vec4<f32>,
+                      uOutputFrame: vec4<f32>,
+                      uGlobalFrame: vec4<f32>,
+                      uOutputTexture: vec4<f32>,
+                    };
+
+                    struct ShaderUniforms {
+                      uProgress: f32,
+                      uResolution: vec2<f32>,
+                      uNextTextureMatrix: mat3x3<f32>,
+                      uNextTextureClamp: vec4<f32>,
+                      uEdgeWidth: f32,
+                      uTone: vec3<f32>,
+                    };
+
+                    @group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+                    @group(0) @binding(1) var uTexture: texture_2d<f32>;
+                    @group(0) @binding(2) var uSampler: sampler;
+                    @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
+                    @group(1) @binding(1) var uNextTexture: texture_2d<f32>;
+
+                    struct VSOutput {
+                      @builtin(position) position: vec4<f32>,
+                      @location(0) uv: vec2<f32>,
+                    };
+
+                    fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+                    {
+                      var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+                      position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+                      position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+                      return vec4<f32>(position, 0.0, 1.0);
+                    }
+
+                    fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+                    {
+                      return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+                    }
+
+                    @vertex
+                    fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput
+                    {
+                      return VSOutput(filterVertexPosition(aPosition), filterTextureCoord(aPosition));
+                    }
+
+                    @fragment
+                    fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
+                    {
+                      let nextUv = clamp(
+                        (shaderUniforms.uNextTextureMatrix * vec3<f32>(uv, 1.0)).xy,
+                        shaderUniforms.uNextTextureClamp.xy,
+                        shaderUniforms.uNextTextureClamp.zw,
+                      );
+                      let currentColor = textureSample(uTexture, uSampler, uv);
+                      let nextColor = textureSample(uNextTexture, uSampler, nextUv);
+                      let progress = clamp(shaderUniforms.uProgress, 0.0, 1.0);
+                      if (progress >= 1.0) {
+                        return vec4<f32>(nextColor.rgb * nextColor.a, nextColor.a);
+                      }
+                      let reveal = 1.0 - smoothstep(
+                        progress - shaderUniforms.uEdgeWidth,
+                        progress + shaderUniforms.uEdgeWidth,
+                        uv.x,
+                      );
+                      let tonedCurrent = currentColor.rgb * mix(
+                        vec3<f32>(1.0, 1.0, 1.0),
+                        shaderUniforms.uTone,
+                        0.85,
+                      );
+                      return vec4<f32>(
+                        mix(tonedCurrent, nextColor.rgb, reveal),
+                        mix(currentColor.a, nextColor.a, reveal),
+                      );
+                    }
+            - id: finish
+              source:
+                webgl:
+                  fragment: |
+                    precision mediump float;
+
+                    in vec2 vTextureCoord;
+                    out vec4 finalColor;
+
+                    uniform sampler2D uTexture;
+                    uniform sampler2D uNextTexture;
+                    uniform mat3 uNextTextureMatrix;
+                    uniform vec4 uNextTextureClamp;
+                    uniform float uProgress;
+                    uniform float uEdgeWidth;
+                    uniform vec3 uTone;
+
+                    void main(void)
+                    {
+                        vec2 nextUv = clamp((uNextTextureMatrix * vec3(vTextureCoord, 1.0)).xy, uNextTextureClamp.xy, uNextTextureClamp.zw);
+                        vec4 currentColor = texture(uTexture, vTextureCoord);
+                        vec4 nextColor = texture(uNextTexture, nextUv);
+                        float progress = clamp(uProgress, 0.0, 1.0);
+                        if (progress >= 1.0) {
+                            finalColor = vec4(nextColor.rgb * nextColor.a, nextColor.a);
+                            return;
+                        }
+                        float edge = 1.0 - smoothstep(0.0, max(0.001, uEdgeWidth), abs(vTextureCoord.x - progress));
+                        vec3 graded = currentColor.rgb * mix(vec3(1.0), uTone, 0.55);
+                        finalColor = vec4(mix(graded, nextColor.rgb, edge * 0.35), currentColor.a);
+                    }
+                webgpu:
+                  source: |
+                    struct GlobalFilterUniforms {
+                      uInputSize: vec4<f32>,
+                      uInputPixel: vec4<f32>,
+                      uInputClamp: vec4<f32>,
+                      uOutputFrame: vec4<f32>,
+                      uGlobalFrame: vec4<f32>,
+                      uOutputTexture: vec4<f32>,
+                    };
+
+                    struct ShaderUniforms {
+                      uProgress: f32,
+                      uResolution: vec2<f32>,
+                      uNextTextureMatrix: mat3x3<f32>,
+                      uNextTextureClamp: vec4<f32>,
+                      uEdgeWidth: f32,
+                      uTone: vec3<f32>,
+                    };
+
+                    @group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+                    @group(0) @binding(1) var uTexture: texture_2d<f32>;
+                    @group(0) @binding(2) var uSampler: sampler;
+                    @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
+                    @group(1) @binding(1) var uNextTexture: texture_2d<f32>;
+
+                    struct VSOutput {
+                      @builtin(position) position: vec4<f32>,
+                      @location(0) uv: vec2<f32>,
+                    };
+
+                    fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+                    {
+                      var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+                      position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+                      position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+                      return vec4<f32>(position, 0.0, 1.0);
+                    }
+
+                    fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+                    {
+                      return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+                    }
+
+                    @vertex
+                    fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput
+                    {
+                      return VSOutput(filterVertexPosition(aPosition), filterTextureCoord(aPosition));
+                    }
+
+                    @fragment
+                    fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
+                    {
+                      let nextUv = clamp(
+                        (shaderUniforms.uNextTextureMatrix * vec3<f32>(uv, 1.0)).xy,
+                        shaderUniforms.uNextTextureClamp.xy,
+                        shaderUniforms.uNextTextureClamp.zw,
+                      );
+                      let currentColor = textureSample(uTexture, uSampler, uv);
+                      let nextColor = textureSample(uNextTexture, uSampler, nextUv);
+                      let progress = clamp(shaderUniforms.uProgress, 0.0, 1.0);
+                      if (progress >= 1.0) {
+                        return vec4<f32>(nextColor.rgb * nextColor.a, nextColor.a);
+                      }
+                      let edge = 1.0 - smoothstep(
+                        0.0,
+                        max(0.001, shaderUniforms.uEdgeWidth),
+                        abs(uv.x - progress),
+                      );
+                      let graded = currentColor.rgb * mix(
+                        vec3<f32>(1.0, 1.0, 1.0),
+                        shaderUniforms.uTone,
+                        0.55,
+                      );
+                      return vec4<f32>(
+                        mix(graded, nextColor.rgb, edge * 0.35),
+                        currentColor.a,
+                      );
+                    }
+          tween:
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 760
+                  value: 1
+                  easing: linear
+                - duration: 40
+                  value: 1
+                  easing: linear
+            edgeWidth:
+              keyframes:
+                - duration: 800
+                  value: 0.16
+                  easing: easeInOutCubic
+            tone:
+              keyframes:
+                - duration: 800
+                  value: [1, 1, 1]
+                  easing: linear

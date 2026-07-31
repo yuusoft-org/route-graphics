@@ -27,9 +27,15 @@ import { cleanupParticlesInTree } from "../../elements/particles/particleRuntime
 import { getAnimationContinuitySignature } from "../planAnimations.js";
 import { degreesToRadians } from "../../elements/util/transform.js";
 import {
-  createShaderFilter,
-  setShaderFilterProgress,
-  setShaderFilterResolution,
+  createShaderEffect,
+  destroyShaderEffect,
+  getShaderEffectParameter,
+  setShaderEffectParameter,
+  setShaderEffectProgress,
+  setShaderEffectResolution,
+  setShaderEffectTime,
+  setShaderTimeInTree,
+  validateShaderEffectParameterValue,
 } from "../../elements/util/shaderFilterEffect.js";
 const DEFAULT_SUBJECT_VALUES = {
   translateX: 0,
@@ -322,9 +328,9 @@ const createMaskProgressTimeline = (mask) =>
 const createCompositorProgressTimeline = (animation) =>
   buildTimeline([
     {
-      value: animation.tween?.uProgress?.initialValue ?? 0,
+      value: animation.compositor?.tween?.uProgress?.initialValue ?? 0,
     },
-    ...(animation.tween?.uProgress?.keyframes ?? []),
+    ...(animation.compositor?.tween?.uProgress?.keyframes ?? []),
   ]);
 
 const REPLACE_MASK_FILTER_VERTEX = `
@@ -1243,6 +1249,7 @@ const createCompositorOverlay = ({
   prevSubject,
   nextSubject,
   zIndex,
+  getShaderTime,
 }) => {
   const prevController = createSubjectController(
     prevSubject,
@@ -1296,37 +1303,110 @@ const createCompositorOverlay = ({
   );
   overlay.addChild(sprite);
 
-  const compositorFilter = createShaderFilter({
-    shader: animation.compositor,
+  const compositorEffect = createShaderEffect({
+    effect: animation.compositor,
     width: unionBounds.width,
     height: unionBounds.height,
     progress: getValueAtTime(progressTimeline, 0),
+    time: getShaderTime(),
     nextTextureSource: nextTexture.source,
     name: `route-graphics-transition-compositor-${animation.id}`,
   });
-  sprite.filters = [compositorFilter];
   const nextTextureClamp = createFullFrameClamp(
     unionBounds.width,
     unionBounds.height,
   );
-  const baseApplyCompositorFilter =
-    typeof compositorFilter.apply === "function"
-      ? compositorFilter.apply.bind(compositorFilter)
-      : (filterManager, input, output, clearMode) => {
-          filterManager.applyFilter(compositorFilter, input, output, clearMode);
-        };
-  compositorFilter.apply = (filterManager, input, output, clearMode) => {
-    const shaderUniforms = compositorFilter.resources.shaderUniforms;
-    if (shaderUniforms?.uniforms?.uNextTextureMatrix) {
+  for (const compositorFilter of compositorEffect.filters) {
+    const baseApplyCompositorFilter =
+      typeof compositorFilter.apply === "function"
+        ? compositorFilter.apply.bind(compositorFilter)
+        : (filterManager, input, output, clearMode) => {
+            filterManager.applyFilter(
+              compositorFilter,
+              input,
+              output,
+              clearMode,
+            );
+          };
+    compositorFilter.apply = (filterManager, input, output, clearMode) => {
+      const shaderUniforms = compositorFilter.resources.shaderUniforms;
+      if (shaderUniforms?.uniforms?.uNextTextureMatrix) {
+        filterManager.calculateSpriteMatrix(
+          shaderUniforms.uniforms.uNextTextureMatrix,
+          sprite,
+        );
+        shaderUniforms.uniforms.uNextTextureClamp = nextTextureClamp;
+        shaderUniforms.update();
+      }
+      baseApplyCompositorFilter(filterManager, input, output, clearMode);
+    };
+  }
+
+  const parameterTimelines = Object.entries(animation.compositor.tween ?? {})
+    .filter(([parameter]) => parameter !== "uProgress")
+    .map(([parameter, config]) => {
+      const currentValue = getShaderEffectParameter(
+        compositorEffect,
+        parameter,
+      );
+      if (currentValue === undefined) {
+        throw new Error(
+          `Transition animation "${animation.id}" cannot target unknown compositor parameter "${parameter}".`,
+        );
+      }
+      const parameterValues = [
+        ...(config.initialValue === undefined ? [] : [config.initialValue]),
+        ...config.keyframes.map((keyframe) => keyframe.value),
+      ];
+      for (const value of parameterValues) {
+        validateShaderEffectParameterValue(compositorEffect, parameter, value);
+      }
+      return {
+        parameter,
+        timeline: buildTimeline([
+          { value: config.initialValue ?? currentValue },
+          ...config.keyframes,
+        ]),
+      };
+    });
+  const parameterDuration = calculateMaxDuration(parameterTimelines);
+
+  let maskFilter = null;
+  let maskTextureController = null;
+  if (animation.mask) {
+    ({ filter: maskFilter } = createReplaceMaskFilter());
+    maskFilter.resources.uNextTexture = nextTexture.source;
+
+    const baseApplyMaskFilter =
+      typeof maskFilter.apply === "function"
+        ? maskFilter.apply.bind(maskFilter)
+        : (filterManager, input, output, clearMode) => {
+            filterManager.applyFilter(maskFilter, input, output, clearMode);
+          };
+    maskFilter.apply = (filterManager, input, output, clearMode) => {
+      const replaceMaskUniforms = maskFilter.resources.replaceMaskUniforms;
       filterManager.calculateSpriteMatrix(
-        shaderUniforms.uniforms.uNextTextureMatrix,
+        replaceMaskUniforms.uniforms.uSecondaryMatrix,
         sprite,
       );
-      shaderUniforms.uniforms.uNextTextureClamp = nextTextureClamp;
-      shaderUniforms.update();
-    }
-    baseApplyCompositorFilter(filterManager, input, output, clearMode);
-  };
+      replaceMaskUniforms.uniforms.uSecondaryClamp = nextTextureClamp;
+      replaceMaskUniforms.update();
+      baseApplyMaskFilter(filterManager, input, output, clearMode);
+    };
+
+    maskTextureController = createMaskTextureController(
+      app,
+      animation.mask,
+      unionBounds.width,
+      unionBounds.height,
+      maskFilter,
+    );
+  }
+
+  sprite.filters = [
+    ...(maskFilter ? [maskFilter] : []),
+    ...compositorEffect.filters,
+  ];
 
   let prevStaticRendered = false;
   let nextStaticRendered = false;
@@ -1357,6 +1437,8 @@ const createCompositorOverlay = ({
       prevController.duration,
       nextController.duration,
       progressDuration,
+      parameterDuration,
+      maskTextureController?.duration ?? 0,
     ),
     apply: (time) => {
       prevController.apply(time);
@@ -1388,20 +1470,36 @@ const createCompositorOverlay = ({
         nextStaticRendered = true;
       }
 
-      setShaderFilterResolution(
-        compositorFilter,
+      if (maskTextureController) {
+        maskTextureController.apply(
+          clamp01(getValueAtTime(maskTextureController.progressTimeline, time)),
+        );
+      }
+
+      setShaderEffectResolution(
+        compositorEffect,
         unionBounds.width,
         unionBounds.height,
       );
-      setShaderFilterProgress(
-        compositorFilter,
+      setShaderEffectProgress(
+        compositorEffect,
         getValueAtTime(progressTimeline, time),
       );
+      setShaderEffectTime(compositorEffect, getShaderTime());
+      for (const { parameter, timeline } of parameterTimelines) {
+        setShaderEffectParameter(
+          compositorEffect,
+          parameter,
+          getValueAtTime(timeline, time),
+        );
+      }
     },
     destroy: () => {
       overlay.removeFromParent();
       sprite.filters = [];
-      compositorFilter.destroy();
+      maskFilter?.destroy();
+      maskTextureController?.destroy();
+      destroyShaderEffect(compositorEffect);
       cleanupParticlesInTree({ app, root: overlay });
       cleanupParticlesInTree({ app, root: prevRoot });
       cleanupParticlesInTree({ app, root: nextRoot });
@@ -1588,6 +1686,7 @@ const createReplaceOverlay = ({
   prevSubject,
   nextSubject,
   zIndex,
+  getShaderTime,
 }) => {
   let replaceOverlay;
 
@@ -1598,6 +1697,7 @@ const createReplaceOverlay = ({
       prevSubject,
       nextSubject,
       zIndex,
+      getShaderTime,
     });
   } else if (animation.mask) {
     replaceOverlay = createMaskedOverlay({
@@ -1637,6 +1737,8 @@ const instantiateNextLiveElement = ({
   renderContext,
   zIndex,
   signal,
+  shaderTime,
+  getShaderTime,
 }) => {
   if (!nextElement) {
     return null;
@@ -1654,6 +1756,8 @@ const instantiateNextLiveElement = ({
     renderContext,
     zIndex,
     signal,
+    shaderTime,
+    getShaderTime,
   });
 
   if (result && typeof result.then === "function") {
@@ -1712,6 +1816,8 @@ export const runReplaceAnimation = ({
   resolveParent,
   zIndex,
   signal,
+  shaderTime = 0,
+  getShaderTime,
 }) => {
   if (!prevElement && !nextElement) {
     throw new Error(
@@ -1749,6 +1855,8 @@ export const runReplaceAnimation = ({
 
     return parent.destroyed ? null : parent;
   };
+  const resolveShaderTime = () =>
+    typeof getShaderTime === "function" ? getShaderTime() : shaderTime;
 
   const transitionMountParent = new Container();
   const hiddenMountContext = createRenderContext({
@@ -1962,6 +2070,10 @@ export const runReplaceAnimation = ({
       );
     }
 
+    if (nextDisplayObject) {
+      setShaderTimeInTree(nextDisplayObject, resolveShaderTime());
+    }
+
     const useLivePlainOverlay =
       animation.mask === undefined &&
       animation.compositor === undefined &&
@@ -2032,6 +2144,7 @@ export const runReplaceAnimation = ({
         prevSubject: overlaySubjects.prevSubject,
         nextSubject: overlaySubjects.nextSubject,
         zIndex: currentZIndex,
+        getShaderTime: resolveShaderTime,
       });
       replaceOverlayRef.value = replaceOverlay;
       nextDisplayObjectRef.value = nextDisplayObject;
@@ -2165,6 +2278,8 @@ export const runReplaceAnimation = ({
         renderContext: hiddenMountContext,
         zIndex,
         signal: transitionSignal,
+        shaderTime,
+        getShaderTime,
       })
     : null;
 

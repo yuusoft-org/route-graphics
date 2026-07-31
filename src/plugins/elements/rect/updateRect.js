@@ -11,6 +11,7 @@ import {
 import {
   getShaderFilterTargetState,
   hasShaderProgressUpdateAnimation,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
@@ -51,10 +52,18 @@ export const updateRect = ({
       width: prevElement.width,
       height: prevElement.height,
       force: true,
+      animations,
+      targetId: prevElement.id,
     });
   } else {
     resetShaderFilterProgress(rectElement);
   }
+  prepareShaderFilterAnimationTargets({
+    displayObject: rectElement,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
   const targetState = getElementTransformTargetState(nextElement, { alpha });
 
   if (scaleX !== undefined) {
@@ -92,6 +101,8 @@ export const updateRect = ({
         width,
         height,
         force: shouldForceShaderProgress,
+        animations,
+        targetId: prevElement.id,
       });
 
       rectElement.removeAllListeners("pointerover");

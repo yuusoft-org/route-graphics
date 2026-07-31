@@ -4,6 +4,11 @@ import { addInput } from "../../src/plugins/elements/input/addInput.js";
 import { deleteInput } from "../../src/plugins/elements/input/deleteInput.js";
 import { parseInput } from "../../src/plugins/elements/input/parseInput.js";
 import { updateInput } from "../../src/plugins/elements/input/updateInput.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import {
+  createAnimatedShaderFilterFixture,
+  createFilterAnimationFixture,
+} from "../util/shaderFilterFixtures.js";
 
 const createApp = () => {
   const bridgeState = {
@@ -33,6 +38,43 @@ const createApp = () => {
 };
 
 describe("input plugin", () => {
+  it("installs shader filters before dispatching mount animations", () => {
+    const parent = new Container();
+    const { app } = createApp();
+    const element = parseInput({
+      state: {
+        id: "animated-input",
+        type: "input",
+        width: 200,
+        height: 44,
+      },
+    });
+    element.filters = createAnimatedShaderFilterFixture();
+    const animationBus = createAnimationBus();
+
+    addInput({
+      app,
+      parent,
+      element,
+      animations: createFilterAnimationFixture(element.id),
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+    animationBus.flush();
+
+    const input = parent.getChildByLabel(element.id);
+    expect(
+      input.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.4);
+    input.destroy({ children: true });
+  });
+
   it("applies and resets degree rotation around the configured origin", () => {
     const parent = new Container();
     const eventHandler = vi.fn();

@@ -47,19 +47,19 @@ states:
       - id: sprite-textured-compositor
         targetId: sprite-compositor
         type: transition
-        tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: easeInOutCubic
         compositor:
           type: shader
           mesh:
             grid: [8, 4]
           uniforms:
             wave: 0.14
+          tween:
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: easeInOutCubic
           textures:
             paper: mask-diagonal
           pipeline:
@@ -153,6 +153,7 @@ states:
                 @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
                 @group(1) @binding(1) var uNextTexture: texture_2d<f32>;
                 @group(1) @binding(2) var uPaperTexture: texture_2d<f32>;
+                @group(1) @binding(3) var uPaperTextureSampler: sampler;
 
                 struct VSOutput {
                   @builtin(position) position: vec4<f32>,
@@ -187,7 +188,7 @@ states:
                   );
                   let prevColor = textureSample(uTexture, uSampler, clampedUv);
                   let nextColor = textureSample(uNextTexture, uSampler, nextUv);
-                  let grain = textureSample(uPaperTexture, uSampler, clampedUv * 3.0).r;
+                  let grain = textureSample(uPaperTexture, uPaperTextureSampler, clampedUv * 3.0).r;
                   let progress = clamp(shaderUniforms.uProgress, 0.0, 1.0);
                   if (progress >= 1.0) {
                     return vec4<f32>(nextColor.rgb * nextColor.a, nextColor.a);

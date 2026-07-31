@@ -340,6 +340,7 @@ describe("spritesheet animation rendering", () => {
       debug: true,
       render: vi.fn(),
     };
+    const getShaderTime = vi.fn(() => 4.25);
     const parent = {
       destroyed: false,
       addChild: vi.fn(),
@@ -352,10 +353,16 @@ describe("spritesheet animation rendering", () => {
       renderContext: {},
       zIndex: 3,
       signal: undefined,
+      shaderTime: 1,
+      getShaderTime,
     });
 
     expect(parent.addChild).toHaveBeenCalledTimes(1);
     expect(app.render).toHaveBeenCalledTimes(1);
+    expect(getShaderTime).toHaveBeenCalledTimes(1);
+    expect(getShaderTime.mock.invocationCallOrder[0]).toBeLessThan(
+      app.render.mock.invocationCallOrder[0],
+    );
   });
 
   it("dispatches update animations after asynchronously adding a spritesheet animation", async () => {

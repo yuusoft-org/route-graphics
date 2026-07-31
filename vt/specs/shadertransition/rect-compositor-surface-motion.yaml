@@ -4,7 +4,7 @@ description: Transition compositors should receive prev and next surfaces after 
 specs:
   - prev.tween should move and fade the outgoing surface before compositor sampling
   - next.tween should move and scale the incoming surface before compositor sampling
-  - top-level tween.uProgress should drive only the compositor reveal
+  - compositor.tween.progress should drive only the compositor reveal
   - the near-end frame should already match the final target closely enough to avoid a handoff jump
   - the post-completion frame should match the final compositor frame
 steps:
@@ -80,20 +80,20 @@ states:
                 - duration: 760
                   value: 1
                   easing: easeOutCubic
-        tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 760
-                value: 1
-                easing: linear
-              - duration: 40
-                value: 1
-                easing: linear
         compositor:
           type: shader
           uniforms:
             feather: 0.08
+          tween:
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 760
+                  value: 1
+                  easing: linear
+                - duration: 40
+                  value: 1
+                  easing: linear
           source:
             webgl:
               fragment: |

@@ -23,6 +23,7 @@ import {
   getShaderFilterTargetState,
   hasStaleShaderFilterProgressInTree,
   hasShaderProgressUpdateAnimation,
+  prepareShaderFilterAnimationTargets,
   resetShaderFilterProgress,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
@@ -51,6 +52,8 @@ export const updateContainer = ({
   zIndex,
   completionTracker,
   signal,
+  shaderTime,
+  getShaderTime,
   deferRenderStateCommit,
   commitRenderState,
 }) => {
@@ -76,10 +79,18 @@ export const updateContainer = ({
       width: prevElement.width,
       height: prevElement.height,
       force: true,
+      animations,
+      targetId: prevElement.id,
     });
   } else {
     resetShaderFilterProgress(containerElement);
   }
+  prepareShaderFilterAnimationTargets({
+    displayObject: containerElement,
+    element: nextElement,
+    animations,
+    targetId: prevElement.id,
+  });
 
   const updateElement = () => {
     if (!isDeepEqual(prevElement, nextElement)) {
@@ -95,6 +106,8 @@ export const updateContainer = ({
         width: nextElement.width,
         height: nextElement.height,
         force: shouldForceShaderProgress,
+        animations,
+        targetId: prevElement.id,
       });
 
       const prevUsesViewport = prevElement.scroll || prevElement.anchorToBottom;
@@ -175,6 +188,8 @@ export const updateContainer = ({
         completionTracker,
         renderContext,
         signal,
+        shaderTime,
+        getShaderTime,
       });
 
       reapplyContainerInheritedHover({

@@ -162,6 +162,8 @@ properties:
     minimum: 0
     maximum: 1
     default: 1
+  filters:
+    $ref: "../shader-config.yaml#/definitions/elementFilters"
   textStyle:
     "$ref": "#/$def/textStyle"
   hover:

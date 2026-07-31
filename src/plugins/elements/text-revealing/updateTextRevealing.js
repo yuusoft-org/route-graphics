@@ -10,6 +10,7 @@ import {
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
+import { prepareShaderFilterAnimationTargets } from "../util/shaderFilterEffect.js";
 
 const getRevealIdentity = (element = {}) =>
   JSON.stringify({
@@ -56,6 +57,13 @@ export const updateTextRevealing = async ({
     (child) => child.label === prevElement.id,
   );
   if (!textRevealingElement) return;
+
+  prepareShaderFilterAnimationTargets({
+    displayObject: textRevealingElement,
+    element,
+    animations,
+    targetId: prevElement.id,
+  });
 
   let didCommitMountedLayout = false;
   const commitMountedLayout = () => {

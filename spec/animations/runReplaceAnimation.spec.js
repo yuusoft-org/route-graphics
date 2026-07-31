@@ -14,6 +14,8 @@ import {
   selectSequenceMaskFrameState,
 } from "../../src/plugins/animations/replace/runReplaceAnimation.js";
 import { getElementRenderState } from "../../src/plugins/elements/elementRenderState.js";
+import { syncShaderFilters } from "../../src/plugins/elements/util/shaderFilterEffect.js";
+import { normalizeElementShaderFilters } from "../../src/plugins/elements/util/shaderConfig.js";
 import {
   queueDeferredAnimatedSpritePlay,
   queueDeferredParticlesStart,
@@ -78,6 +80,12 @@ const passthroughCompositor = {
   textures: [],
   pipeline: {},
   mesh: { grid: [1, 1] },
+  tween: {
+    uProgress: {
+      initialValue: 0,
+      keyframes: [{ duration: 300, value: 1, easing: "linear" }],
+    },
+  },
   source: {
     webgl: {
       fragment: `
@@ -166,6 +174,35 @@ fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 }
 `,
     },
+  },
+};
+
+const timedFilterSource = {
+  webgl: {
+    fragment: `
+      in vec2 vTextureCoord;
+      out vec4 finalColor;
+      uniform sampler2D uTexture;
+      void main() { finalColor = texture(uTexture, vTextureCoord); }
+    `,
+  },
+  webgpu: {
+    source: `
+      struct VSOutput {
+        @builtin(position) position: vec4<f32>,
+        @location(0) uv: vec2<f32>,
+      };
+
+      @vertex fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput {
+        return VSOutput(vec4<f32>(aPosition, 0.0, 1.0), aPosition);
+      }
+
+      @fragment fn mainFragment(
+        @location(0) uv: vec2<f32>,
+      ) -> @location(0) vec4<f32> {
+        return vec4<f32>(uv, 0.0, 1.0);
+      }
+    `,
   },
 };
 
@@ -295,7 +332,6 @@ describe("runReplaceAnimation", () => {
         generateTexture: vi.fn(() => Texture.EMPTY),
       },
     };
-
     runReplaceAnimation({
       app,
       parent,
@@ -347,6 +383,90 @@ describe("runReplaceAnimation", () => {
     expect(nextDisplayObject.visible).toBe(true);
     expect(deferredEffect).toHaveBeenCalledTimes(1);
     expect(tracker.complete).toHaveBeenCalledWith(11);
+  });
+
+  it("seeds hidden transition snapshots with the current shader clock", () => {
+    const parent = createParent();
+    const nextDisplayObject = createDisplayObject("scene-root");
+    const [timedFilter] = normalizeElementShaderFilters([
+      {
+        id: "clock",
+        type: "shader",
+        time: true,
+        source: timedFilterSource,
+      },
+    ]);
+    let snapshotTime;
+
+    const plugin = {
+      add: vi.fn(({ parent: targetParent }) => {
+        syncShaderFilters(nextDisplayObject, [timedFilter], {
+          width: 100,
+          height: 100,
+        });
+        targetParent.addChild(nextDisplayObject);
+      }),
+      delete: vi.fn(),
+    };
+    const animationBus = {
+      dispatch: vi.fn(),
+    };
+    const app = {
+      renderer: {
+        generateTexture: vi.fn(({ target }) => {
+          snapshotTime =
+            target.filters[0].resources.shaderUniforms.uniforms.uTime;
+          return Texture.EMPTY;
+        }),
+      },
+    };
+
+    const shaderClock = 4.25;
+    runReplaceAnimation({
+      app,
+      parent,
+      prevElement: null,
+      nextElement: {
+        id: "scene-root",
+        type: "container",
+        children: [],
+      },
+      animation: {
+        id: "scene-enter",
+        targetId: "scene-root",
+        type: "transition",
+        next: {
+          tween: {
+            alpha: {
+              initialValue: 0,
+              keyframes: [{ duration: 300, value: 1, easing: "linear" }],
+            },
+          },
+        },
+      },
+      animations: new Map(),
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      eventHandler: vi.fn(),
+      elementPlugins: [],
+      plugin,
+      zIndex: 0,
+      shaderTime: 1,
+      getShaderTime: () => shaderClock,
+      signal: new AbortController().signal,
+    });
+
+    expect(snapshotTime).toBeCloseTo(4.25);
+    expect(
+      nextDisplayObject.filters[0].resources.shaderUniforms.uniforms.uTime,
+    ).toBeCloseTo(4.25);
+
+    animationBus.dispatch.mock.calls[0][0].payload.onComplete();
+    nextDisplayObject.destroy();
   });
 
   it("uses separate plugins for cross-type transition lifecycle operations", () => {
@@ -710,7 +830,44 @@ describe("runReplaceAnimation", () => {
         render: vi.fn(),
       },
     };
+    const amountParameter = {
+      key: "amount",
+      symbol: "uAmount",
+      role: "parameter",
+      type: "f32",
+      value: 0.2,
+    };
+    const tintParameter = {
+      key: "tint",
+      symbol: "uTint",
+      role: "parameter",
+      type: "vec3<f32>",
+      value: [0.2, 0.4, 0.6],
+    };
+    const animatedCompositor = {
+      ...passthroughCompositor,
+      time: true,
+      padding: 12,
+      parameters: [amountParameter, tintParameter],
+      uniforms: [amountParameter, tintParameter],
+      tween: {
+        ...passthroughCompositor.tween,
+        amount: {
+          keyframes: [{ duration: 600, value: 0.8, easing: "linear" }],
+        },
+        tint: {
+          keyframes: [
+            {
+              duration: 300,
+              value: [0.8, 0.6, 0.4],
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    };
 
+    let shaderClock = 7.5;
     runReplaceAnimation({
       app,
       parent,
@@ -720,13 +877,7 @@ describe("runReplaceAnimation", () => {
         id: "scene-compositor",
         targetId: "scene-root",
         type: "transition",
-        tween: {
-          uProgress: {
-            initialValue: 0,
-            keyframes: [{ duration: 300, value: 1, easing: "linear" }],
-          },
-        },
-        compositor: passthroughCompositor,
+        compositor: animatedCompositor,
       },
       animations: new Map(),
       animationBus,
@@ -739,6 +890,8 @@ describe("runReplaceAnimation", () => {
       elementPlugins: [],
       plugin,
       zIndex: 0,
+      shaderTime: 1,
+      getShaderTime: () => shaderClock,
       signal: new AbortController().signal,
     });
 
@@ -748,6 +901,7 @@ describe("runReplaceAnimation", () => {
         payload: expect.objectContaining({
           id: "scene-compositor",
           driver: "custom",
+          duration: 600,
           deferCompletionUntilNextFrame: true,
         }),
       }),
@@ -792,6 +946,23 @@ describe("runReplaceAnimation", () => {
 
     compositorFilter.apply(filterManager, Texture.EMPTY, Texture.EMPTY, true);
 
+    expect(compositorFilter.padding).toBe(12);
+    expect(compositorSprite.filterArea).toMatchObject({
+      x: 0,
+      y: 0,
+      width: compositorSprite.texture.width,
+      height: compositorSprite.texture.height,
+    });
+    expect(shaderUniforms.uniforms.uProgress).toBeCloseTo(0.5);
+    expect(shaderUniforms.uniforms.uTime).toBeCloseTo(7.5);
+    expect(shaderUniforms.uniforms.uAmount).toBeCloseTo(0.35);
+    expect(Array.from(shaderUniforms.uniforms.uTint)).toEqual(
+      expect.arrayContaining([
+        expect.closeTo(0.5),
+        expect.closeTo(0.5),
+        expect.closeTo(0.5),
+      ]),
+    );
     expect(filterManager.calculateSpriteMatrix).toHaveBeenCalledWith(
       shaderUniforms.uniforms.uNextTextureMatrix,
       compositorSprite,
@@ -805,6 +976,10 @@ describe("runReplaceAnimation", () => {
       Texture.EMPTY,
       true,
     );
+
+    shaderClock = 9.25;
+    dispatched.payload.applyFrame(150);
+    expect(shaderUniforms.uniforms.uTime).toBeCloseTo(9.25);
   });
 
   it("reuses plain sprite textures for compositor snapshots instead of baking display scale into the texture", () => {
@@ -857,12 +1032,6 @@ describe("runReplaceAnimation", () => {
         id: "sprite-compositor",
         targetId: "scene-root",
         type: "transition",
-        tween: {
-          uProgress: {
-            initialValue: 0,
-            keyframes: [{ duration: 300, value: 1, easing: "linear" }],
-          },
-        },
         compositor: passthroughCompositor,
       },
       animations: new Map(),

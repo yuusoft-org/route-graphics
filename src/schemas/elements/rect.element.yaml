@@ -58,10 +58,10 @@ $def:
             description: Linear gradient fill type
           start:
             "$ref": "#/$def/point"
-            description: Gradient start point. Defaults to { x: 0, y: 0 } in local normalized coordinates.
+            description: "Gradient start point. Defaults to { x: 0, y: 0 } in local normalized coordinates."
           end:
             "$ref": "#/$def/point"
-            description: Gradient end point. Defaults to { x: 0, y: 1 } in local normalized coordinates.
+            description: "Gradient end point. Defaults to { x: 0, y: 1 } in local normalized coordinates."
           stops:
             type: array
             minItems: 2
@@ -89,7 +89,7 @@ $def:
             description: Radial gradient fill type
           innerCenter:
             "$ref": "#/$def/point"
-            description: Inner circle center. Defaults to { x: 0.5, y: 0.5 } in local normalized coordinates.
+            description: "Inner circle center. Defaults to { x: 0.5, y: 0.5 } in local normalized coordinates."
           innerRadius:
             type: number
             description: Inner circle radius. Defaults to 0.
@@ -190,6 +190,8 @@ properties:
     type: number
     description: Rotation in degrees
     default: 0
+  filters:
+    $ref: "../shader-config.yaml#/definitions/elementFilters"
   hover:
     type: object
     properties:

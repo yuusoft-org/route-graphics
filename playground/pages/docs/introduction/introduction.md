@@ -20,6 +20,8 @@ This documentation is organized around the actual runtime surfaces:
 
 - Element lifecycle: add, update, and delete
 - Animations: explicit enter, update, exit, and replace operations
+- Shaders: inline multi-pass filters, animated parameters, deterministic time,
+  and previous/next transition compositors on WebGL or WebGPU
 - Interaction events: click, hover, drag, keyboard
 - Audio: sound asset playback
 - Deterministic parsing and render pipeline
@@ -31,4 +33,7 @@ This documentation is organized around the actual runtime surfaces:
 3. Call `render(state)` with `elements`, `animations`, `audio`, and optional `global`.
 4. Push the next state to animate live elements or replace visuals by id.
 
-Continue with [Getting Started](/docs/introduction/getting-started/) for a minimal setup, then use [Assets & Loading](/docs/guides/assets-loading/) and [Using the Playground](/docs/guides/playground/) as the practical next steps.
+Continue with [Getting Started](/docs/introduction/getting-started/) for a
+minimal setup, then use [Assets & Loading](/docs/guides/assets-loading/),
+[Shaders](/docs/guides/shaders/), and
+[Using the Playground](/docs/guides/playground/) as practical next steps.

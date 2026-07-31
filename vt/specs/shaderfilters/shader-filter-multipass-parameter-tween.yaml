@@ -1,0 +1,217 @@
+---
+title: Shader Filter Multipass Parameter Tween
+description: A targeted scalar and progress tween should update every pass in one inline multipass filter without rebuilding the chain.
+specs:
+  - both passes should share the same animated amount and progress values
+  - the first pass should change luminance while the second adds moving bands
+  - pass order should remain stable throughout deterministic sampling
+  - navigating backward should remove the complete filter chain
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 16
+  - action: screenshot
+  - action: keypress
+    key: b
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: multipass-rect
+        type: rect
+        x: 190
+        "y": 150
+        width: 720
+        height: 340
+        fill: "#737373"
+  - elements:
+      - id: multipass-rect
+        type: rect
+        x: 190
+        "y": 150
+        width: 720
+        height: 340
+        fill: "#737373"
+        filters:
+          - id: multipass
+            type: shader
+            parameters:
+              amount: 0.1
+            passes:
+              - id: luminance
+                source:
+                  webgl:
+                    fragment: |
+                      precision mediump float;
+
+                      in vec2 vTextureCoord;
+                      out vec4 finalColor;
+
+                      uniform sampler2D uTexture;
+                      uniform float uAmount;
+                      uniform float uProgress;
+
+                      void main(void)
+                      {
+                          vec4 color = texture(uTexture, vTextureCoord);
+                          float gain = 0.7 + uAmount * (0.45 + 0.25 * uProgress);
+                          finalColor = vec4(color.rgb * gain, color.a);
+                      }
+                  webgpu:
+                    source: |
+                      struct GlobalFilterUniforms {
+                        uInputSize: vec4<f32>,
+                        uInputPixel: vec4<f32>,
+                        uInputClamp: vec4<f32>,
+                        uOutputFrame: vec4<f32>,
+                        uGlobalFrame: vec4<f32>,
+                        uOutputTexture: vec4<f32>,
+                      };
+
+                      struct ShaderUniforms {
+                        uProgress: f32,
+                        uResolution: vec2<f32>,
+                        uAmount: f32,
+                      };
+
+                      @group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+                      @group(0) @binding(1) var uTexture: texture_2d<f32>;
+                      @group(0) @binding(2) var uSampler: sampler;
+                      @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
+
+                      struct VSOutput {
+                        @builtin(position) position: vec4<f32>,
+                        @location(0) uv: vec2<f32>,
+                      };
+
+                      fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+                      {
+                        var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+                        position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+                        position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+                        return vec4<f32>(position, 0.0, 1.0);
+                      }
+
+                      fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+                      {
+                        return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+                      }
+
+                      @vertex
+                      fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput
+                      {
+                        return VSOutput(filterVertexPosition(aPosition), filterTextureCoord(aPosition));
+                      }
+
+                      @fragment
+                      fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
+                      {
+                        let color = textureSample(uTexture, uSampler, uv);
+                        let gain = 0.7 + shaderUniforms.uAmount * (0.45 + 0.25 * shaderUniforms.uProgress);
+                        return vec4<f32>(color.rgb * gain, color.a);
+                      }
+              - id: bands
+                source:
+                  webgl:
+                    fragment: |
+                      precision mediump float;
+
+                      in vec2 vTextureCoord;
+                      out vec4 finalColor;
+
+                      uniform sampler2D uTexture;
+                      uniform float uAmount;
+                      uniform float uProgress;
+
+                      void main(void)
+                      {
+                          vec4 color = texture(uTexture, vTextureCoord);
+                          float stripe = step(0.58, fract(vTextureCoord.x * 8.0 + uProgress));
+                          float shade = mix(1.0, 0.45, stripe * uAmount);
+                          finalColor = vec4(color.rgb * shade, color.a);
+                      }
+                  webgpu:
+                    source: |
+                      struct GlobalFilterUniforms {
+                        uInputSize: vec4<f32>,
+                        uInputPixel: vec4<f32>,
+                        uInputClamp: vec4<f32>,
+                        uOutputFrame: vec4<f32>,
+                        uGlobalFrame: vec4<f32>,
+                        uOutputTexture: vec4<f32>,
+                      };
+
+                      struct ShaderUniforms {
+                        uProgress: f32,
+                        uResolution: vec2<f32>,
+                        uAmount: f32,
+                      };
+
+                      @group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+                      @group(0) @binding(1) var uTexture: texture_2d<f32>;
+                      @group(0) @binding(2) var uSampler: sampler;
+                      @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
+
+                      struct VSOutput {
+                        @builtin(position) position: vec4<f32>,
+                        @location(0) uv: vec2<f32>,
+                      };
+
+                      fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+                      {
+                        var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+                        position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+                        position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+                        return vec4<f32>(position, 0.0, 1.0);
+                      }
+
+                      fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+                      {
+                        return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+                      }
+
+                      @vertex
+                      fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput
+                      {
+                        return VSOutput(filterVertexPosition(aPosition), filterTextureCoord(aPosition));
+                      }
+
+                      @fragment
+                      fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
+                      {
+                        let color = textureSample(uTexture, uSampler, uv);
+                        let stripe = step(0.58, fract(uv.x * 8.0 + shaderUniforms.uProgress));
+                        let shade = mix(1.0, 0.45, stripe * shaderUniforms.uAmount);
+                        return vec4<f32>(color.rgb * shade, color.a);
+                      }
+    animations:
+      - id: multipass-parameters
+        targetId: multipass-rect
+        type: update
+        tween:
+          filters:
+            multipass:
+              amount:
+                keyframes:
+                  - duration: 600
+                    value: 1
+                    easing: easeInOutCubic
+              progress:
+                initialValue: 0
+                keyframes:
+                  - duration: 600
+                    value: 1
+                    easing: linear

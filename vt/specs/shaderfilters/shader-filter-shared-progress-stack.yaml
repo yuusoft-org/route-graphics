@@ -1,11 +1,11 @@
 ---
-title: Shader Filter Shared Progress Stack
-description: A uProgress update tween should drive every shader filter in a target filter stack.
+title: Shader Filter Targeted Progress Stack
+description: One update tween should independently target progress on multiple shader filters in a stack.
 specs:
-  - both shader filters should start with uProgress at zero
-  - the first filter should use uProgress for brightness
-  - the second filter should use the same uProgress for moving bands
-  - non-monotonic keyframes should update both filters together
+  - both targeted shader filters should start with progress at zero
+  - the first filter should use its progress track for brightness
+  - the second filter should use its progress track for moving bands
+  - non-monotonic keyframes should update both targeted filters together
 steps:
   - action: keypress
     key: "n"
@@ -337,12 +337,24 @@ states:
         targetId: shared-progress
         type: update
         tween:
-          uProgress:
-            initialValue: 0
-            keyframes:
-              - duration: 500
-                value: 1
-                easing: easeInOutCubic
-              - duration: 500
-                value: 0.2
-                easing: linear
+          filters:
+            progress-brightness:
+              progress:
+                initialValue: 0
+                keyframes:
+                  - duration: 500
+                    value: 1
+                    easing: easeInOutCubic
+                  - duration: 500
+                    value: 0.2
+                    easing: linear
+            progress-bands:
+              progress:
+                initialValue: 0
+                keyframes:
+                  - duration: 500
+                    value: 1
+                    easing: easeInOutCubic
+                  - duration: 500
+                    value: 0.2
+                    easing: linear

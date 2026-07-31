@@ -42,6 +42,8 @@ await app.init({
   width: 1280,
   height: 720,
   backgroundColor: 0x000000,
+  rendererPreference: "webgl",
+  rendererFallback: true,
   plugins: {
     elements: [textPlugin, rectPlugin, spritePlugin, containerPlugin],
     animations: [tweenPlugin],
@@ -74,6 +76,12 @@ app.render({
   audio: [],
 });
 ```
+
+`rendererPreference` accepts `"webgl"` or `"webgpu"`;
+`rendererFallback: false` makes initialization fail instead of selecting the
+other backend. The selected value is available as `app.rendererType`. Inline
+shader effects always provide both GLSL and WGSL so the same state works on
+either backend.
 
 `createAssetBufferManager()` may keep image and video assets as direct source
 URLs when possible, while audio and font assets remain buffer-backed.
@@ -128,12 +136,14 @@ For complete usage details, go to:
 - [Getting Started](http://route-graphics.routevn.com/docs/introduction/getting-started/)
 - [Assets & Loading](http://route-graphics.routevn.com/docs/guides/assets-loading/)
 - [Events & Render Complete](http://route-graphics.routevn.com/docs/guides/events-render-complete/)
+- [Shaders](http://route-graphics.routevn.com/docs/guides/shaders/)
 - [Custom Plugins](http://route-graphics.routevn.com/docs/guides/custom-plugins/)
 
 Design notes:
 
 - [Audio Effects](./docs/audio-effects.md)
 - [Command-Controlled Sound Playback](./docs/audio-playback-commands.md)
+- [Animation Model](./docs/animation-model.md)
 - [Shader Interface](./docs/shader-interface.md)
 
 ## Render CLI

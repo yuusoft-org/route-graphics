@@ -17,7 +17,6 @@ const UPDATE_TWEEN_PROPERTIES = new Set([
   "rotation",
   "blurX",
   "blurY",
-  "uProgress",
 ]);
 const TRANSITION_TWEEN_PROPERTIES = new Set([
   "x",
@@ -29,11 +28,11 @@ const TRANSITION_TWEEN_PROPERTIES = new Set([
   "scaleY",
   "rotation",
 ]);
-const TRANSITION_COMPOSITOR_TWEEN_PROPERTIES = new Set(["uProgress"]);
 const MASK_KINDS = new Set(["single", "sequence"]);
 const MASK_CHANNELS = new Set(["red", "green", "blue", "alpha"]);
 const MASK_SEQUENCE_SAMPLE_MODES = new Set(["hold", "linear"]);
 const SUPPORTED_EASINGS = new Set(SUPPORTED_EASING_NAMES);
+const SHADER_PARAMETER_PATTERN = /^[a-z][A-Za-z0-9]*$/;
 
 const assertPlainObject = (value, path) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -50,6 +49,30 @@ const assertString = (value, path) => {
 const assertNumber = (value, path) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
     throw new Error(`${path} must be a number.`);
+  }
+};
+
+const assertShaderTweenValue = (value, path) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return;
+  }
+
+  if (
+    Array.isArray(value) &&
+    [2, 3, 4, 9, 16].includes(value.length) &&
+    value.every((component) => Number.isFinite(component))
+  ) {
+    return;
+  }
+
+  throw new Error(
+    `${path} must be a finite number or a numeric array with length 2, 3, 4, 9, or 16.`,
+  );
+};
+
+const assertShaderProgressValue = (value, path) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${path} must be a finite number.`);
   }
 };
 
@@ -115,14 +138,20 @@ const normalizeAutoTween = (autoConfig, path) => {
   };
 };
 
-const normalizeKeyframes = (propertyConfig, path) => {
+const normalizeKeyframes = (
+  propertyConfig,
+  path,
+  assertValue = assertNumber,
+) => {
   assertPlainObject(propertyConfig, path);
 
   const normalized = {};
 
   if (propertyConfig.initialValue !== undefined) {
-    assertNumber(propertyConfig.initialValue, `${path}.initialValue`);
-    normalized.initialValue = propertyConfig.initialValue;
+    assertValue(propertyConfig.initialValue, `${path}.initialValue`);
+    normalized.initialValue = Array.isArray(propertyConfig.initialValue)
+      ? [...propertyConfig.initialValue]
+      : propertyConfig.initialValue;
   }
 
   if (
@@ -135,7 +164,7 @@ const normalizeKeyframes = (propertyConfig, path) => {
   normalized.keyframes = propertyConfig.keyframes.map((keyframe, index) => {
     const keyframePath = `${path}.keyframes[${index}]`;
     assertPlainObject(keyframe, keyframePath);
-    assertNumber(keyframe.value, `${keyframePath}.value`);
+    assertValue(keyframe.value, `${keyframePath}.value`);
     assertNumber(keyframe.duration, `${keyframePath}.duration`);
 
     if (keyframe.easing !== undefined && typeof keyframe.easing !== "string") {
@@ -159,7 +188,9 @@ const normalizeKeyframes = (propertyConfig, path) => {
     }
 
     return {
-      value: keyframe.value,
+      value: Array.isArray(keyframe.value)
+        ? [...keyframe.value]
+        : keyframe.value,
       duration: keyframe.duration,
       easing: keyframe.easing ?? "linear",
       ...(keyframe.relative !== undefined
@@ -169,6 +200,48 @@ const normalizeKeyframes = (propertyConfig, path) => {
   });
 
   return normalized;
+};
+
+const normalizeShaderTweenMap = (tween, path) => {
+  assertPlainObject(tween, path);
+  const entries = Object.entries(tween);
+  if (entries.length === 0) {
+    throw new Error(`${path} must define at least one parameter.`);
+  }
+
+  return Object.fromEntries(
+    entries.map(([parameter, config]) => {
+      if (parameter === "uTime" || parameter === "time") {
+        throw new Error(
+          `${path}.${parameter} is read-only. Animate a custom parameter instead.`,
+        );
+      }
+      if (parameter === "uProgress") {
+        throw new Error(
+          `${path}.uProgress is no longer supported. Use ${path}.progress.`,
+        );
+      }
+      if (
+        parameter !== "progress" &&
+        !SHADER_PARAMETER_PATTERN.test(parameter)
+      ) {
+        throw new Error(
+          `${path}.${parameter} must be progress or match ${SHADER_PARAMETER_PATTERN.source}.`,
+        );
+      }
+
+      return [
+        parameter === "progress" ? "uProgress" : parameter,
+        normalizeKeyframes(
+          config,
+          `${path}.${parameter}`,
+          parameter === "progress"
+            ? assertShaderProgressValue
+            : assertShaderTweenValue,
+        ),
+      ];
+    }),
+  );
 };
 
 const normalizeUpdatePropertyConfig = (propertyConfig, path) => {
@@ -231,6 +304,47 @@ const normalizeTweenMap = (
   }
 
   return Object.fromEntries(normalizedEntries);
+};
+
+const normalizeFilterTweens = (filters, path) => {
+  assertPlainObject(filters, path);
+  const entries = Object.entries(filters);
+  if (entries.length === 0) {
+    throw new Error(`${path} must target at least one filter.`);
+  }
+
+  return Object.fromEntries(
+    entries.map(([filterId, tween]) => {
+      assertString(filterId, `${path} filter id`);
+      return [filterId, normalizeShaderTweenMap(tween, `${path}.${filterId}`)];
+    }),
+  );
+};
+
+const normalizeUpdateTween = (tween, path) => {
+  assertPlainObject(tween, path);
+
+  const { filters, ...elementTween } = tween;
+  const normalized = {};
+
+  if (Object.keys(elementTween).length > 0) {
+    normalized.tween = normalizeTweenMap(
+      elementTween,
+      path,
+      UPDATE_TWEEN_PROPERTIES,
+      normalizeUpdatePropertyConfig,
+    );
+  }
+
+  if (filters !== undefined) {
+    normalized.filterTweens = normalizeFilterTweens(filters, `${path}.filters`);
+  }
+
+  if (normalized.tween === undefined && normalized.filterTweens === undefined) {
+    throw new Error(`${path} must define an element property or filters.`);
+  }
+
+  return normalized;
 };
 
 const normalizeSequenceFrame = (frame, path) => {
@@ -404,10 +518,6 @@ const normalizeReplaceSide = (side, path) => {
 const normalizeReplacePayload = (animation, path) => {
   const normalized = {};
 
-  if (animation.shader !== undefined) {
-    throw new Error(`${path}.shader is not supported.`);
-  }
-
   if (animation.prev !== undefined) {
     normalized.prev = normalizeReplaceSide(animation.prev, `${path}.prev`);
   }
@@ -425,12 +535,20 @@ const normalizeReplacePayload = (animation, path) => {
       animation.compositor,
       `${path}.compositor`,
     );
-  }
-
-  if (normalized.mask !== undefined && normalized.compositor !== undefined) {
-    throw new Error(
-      `${path}.compositor cannot be combined with ${path}.mask in v1.`,
+    if (animation.compositor.tween === undefined) {
+      throw new Error(
+        `${path}.compositor.tween.progress is required when compositor is defined.`,
+      );
+    }
+    normalized.compositor.tween = normalizeShaderTweenMap(
+      animation.compositor.tween,
+      `${path}.compositor.tween`,
     );
+    if (normalized.compositor.tween.uProgress === undefined) {
+      throw new Error(
+        `${path}.compositor.tween.progress is required when compositor is defined.`,
+      );
+    }
   }
 
   if (
@@ -515,14 +633,26 @@ export const normalizeAnimations = (animations = []) => {
       `${path}.subjects`,
       "is no longer supported. Use `prev` / `next` instead.",
     );
+    assertLegacyFieldAbsent(
+      animation.shader,
+      `${path}.shader`,
+      "is no longer supported. Use `tween.filters.<filterId>` for element filters or `compositor.tween` for a transition compositor.",
+    );
 
     if (animation.type === "update") {
-      normalizedAnimation.tween = normalizeTweenMap(
-        animation.tween,
-        `${path}.tween`,
-        UPDATE_TWEEN_PROPERTIES,
-        normalizeUpdatePropertyConfig,
-      );
+      if (animation.tween !== undefined) {
+        Object.assign(
+          normalizedAnimation,
+          normalizeUpdateTween(animation.tween, `${path}.tween`),
+        );
+      }
+
+      if (
+        normalizedAnimation.tween === undefined &&
+        normalizedAnimation.filterTweens === undefined
+      ) {
+        throw new Error(`${path} must define tween for an update animation.`);
+      }
 
       if (animation.replace !== undefined) {
         throw new Error(
@@ -554,14 +684,10 @@ export const normalizeAnimations = (animations = []) => {
         );
       }
 
-      if (animation.shader !== undefined) {
-        throw new Error(`${path}.shader is not supported.`);
-      }
-
       return normalizedAnimation;
     }
 
-    if (animation.tween !== undefined && animation.compositor === undefined) {
+    if (animation.tween !== undefined) {
       throw new Error(`${path}.tween is not valid for transition animations.`);
     }
 
@@ -583,17 +709,6 @@ export const normalizeAnimations = (animations = []) => {
     }
     if (normalizedReplace.compositor !== undefined) {
       normalizedAnimation.compositor = normalizedReplace.compositor;
-      if (animation.tween === undefined) {
-        throw new Error(
-          `${path}.tween.uProgress is required when compositor is defined.`,
-        );
-      }
-
-      normalizedAnimation.tween = normalizeTweenMap(
-        animation.tween,
-        `${path}.tween`,
-        TRANSITION_COMPOSITOR_TWEEN_PROPERTIES,
-      );
     }
 
     return normalizedAnimation;
@@ -615,23 +730,32 @@ export const normalizeAnimations = (animations = []) => {
     }
   }
 
-  const updateProgressTargets = new Set();
+  const shaderAnimationChannels = new Set();
 
   for (const animation of normalized) {
-    if (
-      animation.type !== "update" ||
-      animation.tween?.uProgress === undefined
-    ) {
+    if (animation.type !== "update") {
       continue;
     }
 
-    if (updateProgressTargets.has(animation.targetId)) {
-      throw new Error(
-        `Animations targeting "${animation.targetId}" cannot define multiple active uProgress update tweens in the same state.`,
-      );
+    for (const [filterId, tween] of Object.entries(
+      animation.filterTweens ?? {},
+    )) {
+      for (const parameter of Object.keys(tween)) {
+        const channel = JSON.stringify([
+          animation.targetId,
+          filterId,
+          parameter,
+        ]);
+        if (shaderAnimationChannels.has(channel)) {
+          const authoredParameter =
+            parameter === "uProgress" ? "progress" : parameter;
+          throw new Error(
+            `Animations targeting shader filter "${filterId}" on "${animation.targetId}" cannot both animate parameter "${authoredParameter}".`,
+          );
+        }
+        shaderAnimationChannels.add(channel);
+      }
     }
-
-    updateProgressTargets.add(animation.targetId);
   }
 
   return normalized;

@@ -101,7 +101,7 @@ in:
     height: 29
 throws: "Input Error: Id is missing"
 ---
-case: Parsing unsupported input filters throws
+case: Parsing input shader filters
 in:
   - id: typed-name
     type: input
@@ -110,9 +110,20 @@ in:
     width: 240
     height: 48
     filters: []
-throws: "Input Error: filters are not supported on input elements"
+out:
+  id: typed-name
+  type: input
+  width: 240
+  height: 48
+  x: 0
+  "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
+  alpha: 1
+  filters: []
 ---
-case: Parsing unsupported slider filters throws
+case: Parsing slider shader filters
 in:
   - id: volume
     type: slider
@@ -121,9 +132,20 @@ in:
     width: 240
     height: 48
     filters: []
-throws: "Input Error: filters are not supported on slider elements"
+out:
+  id: volume
+  type: slider
+  width: 240
+  height: 48
+  x: 0
+  "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
+  alpha: 1
+  filters: []
 ---
-case: Parsing unsupported text-revealing filters throws
+case: Parsing text-revealing shader filters
 in:
   - id: line
     type: text-revealing
@@ -132,7 +154,18 @@ in:
     width: 240
     height: 48
     filters: []
-throws: "Input Error: filters are not supported on text-revealing elements"
+out:
+  id: line
+  type: text-revealing
+  width: 240
+  height: 48
+  x: 0
+  "y": 0
+  originX: 0
+  originY: 0
+  rotation: 0
+  alpha: 1
+  filters: []
 ---
 case: Parsing object with incorrect type
 in:

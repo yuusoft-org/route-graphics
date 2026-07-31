@@ -1,4 +1,9 @@
 import { isDeepEqual } from "../../util/isDeepEqual.js";
+import {
+  hasInstalledShaderFilters,
+  setShaderTime,
+  syncShaderFilters,
+} from "./util/shaderFilterEffect.js";
 
 const ELEMENT_RENDER_STATE = Symbol("routeGraphicsElementRenderState");
 const ELEMENT_HIT_TEST_BOUNDS = Symbol("routeGraphicsElementHitTestBounds");
@@ -64,8 +69,30 @@ const getAddedChild = (parent, element, childrenBefore) => {
   return null;
 };
 
-const markMountedElement = (child, element) => {
+const markMountedElement = (
+  child,
+  element,
+  { animations, targetId = element?.id, shaderTime = 0, getShaderTime } = {},
+) => {
   if (child) {
+    const hasRuntimeReadyFilters =
+      Array.isArray(element.filters) &&
+      element.filters.every(
+        (filter) => Array.isArray(filter?.passes) || filter?.source,
+      );
+    if (hasRuntimeReadyFilters || hasInstalledShaderFilters(child)) {
+      syncShaderFilters(child, element.filters, {
+        width: element.width,
+        height: element.height,
+        force: true,
+        animations,
+        targetId,
+      });
+      setShaderTime(
+        child,
+        typeof getShaderTime === "function" ? getShaderTime() : shaderTime,
+      );
+    }
     setElementRenderState(child, element);
   }
 };
@@ -75,7 +102,11 @@ export const addElementWithRenderState = ({ plugin, ...options }) => {
   const operation = plugin.add(options);
   const { parent, element } = options;
   let mountedChild = getAddedChild(parent, element, childrenBefore);
-  markMountedElement(mountedChild, element);
+  markMountedElement(mountedChild, element, {
+    animations: options.animations,
+    shaderTime: options.shaderTime,
+    getShaderTime: options.getShaderTime,
+  });
 
   if (!isPromise(operation)) {
     return operation;
@@ -85,7 +116,11 @@ export const addElementWithRenderState = ({ plugin, ...options }) => {
     if (!mountedChild || mountedChild.destroyed) {
       mountedChild = getAddedChild(parent, element, childrenBefore);
     }
-    markMountedElement(mountedChild, element);
+    markMountedElement(mountedChild, element, {
+      animations: options.animations,
+      shaderTime: options.shaderTime,
+      getShaderTime: options.getShaderTime,
+    });
   });
 };
 
@@ -130,7 +165,12 @@ export const updateElementWithRenderState = ({ plugin, ...options }) => {
         displayObject ??
         getMountedChild(parent, nextElement.id) ??
         getMountedChild(parent, prevElement.id);
-      markMountedElement(mountedChild, nextElement);
+      markMountedElement(mountedChild, nextElement, {
+        animations: options.animations,
+        targetId: prevElement.id,
+        shaderTime: options.shaderTime,
+        getShaderTime: options.getShaderTime,
+      });
     }
     deferredCommit?.settle();
   };

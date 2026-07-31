@@ -69,6 +69,7 @@ states:
                   @group(0) @binding(2) var uSampler: sampler;
                   @group(1) @binding(0) var<uniform> shaderUniforms: ShaderUniforms;
                   @group(1) @binding(1) var uNoiseTexture: texture_2d<f32>;
+                  @group(1) @binding(2) var uNoiseTextureSampler: sampler;
 
                   struct VSOutput {
                     @builtin(position) position: vec4<f32>,
@@ -98,7 +99,7 @@ states:
                   fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
                   {
                     let color = textureSample(uTexture, uSampler, uv);
-                    let maskValue = textureSample(uNoiseTexture, uSampler, uv).r;
+                    let maskValue = textureSample(uNoiseTexture, uNoiseTextureSampler, uv).r;
                     let tinted = mix(color.rgb, shaderUniforms.uTint.rgb, maskValue * shaderUniforms.uAmount);
                     return vec4<f32>(tinted, color.a);
                   }

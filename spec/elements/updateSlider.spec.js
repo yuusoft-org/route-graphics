@@ -2,6 +2,11 @@ import { Container } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 import { addSlider } from "../../src/plugins/elements/slider/addSlider.js";
 import { updateSlider } from "../../src/plugins/elements/slider/updateSlider.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import {
+  createAnimatedShaderFilterFixture,
+  createFilterAnimationFixture,
+} from "../util/shaderFilterFixtures.js";
 
 const createSharedParams = () => ({
   app: {
@@ -57,6 +62,31 @@ const createSliderElement = (overrides = {}) => ({
 });
 
 describe("updateSlider", () => {
+  it("installs shader filters before dispatching mount animations", () => {
+    const parent = new Container();
+    const element = createSliderElement({
+      filters: createAnimatedShaderFilterFixture(),
+    });
+    const animationBus = createAnimationBus();
+
+    addSlider({
+      ...createSharedParams(),
+      parent,
+      element,
+      animations: createFilterAnimationFixture(element.id),
+      animationBus,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+    animationBus.flush();
+
+    const slider = parent.getChildByLabel(element.id);
+    expect(
+      slider.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.4);
+    slider.destroy({ children: true });
+  });
+
   it("applies and resets degree rotation around the configured origin", () => {
     const parent = new Container();
     const shared = createSharedParams();
