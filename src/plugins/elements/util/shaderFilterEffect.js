@@ -274,6 +274,32 @@ const createShaderFilterGeometry = (grid = [1, 1]) => {
   });
 };
 
+const assertShaderMeshFilterSystemCompatibility = (filterManager) => {
+  const missingInternals = [];
+  if (!Array.isArray(filterManager?._filterStack)) {
+    missingInternals.push("_filterStack");
+  }
+  if (!Number.isInteger(filterManager?._filterStackIndex)) {
+    missingInternals.push("_filterStackIndex");
+  }
+  if (!filterManager?._filterGlobalUniforms?.uniforms) {
+    missingInternals.push("_filterGlobalUniforms");
+  }
+  if (
+    typeof filterManager?._globalFilterBindGroup?.setResource !== "function"
+  ) {
+    missingInternals.push("_globalFilterBindGroup");
+  }
+
+  if (missingInternals.length > 0) {
+    throw new Error(
+      `Custom shader meshes require the pinned Pixi FilterSystem internals; incompatible runtime is missing ${missingInternals.join(
+        ", ",
+      )}.`,
+    );
+  }
+};
+
 const applyShaderFilterWithGeometry = ({
   filterManager,
   filter,
@@ -282,6 +308,7 @@ const applyShaderFilterWithGeometry = ({
   output,
   clear,
 }) => {
+  assertShaderMeshFilterSystemCompatibility(filterManager);
   const renderer = filterManager.renderer;
   const filterData =
     filterManager._filterStack[filterManager._filterStackIndex];

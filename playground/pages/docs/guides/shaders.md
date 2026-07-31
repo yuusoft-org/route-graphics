@@ -449,10 +449,20 @@ Always use the custom sampler for its texture. Group 0's `uSampler` belongs to
 the filter input and does not contain the custom texture's `wrap` or `mipmap`
 settings.
 
+The repository's `bun run test:webgpu` command disables renderer fallback and
+compiles/renders representative timed, multipass, textured-mesh, and compositor
+effects through an actual WebGPU browser. This is separate from the default
+WebGL visual-test run.
+
 ## Mesh, Bounds, And Alpha
 
 `mesh.grid: [1, 1]` is one quad. Subdivision enables vertex deformation but
 does not change layout or semantic hit-test bounds.
+
+Subdivided filter geometry depends on the tested Pixi filter system internals,
+so Route Graphics pins its Pixi version. An incompatible runtime reports a
+focused custom-mesh compatibility error instead of failing later inside a draw
+call.
 
 Use `padding` for effects that draw outside the source bounds. Transition
 overlays include compositor padding.

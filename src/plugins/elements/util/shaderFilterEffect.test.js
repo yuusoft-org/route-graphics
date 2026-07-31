@@ -1422,6 +1422,35 @@ describe("shader filter resources", () => {
     filter.destroy();
   });
 
+  it("reports a clear compatibility error when Pixi mesh internals change", () => {
+    const filter = createShaderFilter({
+      shader: createTestShader({
+        mesh: {
+          grid: [2, 1],
+        },
+      }),
+      width: 100,
+      height: 50,
+    });
+
+    expect(() =>
+      filter.apply(
+        {
+          _filterStack: [],
+          _filterStackIndex: 0,
+          renderer: {},
+        },
+        {},
+        {},
+        false,
+      ),
+    ).toThrow(
+      /Custom shader meshes require the pinned Pixi FilterSystem internals; incompatible runtime is missing _filterGlobalUniforms, _globalFilterBindGroup/,
+    );
+
+    filter.destroy();
+  });
+
   it("destroys managed shader filters when the display object is destroyed", () => {
     Cache.set(TEST_TEXTURE_ALIAS, Texture.WHITE);
     const cachedSource = Texture.WHITE.source;

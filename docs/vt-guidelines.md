@@ -169,6 +169,24 @@ not sufficient.
 - Run screenshot capture and report after manual browser inspection, then accept
   only the expected reference diffs.
 
+The generated VT pages use WebGL by default. To exercise the same page through
+WebGPU, open it with `?renderer=webgpu`. A spec can also set top-level
+`rendererPreference: webgpu` and `rendererFallback: false` when its normal VT
+run is hosted on a WebGPU-capable worker. The selected backend is available to
+behavior assertions as `vtAssert.rendererType()`.
+
+Run the dedicated browser integration suite for every shader runtime change:
+
+```sh
+bun run test:webgpu
+```
+
+This command requires WebGPU rather than accepting WebGL fallback. It reuses
+the shader VT state fixtures to compile and render a timed update, a multipass
+filter, a custom-texture subdivided compositor, and a mask plus multipass
+compositor. A missing adapter, shader compilation error, browser console error,
+transparent output, or unchanged screenshot fails the command.
+
 ### Transition Compositor Handoff Regression
 
 Shader transition compositors have a specific failure mode that is easy to miss:
@@ -204,6 +222,7 @@ snapshot coordinate mapping before accepting references.
 Recommended command sequence for shader VT changes:
 
 ```sh
+bun run test:webgpu
 bun run vt:generate
 # Open the changed page in a browser and inspect console output.
 bun run vt:screenshot

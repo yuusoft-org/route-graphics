@@ -168,6 +168,8 @@ export const updateElementWithRenderState = ({ plugin, ...options }) => {
       markMountedElement(mountedChild, nextElement, {
         animations: options.animations,
         targetId: prevElement.id,
+        shaderTime: options.shaderTime,
+        getShaderTime: options.getShaderTime,
       });
     }
     deferredCommit?.settle();

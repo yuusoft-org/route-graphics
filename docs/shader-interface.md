@@ -440,6 +440,18 @@ console.log(graphics.rendererType); // "webgpu" or fallback "webgl"
 `true`. If fallback is disabled and the requested backend is unavailable,
 initialization throws.
 
+Repository validation includes a strict browser-backed WebGPU suite:
+
+```sh
+bun run test:webgpu
+```
+
+It disables renderer fallback, verifies that Pixi actually selected WebGPU,
+compiles and renders timed filter updates, multipass filter animation, custom
+texture samplers, subdivided meshes, and mask/compositor transitions, and
+checks their browser screenshots. The command requires a functional WebGPU
+adapter; an unavailable or unusable adapter is a test failure.
+
 ## Source And ABI
 
 Each source block is:
@@ -621,6 +633,13 @@ independently.
 
 Owned filters, cloned texture sources, and mesh geometry are destroyed with the
 display object or transition overlay.
+
+The subdivided mesh path integrates with Pixi's filter geometry internals.
+`pixi.js` is therefore pinned to the tested version instead of accepting
+automatic minor upgrades. If an incompatible Pixi runtime is supplied, custom
+mesh rendering throws a focused compatibility error naming the missing filter
+system fields. Standard `[1, 1]` filter geometry does not use this internal
+path.
 
 ## Validation And Diagnostics
 
