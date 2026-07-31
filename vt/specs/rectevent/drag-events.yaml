@@ -66,7 +66,8 @@ states:
         width: 200
         height: 100
         fill: "#A6A6A6"
-        cursor: pointer
+        hover:
+          cursor: pointer
         drag:
           start:
             payload:

@@ -20,7 +20,6 @@ states:
         width: 100
         height: 80
         fill: "#FFFFFF"
-        zIndex: 1
       - id: rect-2
         type: rect
         x: 200
@@ -28,7 +27,6 @@ states:
         width: 120
         height: 90
         fill: "#FFFFFF"
-        zIndex: 1
       - id: rect-3
         type: rect
         x: 350
@@ -36,7 +34,6 @@ states:
         width: 80
         height: 100
         fill: "#FFFFFF"
-        zIndex: 1
   - elements:
       - id: rect-2
         type: rect
@@ -45,4 +42,3 @@ states:
         width: 120
         height: 90
         fill: "#FFFFFF"
-        zIndex: 1

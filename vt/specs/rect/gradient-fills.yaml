@@ -112,7 +112,7 @@ states:
           type: linear-gradient
           start: { x: 0, y: 0 }
           end: { x: 0.25, y: 0 }
-          wrapMode: repeat
+          spread: repeat
           stops:
             - offset: 0
               color: "#ffffff"

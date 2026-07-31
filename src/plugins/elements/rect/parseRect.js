@@ -1,4 +1,6 @@
 import { parseCommonObject } from "../util/parseCommonObject.js";
+import { normalizeBlurConfig } from "../util/blurEffect.js";
+import { normalizeCornerRadius, validateRectState } from "./rectConfig.js";
 /**
  *  @typedef {import('../../../types.js').BaseElement}
  *  @typedef {import('../../../types.js').RectComputedNode}
@@ -11,27 +13,29 @@ import { parseCommonObject } from "../util/parseCommonObject.js";
  * @return {RectComputedNode}
  */
 export const parseRect = ({ state }) => {
+  validateRectState(state);
   const computedObj = parseCommonObject(state);
-  const borderWidth = state.border?.width;
-
-  let finalObj = computedObj;
-
-  if (typeof borderWidth === "number" && borderWidth > 0) {
-    finalObj = {
-      ...computedObj,
-      border: {
-        alpha: state.border?.alpha ?? 1,
-        color: state.border?.color ?? "black",
-        width: borderWidth,
-      },
-    };
-  }
+  const border =
+    state.border === undefined
+      ? undefined
+      : {
+          alpha: state.border.alpha ?? 1,
+          color: state.border.color ?? "black",
+          width: state.border.width ?? 0,
+        };
 
   return {
-    ...finalObj,
+    ...computedObj,
     ...(state.fill !== undefined ? { fill: state.fill } : {}),
+    ...(border !== undefined ? { border } : {}),
     ...(state.scaleX !== undefined ? { scaleX: state.scaleX } : {}),
     ...(state.scaleY !== undefined ? { scaleY: state.scaleY } : {}),
+    ...(state.cornerRadius !== undefined
+      ? { cornerRadius: normalizeCornerRadius(state.cornerRadius) }
+      : {}),
+    ...(state.blur !== undefined && {
+      blur: normalizeBlurConfig(state.blur),
+    }),
     rotation: state.rotation ?? 0,
     ...(state.drag && { drag: state.drag }),
     ...(state.rightClick && { rightClick: state.rightClick }),

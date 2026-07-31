@@ -7,8 +7,12 @@ import {
   resolveInputTextStyle,
   resolvePadding,
 } from "./inputShared.js";
+import { validateRectFill } from "../rect/rectConfig.js";
 
 export const parseInput = ({ state }) => {
+  if (state.fill !== undefined) {
+    validateRectFill(state.fill, "input.fill");
+  }
   const computedObj = parseCommonObject(state);
   const value = String(state.value ?? "");
   const placeholder = String(state.placeholder ?? "");

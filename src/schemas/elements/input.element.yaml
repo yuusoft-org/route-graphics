@@ -71,13 +71,14 @@ $def:
             type: string
             enum: [local, global]
             description: Whether gradient coordinates are relative to the input or the world
-          textureSize:
+          resolution:
             type: number
-            description: Gradient texture resolution hint
-          wrapMode:
+            exclusiveMinimum: 0
+            description: Gradient sampling resolution in pixels
+          spread:
             type: string
-            enum: [clamp-to-edge, repeat]
-            description: Gradient wrap mode
+            enum: [pad, repeat]
+            description: Behavior outside the gradient range
       - type: object
         additionalProperties: false
         required:
@@ -108,13 +109,14 @@ $def:
             type: string
             enum: [local, global]
             description: Whether gradient coordinates are relative to the input or the world
-          textureSize:
+          resolution:
             type: number
-            description: Gradient texture resolution hint
-          wrapMode:
+            exclusiveMinimum: 0
+            description: Gradient sampling resolution in pixels
+          spread:
             type: string
-            enum: [clamp-to-edge, repeat]
-            description: Gradient wrap mode
+            enum: [pad, repeat]
+            description: Behavior outside the gradient range
           scale:
             type: number
             description: Radial gradient ellipse scale

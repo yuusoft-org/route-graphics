@@ -63,6 +63,69 @@ $defs:
     oneOf:
       - $ref: "#/$defs/manualTweenProperty"
       - $ref: "#/$defs/autoTweenProperty"
+  colorKeyframe:
+    type: object
+    required:
+      - value
+      - duration
+    properties:
+      value:
+        type: string
+        description: Target color value.
+      duration:
+        type: number
+      easing:
+        type: string
+        enum:
+          - linear
+          - easeInQuad
+          - easeOutQuad
+          - easeInOutQuad
+          - easeInCubic
+          - easeOutCubic
+          - easeInOutCubic
+          - easeInQuart
+          - easeOutQuart
+          - easeInOutQuart
+          - easeInQuint
+          - easeOutQuint
+          - easeInOutQuint
+          - easeInSine
+          - easeOutSine
+          - easeInOutSine
+          - easeInExpo
+          - easeOutExpo
+          - easeInOutExpo
+          - easeInCirc
+          - easeOutCirc
+          - easeInOutCirc
+          - easeInBack
+          - easeOutBack
+          - easeInOutBack
+          - easeInBounce
+          - easeOutBounce
+          - easeInOutBounce
+          - easeInElastic
+          - easeOutElastic
+          - easeInOutElastic
+    additionalProperties: false
+  manualColorTweenProperty:
+    type: object
+    required:
+      - keyframes
+    properties:
+      initialValue:
+        type: string
+      keyframes:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/colorKeyframe"
+    additionalProperties: false
+  colorTweenProperty:
+    oneOf:
+      - $ref: "#/$defs/manualColorTweenProperty"
+      - $ref: "#/$defs/autoTweenProperty"
   manualTweenProperty:
     type: object
     properties:
@@ -137,6 +200,83 @@ $defs:
       "^.+$":
         $ref: "../shader-config.yaml#/definitions/shaderTween"
     additionalProperties: false
+  rectPointTween:
+    type: object
+    minProperties: 1
+    additionalProperties: false
+    properties:
+      x:
+        $ref: "#/$defs/tweenProperty"
+      y:
+        $ref: "#/$defs/tweenProperty"
+  rectFillStopTween:
+    type: object
+    required:
+      - index
+    minProperties: 2
+    additionalProperties: false
+    properties:
+      index:
+        type: integer
+        minimum: 0
+      offset:
+        $ref: "#/$defs/tweenProperty"
+      color:
+        $ref: "#/$defs/colorTweenProperty"
+  rectFillTween:
+    type: object
+    minProperties: 1
+    additionalProperties: false
+    properties:
+      color:
+        $ref: "#/$defs/colorTweenProperty"
+      start:
+        $ref: "#/$defs/rectPointTween"
+      end:
+        $ref: "#/$defs/rectPointTween"
+      innerCenter:
+        $ref: "#/$defs/rectPointTween"
+      innerRadius:
+        $ref: "#/$defs/tweenProperty"
+      outerCenter:
+        $ref: "#/$defs/rectPointTween"
+      outerRadius:
+        $ref: "#/$defs/tweenProperty"
+      stops:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/rectFillStopTween"
+      scale:
+        $ref: "#/$defs/tweenProperty"
+      rotation:
+        $ref: "#/$defs/tweenProperty"
+  rectBorderTween:
+    type: object
+    minProperties: 1
+    additionalProperties: false
+    properties:
+      width:
+        $ref: "#/$defs/tweenProperty"
+      color:
+        $ref: "#/$defs/colorTweenProperty"
+      alpha:
+        $ref: "#/$defs/tweenProperty"
+  rectCornerRadiusTween:
+    oneOf:
+      - $ref: "#/$defs/tweenProperty"
+      - type: object
+        minProperties: 1
+        additionalProperties: false
+        properties:
+          topLeft:
+            $ref: "#/$defs/tweenProperty"
+          topRight:
+            $ref: "#/$defs/tweenProperty"
+          bottomRight:
+            $ref: "#/$defs/tweenProperty"
+          bottomLeft:
+            $ref: "#/$defs/tweenProperty"
   updateTween:
     type: object
     properties:
@@ -160,6 +300,16 @@ $defs:
         $ref: "#/$defs/tweenProperty"
       blurY:
         $ref: "#/$defs/tweenProperty"
+      width:
+        $ref: "#/$defs/tweenProperty"
+      height:
+        $ref: "#/$defs/tweenProperty"
+      fill:
+        $ref: "#/$defs/rectFillTween"
+      border:
+        $ref: "#/$defs/rectBorderTween"
+      cornerRadius:
+        $ref: "#/$defs/rectCornerRadiusTween"
       filters:
         $ref: "#/$defs/filterTweens"
     allOf:

@@ -78,8 +78,8 @@ export const normalizeRectFill = (fill, element) => {
       end: normalizeGradientPoint(fill.end, fill, element, DEFAULT_LINEAR_END),
       colorStops: sortStops(fill.stops),
       textureSpace: fill.coordinateSpace,
-      textureSize: fill.textureSize,
-      wrapMode: fill.wrapMode,
+      textureSize: fill.resolution,
+      wrapMode: fill.spread === "repeat" ? "repeat" : "clamp-to-edge",
     });
   }
 
@@ -97,8 +97,8 @@ export const normalizeRectFill = (fill, element) => {
       outerRadius: fill.outerRadius,
       colorStops: sortStops(fill.stops),
       textureSpace: fill.coordinateSpace,
-      textureSize: fill.textureSize,
-      wrapMode: fill.wrapMode,
+      textureSize: fill.resolution,
+      wrapMode: fill.spread === "repeat" ? "repeat" : "clamp-to-edge",
       scale: fill.scale,
       rotation: fill.rotation,
     });

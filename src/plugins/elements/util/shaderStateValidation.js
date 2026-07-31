@@ -1,3 +1,8 @@
+import {
+  getRectStyleTargetState,
+  isRectAnimationProperty,
+} from "../rect/rectStyleRuntime.js";
+
 const getTweenValues = (config) => [
   ...(config.initialValue === undefined ? [] : [config.initialValue]),
   ...config.keyframes.map((keyframe) => keyframe.value),
@@ -77,6 +82,28 @@ export const validateShaderAnimationBindings = ({
   const elementById = indexElementsById(elements);
 
   for (const animation of animations) {
+    const rectProperties = Object.keys(animation.tween ?? {}).filter(
+      isRectAnimationProperty,
+    );
+    if (rectProperties.length > 0) {
+      const element = elementById.get(animation.targetId);
+      if (element && element.type !== "rect") {
+        throw new Error(
+          `Animation "${animation.id}" can only target rect style properties on a rect element.`,
+        );
+      }
+      if (element) {
+        const targetState = getRectStyleTargetState(element);
+        for (const property of rectProperties) {
+          if (!Object.prototype.hasOwnProperty.call(targetState, property)) {
+            throw new Error(
+              `Animation "${animation.id}" property "${property.slice("rect.".length)}" is incompatible with rect "${animation.targetId}".`,
+            );
+          }
+        }
+      }
+    }
+
     if (animation.type === "transition" && animation.compositor) {
       validateTweenParameters({
         animation,

@@ -138,6 +138,8 @@ describe("updateRect", () => {
           targetState: expect.objectContaining({
             scaleX: 1.5,
             scaleY: 0.6,
+            "rect.width": 200,
+            "rect.height": 200,
           }),
         }),
       }),

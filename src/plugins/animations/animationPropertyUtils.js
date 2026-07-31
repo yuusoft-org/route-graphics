@@ -12,6 +12,10 @@ const getMappedPath = (propertyPathMap, path) => {
     return path;
   }
 
+  if (path.startsWith("rect.")) {
+    return ["_routeGraphicsRectStyle", path];
+  }
+
   return propertyPathMap[path] ?? path;
 };
 

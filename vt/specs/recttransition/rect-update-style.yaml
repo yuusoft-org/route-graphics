@@ -1,0 +1,80 @@
+---
+title: Rect Style Update Animation
+description: Rect dimensions, fill, border, and independent corners animate together
+specs:
+  - dimensions should interpolate without using display-object scale
+  - solid fill and border colors should interpolate by RGBA channel
+  - each corner radius should interpolate independently
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: style-panel
+        type: rect
+        x: 180
+        "y": 180
+        width: 260
+        height: 160
+        fill: "#ef4444"
+        border:
+          width: 4
+          color: "#ffffff"
+          alpha: 1
+        cornerRadius: 8
+  - elements:
+      - id: style-panel
+        type: rect
+        x: 180
+        "y": 180
+        width: 620
+        height: 340
+        fill: "#2563eb"
+        border:
+          width: 18
+          color: "#22c55e"
+          alpha: 0.5
+        cornerRadius:
+          topLeft: 72
+          topRight: 12
+          bottomRight: 96
+          bottomLeft: 36
+    animations:
+      - id: animate-style
+        targetId: style-panel
+        type: update
+        tween:
+          width:
+            auto: { duration: 1000, easing: linear }
+          height:
+            auto: { duration: 1000, easing: linear }
+          fill:
+            color:
+              auto: { duration: 1000, easing: linear }
+          border:
+            width:
+              auto: { duration: 1000, easing: linear }
+            color:
+              auto: { duration: 1000, easing: linear }
+            alpha:
+              auto: { duration: 1000, easing: linear }
+          cornerRadius:
+            topLeft:
+              auto: { duration: 1000, easing: linear }
+            topRight:
+              auto: { duration: 1000, easing: linear }
+            bottomRight:
+              auto: { duration: 1000, easing: linear }
+            bottomLeft:
+              auto: { duration: 1000, easing: linear }

@@ -1,13 +1,18 @@
 import { isDeepEqual } from "../../../util/isDeepEqual.js";
-import { normalizeVolume } from "../../../util/normalizeVolume.js";
-import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
-import { setupScrollInteraction } from "../util/setupScrollInteraction.js";
-import { isPrimaryPointerEvent } from "../util/isPrimaryPointerEvent.js";
-import { resolveRectFill } from "./rectFill.js";
+import {
+  dispatchLiveAnimations,
+  getLiveAnimations,
+} from "../../animations/planAnimations.js";
 import {
   applyElementTransform,
   getElementTransformTargetState,
+  refreshElementPivot,
 } from "../util/transform.js";
+import {
+  getBlurTargetState,
+  hasBlurUpdateAnimation,
+  syncBlurEffect,
+} from "../util/blurEffect.js";
 import {
   getShaderFilterTargetState,
   hasShaderProgressUpdateAnimation,
@@ -16,6 +21,13 @@ import {
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
 import { setElementRenderState } from "../elementRenderState.js";
+import { drawRectVisual } from "./rectDrawing.js";
+import { bindRectInteractions } from "./rectInteractions.js";
+import {
+  getRectStyleTargetState,
+  installRectStyleRuntime,
+  syncRectStyleRuntime,
+} from "./rectStyleRuntime.js";
 
 /**
  * Update rectangle element (synchronous)
@@ -42,7 +54,11 @@ export const updateRect = ({
 
   rectElement.zIndex = zIndex;
 
-  const { width, height, fill, border, alpha, scaleX, scaleY } = nextElement;
+  const { width, height, alpha, scaleX, scaleY } = nextElement;
+  const shouldForceBlur = hasBlurUpdateAnimation(animations, prevElement.id);
+  if (shouldForceBlur) {
+    syncBlurEffect(rectElement, prevElement.blur, { force: true });
+  }
   const shouldForceShaderProgress = hasShaderProgressUpdateAnimation(
     animations,
     prevElement.id,
@@ -64,6 +80,80 @@ export const updateRect = ({
     animations,
     targetId: prevElement.id,
   });
+  const liveAnimations = getLiveAnimations(animations, prevElement.id);
+  const liveScaleX = liveAnimations.some(
+    (animation) => animation.tween?.scaleX !== undefined,
+  );
+  const liveScaleY = liveAnimations.some(
+    (animation) => animation.tween?.scaleY !== undefined,
+  );
+  const rectStyleTargetState = getRectStyleTargetState(nextElement, {
+    liveScaleX,
+    liveScaleY,
+  });
+  const rectStyleRuntime = installRectStyleRuntime(
+    rectElement,
+    prevElement,
+    (property, runtime) => {
+      drawRectVisual(rectElement, runtime.state, {
+        ...runtime.element,
+        ...runtime.state,
+      });
+      const dimensionChanged =
+        property === "rect.width" ||
+        property === "rect.height" ||
+        property?.has?.("rect.width") ||
+        property?.has?.("rect.height");
+      if (dimensionChanged) {
+        syncShaderFilters(rectElement, runtime.element.filters, {
+          width: runtime.state.width,
+          height: runtime.state.height,
+          force: shouldForceShaderProgress,
+          animations,
+          targetId: prevElement.id,
+        });
+      }
+    },
+  );
+  const rectStyleStartState = getRectStyleTargetState(prevElement, {
+    liveScaleX,
+    liveScaleY,
+  });
+  const hasBakedWidth =
+    liveScaleX &&
+    rectElement.scale.x === 1 &&
+    rectStyleRuntime.state.width === prevElement.width;
+  const hasBakedHeight =
+    liveScaleY &&
+    rectElement.scale.y === 1 &&
+    rectStyleRuntime.state.height === prevElement.height;
+  const shouldFlattenWidth = !liveScaleX && rectElement.scale.x !== 1;
+  const shouldFlattenHeight = !liveScaleY && rectElement.scale.y !== 1;
+
+  if (
+    hasBakedWidth ||
+    hasBakedHeight ||
+    shouldFlattenWidth ||
+    shouldFlattenHeight
+  ) {
+    rectStyleRuntime.beginBatch();
+    if (shouldFlattenWidth) {
+      rectElement.scale.x = 1;
+      rectStyleRuntime["rect.width"] = prevElement.width;
+    } else if (hasBakedWidth) {
+      rectElement.scale.x = prevElement.scaleX ?? 1;
+      rectStyleRuntime["rect.width"] = rectStyleStartState["rect.width"];
+    }
+    if (shouldFlattenHeight) {
+      rectElement.scale.y = 1;
+      rectStyleRuntime["rect.height"] = prevElement.height;
+    } else if (hasBakedHeight) {
+      rectElement.scale.y = prevElement.scaleY ?? 1;
+      rectStyleRuntime["rect.height"] = rectStyleStartState["rect.height"];
+    }
+    refreshElementPivot(rectElement);
+    rectStyleRuntime.endBatch();
+  }
   const targetState = getElementTransformTargetState(nextElement, { alpha });
 
   if (scaleX !== undefined) {
@@ -76,12 +166,8 @@ export const updateRect = ({
 
   const updateElement = () => {
     if (!isDeepEqual(prevElement, nextElement)) {
-      rectElement._cleanupScrollInteraction?.();
-      rectElement.clear();
-
-      rectElement
-        .rect(0, 0, Math.round(width), Math.round(height))
-        .fill(resolveRectFill(rectElement, fill, nextElement));
+      const styleRuntime = syncRectStyleRuntime(rectElement, nextElement);
+      drawRectVisual(rectElement, styleRuntime.state, nextElement);
       rectElement.alpha = alpha;
       // Rect computed nodes already bake scale into width/height for layout.
       // Reset the live transform so update tweens do not double-apply scale.
@@ -89,14 +175,9 @@ export const updateRect = ({
       rectElement.scale.y = 1;
       applyElementTransform(rectElement, nextElement);
 
-      if (border) {
-        rectElement.stroke({
-          color: border.color,
-          alpha: border.alpha,
-          width: Math.round(border.width),
-        });
-      }
-
+      syncBlurEffect(rectElement, nextElement.blur, {
+        force: shouldForceBlur,
+      });
       syncShaderFilters(rectElement, nextElement.filters, {
         width,
         height,
@@ -104,162 +185,12 @@ export const updateRect = ({
         animations,
         targetId: prevElement.id,
       });
-
-      rectElement.removeAllListeners("pointerover");
-      rectElement.removeAllListeners("pointerout");
-      rectElement.removeAllListeners("pointerup");
-      rectElement.removeAllListeners("rightclick");
-      rectElement.removeAllListeners("wheel");
-      rectElement.removeAllListeners("pointerdown");
-      rectElement.removeAllListeners("globalpointermove");
-      rectElement.removeAllListeners("pointerupoutside");
-
-      const hoverEvents = nextElement?.hover;
-      const clickEvents = nextElement?.click;
-      const rightClickEvents = nextElement?.rightClick;
-      const scrollUpEvent = nextElement?.scrollUp;
-      const scrollDownEvent = nextElement?.scrollDown;
-      const dragEvents = nextElement?.drag;
-
-      if (hoverEvents) {
-        const { cursor, soundSrc, soundVolume, payload } = hoverEvents;
-        rectElement.eventMode = "static";
-
-        const overListener = () => {
-          if (payload && eventHandler)
-            eventHandler(`hover`, {
-              _event: {
-                id: rectElement.label,
-              },
-              ...payload,
-            });
-          if (cursor) rectElement.cursor = cursor;
-          if (soundSrc)
-            app.audioStage.add({
-              id: `hover-${Date.now()}`,
-              url: soundSrc,
-              loop: false,
-              volume: normalizeVolume(soundVolume),
-            });
-        };
-
-        const outListener = () => {
-          rectElement.cursor = "auto";
-        };
-
-        rectElement.on("pointerover", overListener);
-        rectElement.on("pointerout", outListener);
-      }
-
-      if (clickEvents) {
-        const { soundSrc, soundVolume, payload } = clickEvents;
-        rectElement.eventMode = "static";
-
-        const clickListener = (event) => {
-          if (!isPrimaryPointerEvent(event)) {
-            return;
-          }
-
-          if (payload && eventHandler)
-            eventHandler(`click`, {
-              _event: {
-                id: rectElement.label,
-              },
-              ...payload,
-            });
-          if (soundSrc)
-            app.audioStage.add({
-              id: `click-${Date.now()}`,
-              url: soundSrc,
-              loop: false,
-              volume: normalizeVolume(soundVolume),
-            });
-        };
-
-        rectElement.on("pointerup", clickListener);
-      }
-
-      if (rightClickEvents) {
-        const { soundSrc, payload } = rightClickEvents;
-        rectElement.eventMode = "static";
-
-        const rightClickListener = () => {
-          if (payload && eventHandler)
-            eventHandler(`rightClick`, {
-              _event: {
-                id: rectElement.label,
-              },
-              ...payload,
-            });
-          if (soundSrc)
-            app.audioStage.add({
-              id: `rightClick-${Date.now()}`,
-              url: soundSrc,
-              loop: false,
-            });
-        };
-
-        rectElement.on("rightclick", rightClickListener);
-      }
-
-      if (scrollUpEvent || scrollDownEvent) {
-        setupScrollInteraction({
-          canvas: app.canvas,
-          displayObject: rectElement,
-          width,
-          height,
-          scrollUpEvent,
-          scrollDownEvent,
-          eventHandler,
-        });
-      }
-
-      if (dragEvents) {
-        const { start, end, move } = dragEvents;
-        rectElement.eventMode = "static";
-
-        const downListener = () => {
-          rectElement._isDragging = true;
-          if (start && eventHandler) {
-            eventHandler("dragStart", {
-              _event: {
-                id: rectElement.label,
-              },
-              ...(typeof start?.payload === "object" ? start.payload : {}),
-            });
-          }
-        };
-
-        const upListener = () => {
-          rectElement._isDragging = false;
-          if (end && eventHandler) {
-            eventHandler("dragEnd", {
-              _event: {
-                id: rectElement.label,
-              },
-              ...(typeof end?.payload === "object" ? end.payload : {}),
-            });
-          }
-        };
-
-        const moveListener = (e) => {
-          if (move && eventHandler && rectElement._isDragging) {
-            eventHandler("dragMove", {
-              _event: {
-                id: rectElement.label,
-                x: e.global.x,
-                y: e.global.y,
-              },
-              ...(typeof move?.payload === "object" ? move.payload : {}),
-            });
-          }
-        };
-
-        rectElement.on("pointerdown", downListener);
-        rectElement.on("pointerup", upListener);
-        rectElement.on("globalpointermove", moveListener);
-        rectElement.on("pointerupoutside", upListener);
-      }
+      bindRectInteractions({
+        app,
+        rect: rectElement,
+        element: nextElement,
+        eventHandler,
+      });
     }
 
     setElementRenderState(rectElement, nextElement);
@@ -274,6 +205,8 @@ export const updateRect = ({
     element: rectElement,
     targetState: {
       ...targetState,
+      ...rectStyleTargetState,
+      ...getBlurTargetState(nextElement, { force: shouldForceBlur }),
       ...getShaderFilterTargetState(nextElement, {
         force: shouldForceShaderProgress,
       }),

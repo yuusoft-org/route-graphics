@@ -14,8 +14,10 @@ steps:
     detail:
       elementId: rotating-video
       time: 1
-  - action: wait
-    ms: 1500
+  - action: waitFor
+    selector: 'html[data-vt-video-frame-ready="rotating-video"]'
+    state: attached
+    timeoutMs: 10000
   - action: customEvent
     name: "primeVtScreenshot"
   - action: wait
