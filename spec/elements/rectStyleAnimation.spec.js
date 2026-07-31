@@ -137,6 +137,198 @@ describe("rect style animation", () => {
     ).toBe(50);
   });
 
+  it("composes dimension and scale tweens without applying baked scale twice", () => {
+    const parent = new Container();
+    const animationBus = createAnimationBus();
+    const prevElement = createRect({
+      width: 100,
+      height: 80,
+      scaleX: 2,
+      scaleY: 0.5,
+    });
+    const nextElement = createRect({
+      width: 200,
+      height: 120,
+      scaleX: 3,
+      scaleY: 1.5,
+    });
+    const rect = mountRect(parent, prevElement, animationBus);
+    const animations = normalizeAnimations([
+      {
+        id: "resize-and-scale",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          width: { auto: { duration: 1000 } },
+          height: { auto: { duration: 1000 } },
+          scaleX: { auto: { duration: 1000 } },
+          scaleY: { auto: { duration: 1000 } },
+        },
+      },
+    ]);
+
+    updateRect({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations,
+      animationBus,
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+
+    expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(100);
+    expect(getRectStyleAnimationValue(rect, "rect.height")).toBe(80);
+    expect(rect.scale.x).toBe(2);
+    expect(rect.scale.y).toBe(0.5);
+
+    animationBus.flush();
+    animationBus.tick(500);
+
+    expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(150);
+    expect(getRectStyleAnimationValue(rect, "rect.height")).toBe(100);
+    expect(rect.scale.x).toBe(2.5);
+    expect(rect.scale.y).toBe(1);
+    expect(getRectStyleAnimationValue(rect, "rect.width") * rect.scale.x).toBe(
+      375,
+    );
+    expect(getRectStyleAnimationValue(rect, "rect.height") * rect.scale.y).toBe(
+      100,
+    );
+
+    animationBus.tick(500);
+
+    expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(600);
+    expect(getRectStyleAnimationValue(rect, "rect.height")).toBe(180);
+    expect(rect.scale.x).toBe(1);
+    expect(rect.scale.y).toBe(1);
+  });
+
+  it("settles scale-only tweens to unbaked geometry when cancelled", () => {
+    const parent = new Container();
+    const animationBus = createAnimationBus();
+    const prevElement = createRect({
+      width: 100,
+      height: 80,
+      scaleX: 2,
+      scaleY: 0.5,
+    });
+    const nextElement = createRect({
+      width: 100,
+      height: 80,
+      scaleX: 3,
+      scaleY: 1.5,
+    });
+    const rect = mountRect(parent, prevElement, animationBus);
+    const animations = normalizeAnimations([
+      {
+        id: "scale-only",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          scaleX: { auto: { duration: 1000 } },
+          scaleY: { auto: { duration: 1000 } },
+        },
+      },
+    ]);
+
+    updateRect({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations,
+      animationBus,
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+    animationBus.flush();
+    animationBus.tick(250);
+    animationBus.cancelAllExcept(new Set());
+
+    expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(100);
+    expect(getRectStyleAnimationValue(rect, "rect.height")).toBe(80);
+    expect(rect.scale.x).toBe(3);
+    expect(rect.scale.y).toBe(1.5);
+    expect(getRectStyleAnimationValue(rect, "rect.width") * rect.scale.x).toBe(
+      nextElement.width,
+    );
+    expect(getRectStyleAnimationValue(rect, "rect.height") * rect.scale.y).toBe(
+      nextElement.height,
+    );
+
+    updateRect({
+      app,
+      parent,
+      prevElement: nextElement,
+      nextElement,
+      animations: [],
+      animationBus,
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+
+    expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(
+      nextElement.width,
+    );
+    expect(getRectStyleAnimationValue(rect, "rect.height")).toBe(
+      nextElement.height,
+    );
+    expect(rect.scale.x).toBe(1);
+    expect(rect.scale.y).toBe(1);
+  });
+
+  it("reveals an authored zero-width border without losing its styling", () => {
+    const parent = new Container();
+    const animationBus = createAnimationBus();
+    const prevElement = createRect({
+      border: { width: 0, color: "#ff0000", alpha: 0.35 },
+    });
+    const nextElement = createRect({
+      border: { width: 8, color: "#ff0000", alpha: 0.35 },
+    });
+    const rect = mountRect(parent, prevElement, animationBus);
+    const animations = normalizeAnimations([
+      {
+        id: "reveal-border",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          border: {
+            width: {
+              initialValue: 0,
+              keyframes: [{ duration: 1000, value: 8 }],
+            },
+          },
+        },
+      },
+    ]);
+
+    updateRect({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations,
+      animationBus,
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+    animationBus.flush();
+    animationBus.tick(500);
+
+    expect(getRectStyleAnimationValue(rect, "rect.border.width")).toBe(4);
+    expect(getRectStyleAnimationValue(rect, "rect.border.color")).toEqual([
+      1, 0, 0, 1,
+    ]);
+    expect(getRectStyleAnimationValue(rect, "rect.border.alpha")).toBe(0.35);
+  });
+
   it("animates gradient geometry, offsets, and colors", () => {
     const parent = new Container();
     const animationBus = createAnimationBus();

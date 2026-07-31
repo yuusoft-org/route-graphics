@@ -354,10 +354,20 @@ const addFillTargetState = (targetState, fill) => {
   });
 };
 
-export const getRectStyleTargetState = (element) => {
+const removeBakedScale = (dimension, scale) =>
+  typeof scale === "number" && scale !== 0 ? dimension / scale : dimension;
+
+export const getRectStyleTargetState = (
+  element,
+  { liveScaleX = false, liveScaleY = false } = {},
+) => {
   const targetState = {
-    "rect.width": element.width,
-    "rect.height": element.height,
+    "rect.width": liveScaleX
+      ? removeBakedScale(element.width, element.scaleX)
+      : element.width,
+    "rect.height": liveScaleY
+      ? removeBakedScale(element.height, element.scaleY)
+      : element.height,
     "rect.border.width": element.border?.width ?? 0,
     "rect.border.color": colorToArray(element.border?.color ?? "black"),
     "rect.border.alpha": element.border?.alpha ?? 1,

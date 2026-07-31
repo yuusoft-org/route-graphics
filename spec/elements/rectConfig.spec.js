@@ -74,6 +74,34 @@ describe("rect runtime validation", () => {
     ).not.toThrow();
   });
 
+  it("retains latent border styling when the authored width is zero", () => {
+    expect(
+      parseRect({
+        state: createRect({
+          border: { width: 0, color: "#ff0000", alpha: 0.35 },
+        }),
+      }).border,
+    ).toEqual({
+      width: 0,
+      color: "#ff0000",
+      alpha: 0.35,
+    });
+  });
+
+  it("normalizes an authored border with an omitted width to zero", () => {
+    expect(
+      parseRect({
+        state: createRect({
+          border: { color: "#00ff00", alpha: 0.4 },
+        }),
+      }).border,
+    ).toEqual({
+      width: 0,
+      color: "#00ff00",
+      alpha: 0.4,
+    });
+  });
+
   it.each([
     ["unknown root property", { mystery: true }, "rect.mystery"],
     ["missing id", { id: undefined }, "rect.id"],

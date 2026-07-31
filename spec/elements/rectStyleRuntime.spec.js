@@ -226,6 +226,38 @@ describe("rect style animation runtime", () => {
     });
   });
 
+  it("removes baked geometry scale only on axes using a live scale tween", () => {
+    expect(
+      getRectStyleTargetState(
+        createElement({
+          width: 300,
+          height: 50,
+          scaleX: 1.5,
+          scaleY: 0.5,
+        }),
+        { liveScaleX: true },
+      ),
+    ).toMatchObject({
+      "rect.width": 200,
+      "rect.height": 50,
+    });
+
+    expect(
+      getRectStyleTargetState(
+        createElement({
+          width: 300,
+          height: 50,
+          scaleX: 1.5,
+          scaleY: 0.5,
+        }),
+        { liveScaleY: true },
+      ),
+    ).toMatchObject({
+      "rect.width": 300,
+      "rect.height": 100,
+    });
+  });
+
   it("exposes gradient geometry and indexed stop targets", () => {
     const targets = getRectStyleTargetState(
       createElement({

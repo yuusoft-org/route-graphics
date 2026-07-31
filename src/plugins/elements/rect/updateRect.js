@@ -1,8 +1,12 @@
 import { isDeepEqual } from "../../../util/isDeepEqual.js";
-import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
+import {
+  dispatchLiveAnimations,
+  getLiveAnimations,
+} from "../../animations/planAnimations.js";
 import {
   applyElementTransform,
   getElementTransformTargetState,
+  refreshElementPivot,
 } from "../util/transform.js";
 import {
   getBlurTargetState,
@@ -76,26 +80,80 @@ export const updateRect = ({
     animations,
     targetId: prevElement.id,
   });
-  installRectStyleRuntime(rectElement, prevElement, (property, runtime) => {
-    drawRectVisual(rectElement, runtime.state, {
-      ...runtime.element,
-      ...runtime.state,
-    });
-    const dimensionChanged =
-      property === "rect.width" ||
-      property === "rect.height" ||
-      property?.has?.("rect.width") ||
-      property?.has?.("rect.height");
-    if (dimensionChanged) {
-      syncShaderFilters(rectElement, runtime.element.filters, {
-        width: runtime.state.width,
-        height: runtime.state.height,
-        force: shouldForceShaderProgress,
-        animations,
-        targetId: prevElement.id,
-      });
-    }
+  const liveAnimations = getLiveAnimations(animations, prevElement.id);
+  const liveScaleX = liveAnimations.some(
+    (animation) => animation.tween?.scaleX !== undefined,
+  );
+  const liveScaleY = liveAnimations.some(
+    (animation) => animation.tween?.scaleY !== undefined,
+  );
+  const rectStyleTargetState = getRectStyleTargetState(nextElement, {
+    liveScaleX,
+    liveScaleY,
   });
+  const rectStyleRuntime = installRectStyleRuntime(
+    rectElement,
+    prevElement,
+    (property, runtime) => {
+      drawRectVisual(rectElement, runtime.state, {
+        ...runtime.element,
+        ...runtime.state,
+      });
+      const dimensionChanged =
+        property === "rect.width" ||
+        property === "rect.height" ||
+        property?.has?.("rect.width") ||
+        property?.has?.("rect.height");
+      if (dimensionChanged) {
+        syncShaderFilters(rectElement, runtime.element.filters, {
+          width: runtime.state.width,
+          height: runtime.state.height,
+          force: shouldForceShaderProgress,
+          animations,
+          targetId: prevElement.id,
+        });
+      }
+    },
+  );
+  const rectStyleStartState = getRectStyleTargetState(prevElement, {
+    liveScaleX,
+    liveScaleY,
+  });
+  const hasBakedWidth =
+    liveScaleX &&
+    rectElement.scale.x === 1 &&
+    rectStyleRuntime.state.width === prevElement.width;
+  const hasBakedHeight =
+    liveScaleY &&
+    rectElement.scale.y === 1 &&
+    rectStyleRuntime.state.height === prevElement.height;
+  const shouldFlattenWidth = !liveScaleX && rectElement.scale.x !== 1;
+  const shouldFlattenHeight = !liveScaleY && rectElement.scale.y !== 1;
+
+  if (
+    hasBakedWidth ||
+    hasBakedHeight ||
+    shouldFlattenWidth ||
+    shouldFlattenHeight
+  ) {
+    rectStyleRuntime.beginBatch();
+    if (shouldFlattenWidth) {
+      rectElement.scale.x = 1;
+      rectStyleRuntime["rect.width"] = prevElement.width;
+    } else if (hasBakedWidth) {
+      rectElement.scale.x = prevElement.scaleX ?? 1;
+      rectStyleRuntime["rect.width"] = rectStyleStartState["rect.width"];
+    }
+    if (shouldFlattenHeight) {
+      rectElement.scale.y = 1;
+      rectStyleRuntime["rect.height"] = prevElement.height;
+    } else if (hasBakedHeight) {
+      rectElement.scale.y = prevElement.scaleY ?? 1;
+      rectStyleRuntime["rect.height"] = rectStyleStartState["rect.height"];
+    }
+    refreshElementPivot(rectElement);
+    rectStyleRuntime.endBatch();
+  }
   const targetState = getElementTransformTargetState(nextElement, { alpha });
 
   if (scaleX !== undefined) {
@@ -147,7 +205,7 @@ export const updateRect = ({
     element: rectElement,
     targetState: {
       ...targetState,
-      ...getRectStyleTargetState(nextElement),
+      ...rectStyleTargetState,
       ...getBlurTargetState(nextElement, { force: shouldForceBlur }),
       ...getShaderFilterTargetState(nextElement, {
         force: shouldForceShaderProgress,

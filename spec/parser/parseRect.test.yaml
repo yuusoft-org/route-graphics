@@ -131,6 +131,10 @@ out:
   fill: red
   scaleX: 1.2
   scaleY: 0.8
+  border:
+    width: 0
+    color: black
+    alpha: 0.8
   rotation: 90
   alpha: 1
 ---
@@ -160,6 +164,39 @@ out:
   originY: 40
   scaleX: 1.2
   scaleY: 0.8
+  border:
+    width: 0
+    color: black
+    alpha: 0.8
+  rotation: 0
+  alpha: 1
+---
+case: Test parsing rect preserves an authored zero-width border
+in:
+  - state:
+      id: rect-latent-border
+      type: rect
+      width: 80
+      height: 100
+      x: 10
+      "y": 20
+      border:
+        width: 0
+        color: red
+        alpha: 0.4
+out:
+  id: rect-latent-border
+  type: rect
+  width: 80
+  height: 100
+  x: 10
+  "y": 20
+  originX: 0
+  originY: 0
+  border:
+    width: 0
+    color: red
+    alpha: 0.4
   rotation: 0
   alpha: 1
 ---
