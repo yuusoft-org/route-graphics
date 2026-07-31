@@ -487,6 +487,23 @@ Changing only parameter values updates existing effects in place. Source,
 passes, static uniforms, textures, pipeline, mesh, or pass-option changes
 rebuild the effect. The renderer caches compiled programs by source.
 
+## Invalid Shader Input
+
+Shader objects are strict. Unknown keys at the effect, pass, source, pipeline,
+mesh, texture, and typed-parameter levels are rejected instead of being
+ignored. Parameter values must be finite and animation values must match the
+declared scalar, vector, or matrix shape.
+
+`parse(...)` checks configuration and animation bindings. `render(...)` also
+preflights programs before changing the display tree. Invalid configuration,
+an unloaded custom texture, or a synchronous WebGL compiler/linker failure
+throws a contextual Route Graphics shader error and leaves the last good scene
+mounted.
+
+WebGPU layout and module creation are preflighted synchronously. The WebGPU API
+reports final driver compiler diagnostics asynchronously, so those final
+messages can still be delivered by the browser after `render(...)` returns.
+
 The intentional boundaries are:
 
 - source is inline; there is no root registry or source-file reference

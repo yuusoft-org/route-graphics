@@ -10,6 +10,30 @@ const createMockBounds = (width, height) => ({
   },
 });
 
+const createRejectingWebGLCompiler = () => {
+  const gl = {
+    VERTEX_SHADER: 1,
+    FRAGMENT_SHADER: 2,
+    COMPILE_STATUS: 3,
+    LINK_STATUS: 4,
+    createShader: vi.fn((type) => ({ type })),
+    shaderSource: vi.fn(),
+    compileShader: vi.fn((shader) => {
+      shader.compiled = shader.type !== gl.FRAGMENT_SHADER;
+    }),
+    getShaderParameter: vi.fn((shader) => shader.compiled),
+    getShaderInfoLog: vi.fn(() => "intentional fragment compiler failure"),
+    deleteShader: vi.fn(),
+    createProgram: vi.fn(() => ({})),
+    attachShader: vi.fn(),
+    linkProgram: vi.fn(),
+    getProgramParameter: vi.fn(() => true),
+    getProgramInfoLog: vi.fn(() => ""),
+    deleteProgram: vi.fn(),
+  };
+  return gl;
+};
+
 const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
   let lastApplication = null;
   const assetCache = new Map();
@@ -498,6 +522,88 @@ describe("RouteGraphics public API", () => {
         },
       }),
     ).rejects.toThrow(/Expected "webgl" or "webgpu"/);
+  });
+
+  it("keeps the last good scene when shader preflight fails", async () => {
+    const gl = createRejectingWebGLCompiler();
+    const { app } = await setupRouteGraphics({
+      rendererOverrides: { gl },
+      pluginsFactory: async () => {
+        const { rectPlugin } =
+          await import("../src/plugins/elements/rect/index.js");
+        return {
+          elements: [rectPlugin],
+          animations: [],
+          audio: [],
+        };
+      },
+    });
+    const source = {
+      webgl: {
+        fragment: `
+          in vec2 vTextureCoord;
+          out vec4 finalColor;
+          uniform sampler2D uTexture;
+          void main() { finalColor = texture(uTexture, vTextureCoord); }
+        `,
+      },
+      webgpu: {
+        source: `
+          struct VSOutput {
+            @builtin(position) position: vec4<f32>,
+            @location(0) uv: vec2<f32>,
+          };
+          @vertex fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput {
+            return VSOutput(vec4<f32>(aPosition, 0.0, 1.0), aPosition);
+          }
+          @fragment fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+            return vec4<f32>(uv, 0.0, 1.0);
+          }
+        `,
+      },
+    };
+
+    app.render({
+      id: "good",
+      elements: [
+        {
+          id: "card",
+          type: "rect",
+          x: 10,
+          y: 20,
+          width: 100,
+          height: 50,
+          fill: "#ffffff",
+        },
+      ],
+    });
+
+    expect(() =>
+      app.render({
+        id: "invalid-shader",
+        elements: [
+          {
+            id: "card",
+            type: "rect",
+            x: 99,
+            y: 20,
+            width: 100,
+            height: 50,
+            fill: "#ffffff",
+            filters: [
+              {
+                id: "broken",
+                type: "shader",
+                source,
+              },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(
+      /element "card" shader filter "broken".*intentional fragment compiler failure/,
+    );
+    expect(app.findElementByLabel("card")?.x).toBe(10);
   });
 
   it("unloads and reloads buffer-backed textures", async () => {

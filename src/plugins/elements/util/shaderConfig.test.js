@@ -84,6 +84,154 @@ describe("shader config normalization", () => {
     ).toThrow(/duplicate shader symbol uNoiseTexture/);
   });
 
+  it.each([
+    [
+      "effect",
+      { paddding: 12 },
+      /Input Error: filters\[0\]\.paddding is not supported/,
+    ],
+    [
+      "pipeline",
+      { pipeline: { blend: "normal", textureWarp: "repeat" } },
+      /filters\[0\]\.pipeline\.textureWarp is not supported/,
+    ],
+    [
+      "mesh",
+      { mesh: { grid: [2, 2], columns: 2 } },
+      /filters\[0\]\.mesh\.columns is not supported/,
+    ],
+    [
+      "source",
+      { source: { ...source, language: "glsl" } },
+      /filters\[0\]\.source\.language is not supported/,
+    ],
+    [
+      "backend source",
+      {
+        source: {
+          ...source,
+          webgl: { ...source.webgl, entryPoint: "main" },
+        },
+      },
+      /filters\[0\]\.source\.webgl\.entryPoint is not supported/,
+    ],
+    [
+      "typed parameter",
+      {
+        parameters: {
+          amount: { type: "f32", value: 1, default: 0 },
+        },
+      },
+      /filters\[0\]\.parameters\.amount\.default is not supported/,
+    ],
+    [
+      "texture",
+      {
+        textures: {
+          noise: { src: "noise-texture", filtering: "linear" },
+        },
+      },
+      /filters\[0\]\.textures\.noise\.filtering is not supported/,
+    ],
+    [
+      "pass",
+      {
+        source: undefined,
+        passes: [{ id: "main", source, iterations: 2 }],
+      },
+      /filters\[0\]\.passes\[0\]\.iterations is not supported/,
+    ],
+  ])("rejects unknown %s keys", (_name, overrides, expected) => {
+    expect(() =>
+      normalizeElementShaderFilters([
+        {
+          id: "strict",
+          type: "shader",
+          source,
+          ...overrides,
+        },
+      ]),
+    ).toThrow(expected);
+  });
+
+  it("allows compositor tween while rejecting it on element filters", () => {
+    const compositor = normalizeShaderCompositor({
+      type: "shader",
+      source,
+      tween: {
+        progress: {
+          keyframes: [{ duration: 100, value: 1 }],
+        },
+      },
+    });
+
+    expect(compositor.type).toBe("shader");
+    expect(() =>
+      normalizeElementShaderFilters([
+        {
+          id: "filter",
+          type: "shader",
+          source,
+          tween: {},
+        },
+      ]),
+    ).toThrow(/filters\[0\]\.tween is not supported/);
+  });
+
+  it("requires real backend entry points rather than names in comments", () => {
+    expect(() =>
+      normalizeElementShaderFilters([
+        {
+          id: "missing-gl-main",
+          type: "shader",
+          source: {
+            ...source,
+            webgl: {
+              fragment: "// void main() is not an entry point",
+            },
+          },
+        },
+      ]),
+    ).toThrow(/webgl\.fragment must define void main\(\)/);
+
+    expect(() =>
+      normalizeElementShaderFilters([
+        {
+          id: "missing-wgsl-entry",
+          type: "shader",
+          source: {
+            ...source,
+            webgpu: {
+              source: `
+                // @vertex fn mainVertex() {}
+                // @fragment fn mainFragment() {}
+                fn helper() {}
+              `,
+            },
+          },
+        },
+      ]),
+    ).toThrow(/must define mainVertex and mainFragment/);
+  });
+
+  it("requires a non-empty main function in custom WebGL vertex source", () => {
+    expect(() =>
+      normalizeElementShaderFilters([
+        {
+          id: "bad-vertex",
+          type: "shader",
+          source: {
+            ...source,
+            webgl: {
+              ...source.webgl,
+              vertex: " ",
+            },
+          },
+        },
+      ]),
+    ).toThrow(/webgl\.vertex must be a non-empty string/);
+  });
+
   it("rejects generated custom-texture sampler symbol collisions", () => {
     expect(() =>
       normalizeElementShaderFilters([

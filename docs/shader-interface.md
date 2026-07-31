@@ -654,6 +654,7 @@ Normalization rejects:
 
 - missing WebGL or WebGPU source
 - WGSL without `mainVertex` and `mainFragment`
+- unknown effect, pass, source, pipeline, mesh, texture, or typed-value keys
 - duplicate filter ids or pass ids
 - invalid parameter/texture keys
 - generated symbol collisions
@@ -665,6 +666,25 @@ Normalization rejects:
 
 Animation dispatch reports the animation id, filter id, element id, and unknown
 parameter when a target cannot be resolved.
+
+`parse(...)` performs configuration and shader-animation binding validation.
+`render(...)` performs the same validation, then preflights shader programs
+before mutating the display tree. A rejected configuration or synchronous
+compiler failure leaves the last good scene and logical state in place.
+
+WebGL source is compiled and linked against the active WebGL context during
+preflight. Failures use a `RouteGraphicsShaderError` with a stable
+`ROUTE_GRAPHICS_SHADER_INVALID` code and diagnostic details for backend, phase,
+owner, effect, pass, source path, and shader stage.
+
+WebGPU layout extraction and shader-module creation are also preflighted.
+However, the WebGPU platform exposes final compiler diagnostics
+asynchronously. Errors detectable during synchronous preparation use the same
+Route Graphics diagnostic; final driver diagnostics can still arrive through
+the browser's WebGPU error reporting after `render(...)` returns.
+
+Successful program preflights are cached per renderer context and source, so an
+unchanged shader is not compiled twice merely for validation.
 
 Reserved symbols include `uTexture`, `uPrevTexture`, `uNextTexture`,
 `uNextTextureMatrix`, `uNextTextureClamp`, `uMaskTexture`, `uProgress`,

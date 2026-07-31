@@ -30,6 +30,8 @@ import {
 } from "./plugins/elements/video/managedVideoTextureSizing.js";
 import { hitTestElementBounds as hitTestElementBoundsInTree } from "./util/hitTestElementBounds.js";
 import { setShaderTimeInTree } from "./plugins/elements/util/shaderFilterEffect.js";
+import { validateShaderAnimationBindings } from "./plugins/elements/util/shaderStateValidation.js";
+import { validateShaderProgramsForRenderer } from "./renderer/pixi/shaderProgramValidation.js";
 
 /**
  * @typedef {import('./types.js').RouteGraphicsInitOptions} RouteGraphicsInitOptions
@@ -1277,14 +1279,15 @@ const createRouteGraphics = () => {
       eventHandler: handler,
     });
 
-    state = nextState;
-
     // Present the updated stage immediately instead of relying on Pixi's
     // implicit auto-render loop, which can fail in VT/manual browser runs.
     if (typeof appInstance.render === "function") {
       setShaderTimeInTree(appInstance.stage, shaderTimeMS / 1000);
       appInstance.render();
     }
+
+    // Commit logical state only after the renderer accepts the frame.
+    state = nextState;
 
     // Fire stateComplete immediately if no animations/reveals to track
     completionTracker.completeIfEmpty();
@@ -2169,6 +2172,11 @@ const createRouteGraphics = () => {
         parserPlugins: plugins.parsers,
       });
       const parsedState = { ...normalizedState, elements: parsedElements };
+      validateShaderAnimationBindings(parsedState);
+      validateShaderProgramsForRenderer({
+        renderer: app.renderer,
+        state: parsedState,
+      });
       renderInternal(app, app.stage, parsedState, eventHandler);
     },
 
@@ -2183,6 +2191,7 @@ const createRouteGraphics = () => {
         parserPlugins: plugins.parsers,
       });
       const parsedState = { ...normalizedState, elements: parsedElements };
+      validateShaderAnimationBindings(parsedState);
       return parsedState;
     },
   };

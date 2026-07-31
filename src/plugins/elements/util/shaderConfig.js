@@ -7,6 +7,44 @@ const SHADER_FILTER_TYPES = new Set(["shader"]);
 const BLEND_MODES = new Set(["normal", "add", "multiply", "screen"]);
 const TEXTURE_WRAP_MODES = new Set(["clamp", "repeat"]);
 const ANTIALIAS_MODES = new Set(["on", "off", "inherit"]);
+const SHADER_EFFECT_KEYS = new Set([
+  "type",
+  "id",
+  "parameters",
+  "uniforms",
+  "textures",
+  "pipeline",
+  "mesh",
+  "padding",
+  "resolution",
+  "antialias",
+  "clipToViewport",
+  "time",
+  "source",
+  "passes",
+]);
+const SHADER_COMPOSITOR_KEYS = new Set([...SHADER_EFFECT_KEYS, "tween"]);
+const SHADER_PASS_KEYS = new Set([
+  "id",
+  "source",
+  "uniforms",
+  "textures",
+  "pipeline",
+  "mesh",
+  "padding",
+  "resolution",
+  "antialias",
+  "clipToViewport",
+  "time",
+]);
+const SHADER_PIPELINE_KEYS = new Set(["blend", "textureWrap", "mipmap"]);
+const SHADER_MESH_KEYS = new Set(["grid"]);
+const SHADER_SOURCE_KEYS = new Set(["webgl", "webgpu"]);
+const WEBGL_SOURCE_KEYS = new Set(["vertex", "fragment"]);
+const WEBGPU_SOURCE_KEYS = new Set(["source"]);
+const SHADER_TEXTURE_KEYS = new Set(["src", "wrap", "mipmap"]);
+const TYPED_UNIFORM_KEYS = new Set(["type", "value"]);
+const shaderDiagnosticPaths = new WeakMap();
 
 const UNIFORM_TYPE_ALIASES = new Map([
   ["f32", "f32"],
@@ -69,8 +107,24 @@ const assertPlainObject = (value, path) => {
   }
 };
 
+const assertKnownKeys = (value, path, allowedKeys) => {
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`Input Error: ${path}.${key} is not supported`);
+    }
+  }
+};
+
+const recordShaderDiagnosticPath = (value, path) => {
+  shaderDiagnosticPaths.set(value, path);
+  return value;
+};
+
+export const getShaderDiagnosticPath = (value, fallback = "shader") =>
+  shaderDiagnosticPaths.get(value) ?? fallback;
+
 const assertNonEmptyString = (value, path) => {
-  if (typeof value !== "string" || value.length === 0) {
+  if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`Input Error: ${path} must be a non-empty string`);
   }
 };
@@ -82,6 +136,17 @@ const assertShaderKey = (key, path) => {
     );
   }
 };
+
+const stripShaderComments = (source) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+const hasGLSLMain = (source) =>
+  /\bvoid\s+main\s*\(/.test(stripShaderComments(source));
+
+const hasWGSLEntryPoint = (source, stage, name) =>
+  new RegExp(`@${stage}\\s+fn\\s+${name}\\s*\\(`).test(
+    stripShaderComments(source),
+  );
 
 const toPascalCase = (key) => key.charAt(0).toUpperCase() + key.slice(1);
 
@@ -144,6 +209,7 @@ const inferUniformType = (value, path) => {
 };
 
 const normalizeTypedUniformValue = (descriptor, path) => {
+  assertKnownKeys(descriptor, path, TYPED_UNIFORM_KEYS);
   const type = UNIFORM_TYPE_ALIASES.get(descriptor.type);
   if (!type) {
     throw new Error(
@@ -254,6 +320,7 @@ const normalizeTextureDescriptor = (
   }
 
   assertPlainObject(value, path);
+  assertKnownKeys(value, path, SHADER_TEXTURE_KEYS);
   assertNonEmptyString(value.src, `${path}.src`);
 
   const wrap = value.wrap ?? pipeline.textureWrap;
@@ -336,6 +403,7 @@ const normalizeShaderTextures = ({
 const normalizeShaderPipeline = (pipeline, path, defaults = {}) => {
   if (pipeline !== undefined) {
     assertPlainObject(pipeline, path);
+    assertKnownKeys(pipeline, path, SHADER_PIPELINE_KEYS);
   }
 
   const blend = pipeline?.blend ?? defaults.blend ?? "normal";
@@ -366,22 +434,32 @@ const normalizeShaderPipeline = (pipeline, path, defaults = {}) => {
 
 const normalizeShaderSource = (source, path) => {
   assertPlainObject(source, path);
+  assertKnownKeys(source, path, SHADER_SOURCE_KEYS);
   assertPlainObject(source.webgl, `${path}.webgl`);
+  assertKnownKeys(source.webgl, `${path}.webgl`, WEBGL_SOURCE_KEYS);
   assertPlainObject(source.webgpu, `${path}.webgpu`);
+  assertKnownKeys(source.webgpu, `${path}.webgpu`, WEBGPU_SOURCE_KEYS);
 
-  if (
-    source.webgl.vertex !== undefined &&
-    typeof source.webgl.vertex !== "string"
-  ) {
-    throw new Error(`Input Error: ${path}.webgl.vertex must be a string`);
+  if (source.webgl.vertex !== undefined) {
+    assertNonEmptyString(source.webgl.vertex, `${path}.webgl.vertex`);
+    if (!hasGLSLMain(source.webgl.vertex)) {
+      throw new Error(
+        `Input Error: ${path}.webgl.vertex must define void main()`,
+      );
+    }
   }
 
   assertNonEmptyString(source.webgl.fragment, `${path}.webgl.fragment`);
   assertNonEmptyString(source.webgpu.source, `${path}.webgpu.source`);
+  if (!hasGLSLMain(source.webgl.fragment)) {
+    throw new Error(
+      `Input Error: ${path}.webgl.fragment must define void main()`,
+    );
+  }
 
   if (
-    !source.webgpu.source.includes("mainVertex") ||
-    !source.webgpu.source.includes("mainFragment")
+    !hasWGSLEntryPoint(source.webgpu.source, "vertex", "mainVertex") ||
+    !hasWGSLEntryPoint(source.webgpu.source, "fragment", "mainFragment")
   ) {
     throw new Error(
       `Input Error: ${path}.webgpu.source must define mainVertex and mainFragment`,
@@ -408,6 +486,7 @@ const normalizeShaderMesh = (mesh, path, defaultMesh) => {
   }
 
   assertPlainObject(candidate, path);
+  assertKnownKeys(candidate, path, SHADER_MESH_KEYS);
   if (
     !Array.isArray(candidate.grid) ||
     candidate.grid.length !== 2 ||
@@ -476,6 +555,7 @@ const normalizeEffectPass = ({
   textureLimit,
 }) => {
   assertPlainObject(pass, path);
+  assertKnownKeys(pass, path, SHADER_PASS_KEYS);
 
   const id = pass.id ?? `pass${index + 1}`;
   assertNonEmptyString(id, `${path}.id`);
@@ -508,23 +588,37 @@ const normalizeEffectPass = ({
     mipmap: texture.mipmap ?? pipeline.mipmap,
   }));
 
-  return {
-    id,
-    source: normalizeShaderSource(pass.source, `${path}.source`),
-    uniforms: [...parameters, ...uniforms].sort((a, b) =>
-      a.key.localeCompare(b.key),
-    ),
-    textures: [...resolvedCommonTextures, ...textures].sort((a, b) =>
-      a.key.localeCompare(b.key),
-    ),
-    pipeline,
-    mesh: normalizeShaderMesh(pass.mesh, `${path}.mesh`, effectMesh),
-    ...normalizePassOptions(pass, path, effectOptions),
-  };
+  return recordShaderDiagnosticPath(
+    {
+      id,
+      source: normalizeShaderSource(pass.source, `${path}.source`),
+      uniforms: [...parameters, ...uniforms].sort((a, b) =>
+        a.key.localeCompare(b.key),
+      ),
+      textures: [...resolvedCommonTextures, ...textures].sort((a, b) =>
+        a.key.localeCompare(b.key),
+      ),
+      pipeline,
+      mesh: normalizeShaderMesh(pass.mesh, `${path}.mesh`, effectMesh),
+      ...normalizePassOptions(pass, path, effectOptions),
+    },
+    path,
+  );
 };
 
-const normalizeShaderConfig = ({ shader, path, requireId, textureLimit }) => {
+const normalizeShaderConfig = ({
+  shader,
+  path,
+  requireId,
+  textureLimit,
+  allowTween = false,
+}) => {
   assertPlainObject(shader, path);
+  assertKnownKeys(
+    shader,
+    path,
+    allowTween ? SHADER_COMPOSITOR_KEYS : SHADER_EFFECT_KEYS,
+  );
 
   if (!SHADER_FILTER_TYPES.has(shader.type)) {
     throw new Error(`Input Error: ${path}.type must be shader`);
@@ -615,7 +709,7 @@ const normalizeShaderConfig = ({ shader, path, requireId, textureLimit }) => {
     return normalizedPass;
   });
 
-  return normalized;
+  return recordShaderDiagnosticPath(normalized, path);
 };
 
 export const normalizeElementShaderFilters = (filters, path = "filters") => {
@@ -651,6 +745,7 @@ export const normalizeShaderCompositor = (compositor, path = "compositor") =>
     path,
     requireId: false,
     textureLimit: COMPOSITOR_TEXTURE_LIMIT,
+    allowTween: true,
   });
 
 export const getShaderConfigSignature = (config) =>
