@@ -210,7 +210,7 @@ export const calculateMaxDuration = (timelines) => {
 
 export const getValueAtTime = (timeline, currentTime) => {
   if (timeline.length === 0) return 0;
-  if (currentTime <= timeline[0].time) return timeline[0].value;
+  if (currentTime < timeline[0].time) return timeline[0].value;
   if (currentTime >= timeline[timeline.length - 1].time) {
     return timeline[timeline.length - 1].value;
   }
@@ -219,7 +219,7 @@ export const getValueAtTime = (timeline, currentTime) => {
     const { time: startTime, value: startValue } = timeline[i];
     const { time: endTime, value: endValue, easing } = timeline[i + 1];
 
-    if (currentTime >= startTime && currentTime <= endTime) {
+    if (currentTime >= startTime && currentTime < endTime) {
       const t = (currentTime - startTime) / (endTime - startTime);
       return interpolateTweenValues(
         startValue,

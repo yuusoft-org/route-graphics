@@ -120,14 +120,40 @@ describe("animationTimeline easings", () => {
     expect(getValueAtTime(timeline, 600)).toBe(110);
   });
 
-  it("supports a pure delayed step with zero interpolation duration", () => {
+  it("resolves a delayed zero-duration step at its boundary", () => {
     const timeline = buildTimeline([
       { value: 0 },
       { delay: 250, duration: 0, value: 1 },
+      { duration: 250, value: 2, easing: "linear" },
     ]);
 
-    expect(calculateMaxDuration([{ timeline }])).toBe(250);
+    expect(calculateMaxDuration([{ timeline }])).toBe(500);
     expect(getValueAtTime(timeline, 249.999)).toBe(0);
     expect(getValueAtTime(timeline, 250)).toBe(1);
+    expect(getValueAtTime(timeline, 375)).toBeCloseTo(1.5);
+  });
+
+  it("resolves consecutive zero-duration steps to the last value at a timestamp", () => {
+    const timeline = buildTimeline([
+      { value: 0 },
+      { delay: 250, duration: 0, value: 1 },
+      { duration: 0, value: 2 },
+      { duration: 250, value: 3, easing: "linear" },
+    ]);
+
+    expect(getValueAtTime(timeline, 249.999)).toBe(0);
+    expect(getValueAtTime(timeline, 250)).toBe(2);
+    expect(getValueAtTime(timeline, 375)).toBeCloseTo(2.5);
+  });
+
+  it("resolves zero-duration steps at the initial timestamp", () => {
+    const timeline = buildTimeline([
+      { value: 0 },
+      { duration: 0, value: 1 },
+      { duration: 100, value: 2, easing: "linear" },
+    ]);
+
+    expect(getValueAtTime(timeline, 0)).toBe(1);
+    expect(getValueAtTime(timeline, 50)).toBeCloseTo(1.5);
   });
 });
