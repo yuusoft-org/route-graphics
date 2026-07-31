@@ -252,7 +252,8 @@ animations:
               - duration: 500
                 value: 1
                 easing: easeInOutSine
-              - duration: 500
+              - delay: 250
+                duration: 500
                 value: 0.2
                 easing: easeInOutSine
           tint:
@@ -266,6 +267,10 @@ An update animation may combine ordinary properties and any number of filter
 ids in one `tween`. Arrays interpolate component by component. Missing initial
 values come from the filter's current parameters. Only one active animation
 may write a particular target/filter/parameter channel.
+
+Shader parameter keyframes accept the same optional `delay` as ordinary
+tweens. It must be a finite number greater than or equal to zero and holds the
+previous scalar, vector, or matrix value before that segment starts.
 
 Use `progress` to animate one filter's built-in `uProgress`:
 

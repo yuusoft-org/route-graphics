@@ -3,6 +3,138 @@ import { createAnimationBus } from "../../src/plugins/animations/animationBus.js
 import { applyElementTransform } from "../../src/plugins/elements/util/transform.js";
 
 describe("animationBus auto tween shorthand", () => {
+  it("holds auto tween values for the configured delay before interpolation", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "delayed-auto-x",
+        element,
+        properties: {
+          x: {
+            auto: {
+              delay: 200,
+              duration: 400,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 120 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    expect(animationBus.getState().animations[0].duration).toBe(600);
+
+    animationBus.tick(200);
+    expect(element.x).toBe(20);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    animationBus.tick(200);
+    expect(element.x).toBeCloseTo(70);
+
+    animationBus.tick(200);
+    expect(element.x).toBeCloseTo(120);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies playback speed to both auto delay and interpolation", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "fast-delayed-auto-x",
+        playbackSpeed: 2,
+        element,
+        properties: {
+          x: {
+            auto: {
+              delay: 200,
+              duration: 400,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 120 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(99);
+    expect(element.x).toBe(20);
+
+    animationBus.tick(101);
+    expect(element.x).toBeCloseTo(70);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    animationBus.tick(100);
+    expect(element.x).toBe(120);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds a manual timeline between two keyframe segments", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 0,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "delayed-manual-x",
+        element,
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [
+              { duration: 100, value: 100, easing: "linear" },
+              {
+                delay: 200,
+                duration: 100,
+                value: 200,
+                easing: "linear",
+              },
+            ],
+          },
+        },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    expect(animationBus.getState().animations[0].duration).toBe(400);
+
+    animationBus.tick(100);
+    expect(element.x).toBe(100);
+
+    animationBus.tick(199);
+    expect(element.x).toBe(100);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    animationBus.tick(51);
+    expect(element.x).toBeCloseTo(150);
+
+    animationBus.tick(50);
+    expect(element.x).toBe(200);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
   it("animates to the targetState value for auto tween properties", () => {
     const animationBus = createAnimationBus();
     const onComplete = vi.fn();
@@ -372,6 +504,45 @@ describe("animationBus auto tween shorthand", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
+  it("repeats delayed holds on every loop", () => {
+    const animationBus = createAnimationBus();
+    const element = {
+      x: 0,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "looping-delayed-x",
+        loop: true,
+        element,
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [
+              { delay: 100, duration: 100, value: 100, easing: "linear" },
+            ],
+          },
+        },
+      },
+    });
+
+    animationBus.setTime(50);
+    expect(element.x).toBe(0);
+
+    animationBus.setTime(150);
+    expect(element.x).toBeCloseTo(50);
+
+    animationBus.setTime(250);
+    expect(element.x).toBe(0);
+    expect(animationBus.getState().animations[0]).toMatchObject({
+      duration: 200,
+      currentTime: 50,
+      progress: 0.25,
+    });
+  });
+
   it("rejects looping animations without a positive finite duration", () => {
     const animationBus = createAnimationBus();
 
@@ -464,6 +635,43 @@ describe("animationBus auto tween shorthand", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
     expect(onBusComplete).not.toHaveBeenCalled();
+  });
+
+  it("settles the target state when cancelled during a delay", () => {
+    const animationBus = createAnimationBus();
+    const onCancel = vi.fn();
+    const element = {
+      x: 10,
+      alpha: 0.25,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "cancelled-delayed-update",
+        element,
+        properties: {
+          x: {
+            keyframes: [
+              { delay: 500, duration: 500, value: 110, easing: "linear" },
+            ],
+          },
+        },
+        targetState: { x: 110, alpha: 0.8 },
+        onCancel,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(250);
+    expect(element.x).toBe(10);
+
+    animationBus.dispatch({ type: "CANCEL", id: "cancelled-delayed-update" });
+    animationBus.flush();
+
+    expect(element).toMatchObject({ x: 110, alpha: 0.8 });
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it("applies property path mapping for auto scale tweens", () => {
@@ -915,6 +1123,45 @@ describe("animationBus auto tween shorthand", () => {
     expect(element.x).toBeCloseTo(50);
     expect(onCancel).not.toHaveBeenCalled();
     expect(animationBus.isAnimating("persistent-update")).toBe(true);
+  });
+
+  it("preserves progress while a persistent animation is inside its delay", () => {
+    const animationBus = createAnimationBus();
+    const element = {
+      x: 10,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "persistent-delayed-update",
+        animationType: "update",
+        targetId: "bg",
+        continuity: "persistent",
+        signature: '{"type":"update","delay":500}',
+        element,
+        properties: {
+          x: {
+            keyframes: [
+              { delay: 500, duration: 500, value: 110, easing: "linear" },
+            ],
+          },
+        },
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(300);
+    animationBus.cancelAllExcept(new Set(["persistent-delayed-update"]));
+    animationBus.tick(250);
+
+    expect(element.x).toBeCloseTo(20);
+    expect(animationBus.getState().animations[0]).toMatchObject({
+      currentTime: 550,
+      duration: 1000,
+      progress: 0.55,
+    });
   });
 
   it("exposes pending persistent contexts for continuity planning and cancels unkept ones", () => {

@@ -141,17 +141,18 @@ deterministic clock and cannot be tweened.
 
 Each update property accepts:
 
-| Field          | Type   | Required | Default                | Notes                                   |
-| -------------- | ------ | -------- | ---------------------- | --------------------------------------- |
-| `initialValue` | number | No       | current property value | Value sampled before the first segment. |
-| `keyframes`    | array  | Yes      | -                      | Ordered animation segments.             |
+| Field          | Type  | Required | Default                | Notes                                   |
+| -------------- | ----- | -------- | ---------------------- | --------------------------------------- |
+| `initialValue` | value | No       | current property value | Value sampled before the first segment. |
+| `keyframes`    | array | Yes      | -                      | Ordered animation segments.             |
 
 Each keyframe accepts:
 
 | Field      | Type    | Required | Default  | Notes                                              |
 | ---------- | ------- | -------- | -------- | -------------------------------------------------- |
-| `value`    | number  | Yes      | -        | Target value for this segment.                     |
-| `duration` | number  | Yes      | -        | Milliseconds used to reach this value.             |
+| `value`    | value   | Yes      | -        | Target value compatible with the animated channel. |
+| `delay`    | number  | No       | `0`      | Milliseconds to hold the previous value first.     |
+| `duration` | number  | Yes      | -        | Milliseconds used to reach this value after delay. |
 | `easing`   | string  | No       | `linear` | Easing used by the segment reaching this keyframe. |
 | `relative` | boolean | No       | `false`  | Treat `value` as a delta from the preceding value. |
 
@@ -174,6 +175,40 @@ animations:
             easing: linear
 ```
 
+### Delay And Holds
+
+Set `delay` on a keyframe to hold the preceding value before that keyframe's
+interpolation starts. A delay on the first keyframe holds `initialValue`, or
+the current live value when `initialValue` is omitted. A delay on a later
+keyframe creates an empty space between the two movements:
+
+```yaml
+tween:
+  x:
+    initialValue: 100
+    keyframes:
+      - delay: 300
+        duration: 400
+        value: 500
+        easing: easeOutQuad
+      - delay: 800
+        duration: 400
+        value: 900
+        easing: easeInQuad
+```
+
+This track holds `100` for 300 ms, moves to `500` over 400 ms, holds `500`
+for 800 ms, then moves to `900` over 400 ms. Its total duration is 1900 ms.
+
+`delay` is measured in milliseconds and must be a finite number greater than
+or equal to zero. It contributes to completion time, scales with
+`playback.speed`, and repeats as part of a loop. `delay: 0` is equivalent to
+omitting it. `duration` describes only the interpolation after the hold.
+
+The same delay behavior applies to ordinary properties, rect style and
+geometry tracks, shader filter parameters, transition `prev`/`next` surfaces,
+mask progress, and compositor progress or parameters.
+
 ## Automatic End Value
 
 Update properties also support `auto`, which generates one segment from the
@@ -187,6 +222,7 @@ animations:
     tween:
       x:
         auto:
+          delay: 200
           duration: 450
           easing: easeOutQuad
       y:
@@ -197,11 +233,13 @@ animations:
 
 | Field      | Type   | Required | Default  |
 | ---------- | ------ | -------- | -------- |
+| `delay`    | number | No       | `0`      |
 | `duration` | number | Yes      | -        |
 | `easing`   | string | No       | `linear` |
 
 `auto` and `keyframes` are mutually exclusive for one property. `auto` is not
-supported on `prev.tween` or `next.tween`.
+supported on `prev.tween` or `next.tween`. `auto.delay` holds the current live
+value before moving toward the next render state's value.
 
 ## Easing
 

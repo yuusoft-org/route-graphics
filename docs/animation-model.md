@@ -1,6 +1,6 @@
 # Animation Model
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 See also:
 
@@ -28,6 +28,7 @@ The runtime now exposes:
 - optional `playback.continuity: render | persistent` on `update` and `transition`
 - optional positive `playback.speed` on `update` and `transition`
 - optional infinite `playback.loop` on `update`
+- optional non-negative per-segment `delay`
 - independently targeted shader parameter timelines
 - inline single-pass and multi-pass transition compositors
 - composable mask plus compositor transitions
@@ -177,7 +178,8 @@ x:
     - duration: 450
       value: 180
       easing: "easeOutQuad"
-    - duration: 150
+    - delay: 300
+      duration: 150
       value: 220
       easing: "easeInQuad"
 ```
@@ -194,6 +196,14 @@ from the previous value. The first authored keyframe controls the segment from
 `initialValue` or the current live value to that keyframe. `auto.easing` follows
 the same rule for the single segment from the current live value to the next
 state value.
+
+Each keyframe may define a finite, non-negative `delay` in milliseconds. The
+runtime holds the previous value for that delay and then interpolates for the
+keyframe's `duration`. A first-keyframe delay holds `initialValue` or the
+current live value; a later delay creates a gap between segments. Total track
+duration is the sum of every `delay + duration`. Delays scale with
+`playback.speed` and repeat with the rest of a loop. Omitting `delay`, or
+setting it to `0`, starts the segment immediately.
 
 The same payload is reused in two places:
 
@@ -217,9 +227,12 @@ its current live value to the next state's value" case:
 ```yaml
 x:
   auto:
+    delay: 200
     duration: 450
     easing: "easeOutQuad"
 ```
+
+`auto.delay` holds the current live value before its generated segment starts.
 
 `keyframes` and `auto` are mutually exclusive on the same property.
 

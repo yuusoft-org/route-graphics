@@ -24,4 +24,21 @@ describe("animationTimeline numeric arrays", () => {
 
     expect(getValueAtTime(timeline, 100)).toEqual([3, 1]);
   });
+
+  it("holds vector values before applying a delayed relative keyframe", () => {
+    const timeline = buildTimeline([
+      { value: [1, 2] },
+      {
+        value: [2, -1],
+        delay: 50,
+        duration: 100,
+        easing: "linear",
+        relative: true,
+      },
+    ]);
+
+    expect(getValueAtTime(timeline, 25)).toEqual([1, 2]);
+    expect(getValueAtTime(timeline, 100)).toEqual([2, 1.5]);
+    expect(getValueAtTime(timeline, 150)).toEqual([3, 1]);
+  });
 });
