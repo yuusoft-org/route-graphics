@@ -990,6 +990,7 @@
         });
 
         window.addEventListener("snapShotVideoFrame", (event) => {
+          delete document.documentElement.dataset.vtVideoFrameReady;
           const videoElement = app.findElementByLabel(event.detail?.elementId);
           const source = videoElement?.texture?.source;
           const video = source?.resource;
@@ -998,13 +999,33 @@
           }
 
           video.pause();
-          const commitVideoFrame = () => {
+          let hasCommittedVideoFrame = false;
+          const commitVideoFrame = async () => {
+            if (hasCommittedVideoFrame) {
+              return;
+            }
+
+            if (
+              video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+              video.videoWidth <= 0 ||
+              video.videoHeight <= 0
+            ) {
+              requestAnimationFrame(commitVideoFrame);
+              return;
+            }
+
+            hasCommittedVideoFrame = true;
             video.pause();
             source.__routeGraphicsVideoTextureRuntime?.requestUpdate?.({
               force: true,
             });
             source.update?.();
-            void app.extractBase64();
+            try {
+              await app.extractBase64();
+            } finally {
+              document.documentElement.dataset.vtVideoFrameReady =
+                event.detail?.elementId ?? "ready";
+            }
           };
           const playUntilVideoFrame = () => {
             const requestedTime = Number(event.detail?.time ?? 0);
@@ -1018,9 +1039,10 @@
             const waitForPresentedVideoFrame = () => {
               if (typeof video.requestVideoFrameCallback === "function") {
                 video.requestVideoFrameCallback(commitVideoFrame);
-              } else {
-                requestAnimationFrame(commitVideoFrame);
               }
+              requestAnimationFrame(() => {
+                requestAnimationFrame(commitVideoFrame);
+              });
             };
             const seekableEnd =
               video.seekable.length > 0
