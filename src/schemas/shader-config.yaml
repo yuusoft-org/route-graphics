@@ -141,6 +141,11 @@ definitions:
           - $ref: "#/definitions/numericArray"
       duration:
         type: number
+      delay:
+        type: number
+        minimum: 0
+        default: 0
+        description: Time in milliseconds to hold the previous value before starting this keyframe segment.
       easing:
         $ref: "#/definitions/easing"
       relative:

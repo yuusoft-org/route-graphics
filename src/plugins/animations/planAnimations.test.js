@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeAnimations } from "../../util/normalizeAnimations.js";
 import { getAnimationContinuitySignature } from "./planAnimations.js";
 
 describe("getAnimationContinuitySignature", () => {
@@ -98,6 +99,90 @@ describe("getAnimationContinuitySignature", () => {
           loop: true,
         },
       }),
+    );
+  });
+
+  it("includes keyframe and auto delays in persistent signatures", () => {
+    const manual = {
+      id: "delayed-move",
+      targetId: "portrait",
+      type: "update",
+      playback: {
+        continuity: "persistent",
+      },
+      tween: {
+        x: {
+          keyframes: [
+            { delay: 100, duration: 1000, value: 400, easing: "linear" },
+          ],
+        },
+      },
+    };
+    const automatic = {
+      ...manual,
+      tween: {
+        x: {
+          auto: { delay: 100, duration: 1000, easing: "linear" },
+        },
+      },
+    };
+
+    expect(getAnimationContinuitySignature(manual)).not.toBe(
+      getAnimationContinuitySignature({
+        ...manual,
+        tween: {
+          x: {
+            keyframes: [
+              { delay: 200, duration: 1000, value: 400, easing: "linear" },
+            ],
+          },
+        },
+      }),
+    );
+    expect(getAnimationContinuitySignature(automatic)).not.toBe(
+      getAnimationContinuitySignature({
+        ...automatic,
+        tween: {
+          x: {
+            auto: { delay: 200, duration: 1000, easing: "linear" },
+          },
+        },
+      }),
+    );
+  });
+
+  it("treats an explicit zero delay like an omitted delay", () => {
+    const [withZero] = normalizeAnimations([
+      {
+        id: "zero-delay",
+        targetId: "portrait",
+        type: "update",
+        playback: { continuity: "persistent" },
+        tween: {
+          x: {
+            keyframes: [
+              { delay: 0, duration: 1000, value: 400, easing: "linear" },
+            ],
+          },
+        },
+      },
+    ]);
+    const [withoutDelay] = normalizeAnimations([
+      {
+        id: "zero-delay",
+        targetId: "portrait",
+        type: "update",
+        playback: { continuity: "persistent" },
+        tween: {
+          x: {
+            keyframes: [{ duration: 1000, value: 400, easing: "linear" }],
+          },
+        },
+      },
+    ]);
+
+    expect(getAnimationContinuitySignature(withZero)).toBe(
+      getAnimationContinuitySignature(withoutDelay),
     );
   });
 });

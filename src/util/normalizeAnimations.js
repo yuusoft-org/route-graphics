@@ -98,6 +98,14 @@ const assertPositiveFiniteNumber = (value, path) => {
   }
 };
 
+const assertNonNegativeFiniteNumber = (value, path) => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(
+      `${path} must be a finite number greater than or equal to 0.`,
+    );
+  }
+};
+
 const normalizePlayback = (playback, path) => {
   assertPlainObject(playback, path);
 
@@ -132,6 +140,10 @@ const normalizeAutoTween = (autoConfig, path) => {
   assertPlainObject(autoConfig, path);
   assertNumber(autoConfig.duration, `${path}.duration`);
 
+  if (autoConfig.delay !== undefined) {
+    assertNonNegativeFiniteNumber(autoConfig.delay, `${path}.delay`);
+  }
+
   if (
     autoConfig.easing !== undefined &&
     typeof autoConfig.easing !== "string"
@@ -151,6 +163,7 @@ const normalizeAutoTween = (autoConfig, path) => {
   return {
     duration: autoConfig.duration,
     easing: autoConfig.easing ?? "linear",
+    ...(autoConfig.delay > 0 ? { delay: autoConfig.delay } : {}),
   };
 };
 
@@ -182,6 +195,10 @@ const normalizeKeyframes = (
     assertValue(keyframe.value, `${keyframePath}.value`);
     assertNumber(keyframe.duration, `${keyframePath}.duration`);
 
+    if (keyframe.delay !== undefined) {
+      assertNonNegativeFiniteNumber(keyframe.delay, `${keyframePath}.delay`);
+    }
+
     if (keyframe.easing !== undefined && typeof keyframe.easing !== "string") {
       throw new Error(`${keyframePath}.easing must be a string.`);
     }
@@ -206,6 +223,7 @@ const normalizeKeyframes = (
       value: normalizeValue(keyframe.value),
       duration: keyframe.duration,
       easing: keyframe.easing ?? "linear",
+      ...(keyframe.delay > 0 ? { delay: keyframe.delay } : {}),
       ...(keyframe.relative !== undefined
         ? { relative: keyframe.relative }
         : {}),

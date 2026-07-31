@@ -1,6 +1,6 @@
 # Animation Implementation Plan
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 ## Purpose
 
@@ -25,6 +25,7 @@ The runtime and schema currently support:
 - `playback.continuity: render | persistent`
 - positive playback speed
 - non-blocking loops for updates
+- non-negative per-segment delays for manual and automatic tweens
 - manual deterministic sampling
 
 The old `operation`, `properties`, `subjects`, `live`, and `replace` public

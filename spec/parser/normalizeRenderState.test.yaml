@@ -56,6 +56,81 @@ out:
       src: sfx-1
   audioEffects: []
 ---
+case: Normalize keyframe and auto tween delays
+in:
+  - id: state-delayed-animation
+    elements:
+      - id: panel
+        type: rect
+    animations:
+      - id: delayed-panel
+        targetId: panel
+        type: update
+        tween:
+          x:
+            initialValue: 0
+            keyframes:
+              - delay: 250
+                duration: 300
+                value: 100
+          alpha:
+            auto:
+              delay: 400
+              duration: 500
+out:
+  id: state-delayed-animation
+  elements:
+    - id: panel
+      type: rect
+  animations:
+    - id: delayed-panel
+      targetId: panel
+      type: update
+      tween:
+        x:
+          initialValue: 0
+          keyframes:
+            - delay: 250
+              duration: 300
+              value: 100
+              easing: linear
+        alpha:
+          auto:
+            delay: 400
+            duration: 500
+            easing: linear
+  audio: []
+  audioEffects: []
+---
+case: Throw when a keyframe delay is negative
+in:
+  - id: state-invalid-keyframe-delay
+    animations:
+      - id: invalid-delay
+        targetId: panel
+        type: update
+        tween:
+          x:
+            keyframes:
+              - delay: -1
+                duration: 100
+                value: 20
+throws: animations[0].tween.x.keyframes[0].delay must be a finite number greater than or equal to 0.
+---
+case: Throw when an auto tween delay is negative
+in:
+  - id: state-invalid-auto-delay
+    animations:
+      - id: invalid-auto-delay
+        targetId: panel
+        type: update
+        tween:
+          x:
+            auto:
+              delay: -1
+              duration: 100
+throws: animations[0].tween.x.auto.delay must be a finite number greater than or equal to 0.
+---
 case: Normalize transition animation with mask defaults
 in:
   - id: state-2-replace

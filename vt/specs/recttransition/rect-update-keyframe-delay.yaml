@@ -1,0 +1,90 @@
+---
+title: Rect Update Keyframe Delay
+description: Manual keyframes and auto tweens honor their initial and inter-keyframe delays
+specs:
+  - both rects should remain at their initial positions during the first 300ms delay
+  - the white rect should interpolate during its first keyframe while the gray rect follows its delayed auto tween
+  - the white rect should hold at its first keyframe value during the 400ms gap before its second keyframe
+  - both rects should finish at the authored destination after 1500ms
+steps:
+  - action: keypress
+    key: "n"
+  - action: wait
+    ms: 300
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 400
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 600
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: manual-delay
+        type: rect
+        x: 120
+        "y": 160
+        width: 140
+        height: 120
+        fill: "#FFFFFF"
+      - id: auto-delay
+        type: rect
+        x: 120
+        "y": 420
+        width: 140
+        height: 120
+        fill: "#A6A6A6"
+  - elements:
+      - id: manual-delay
+        type: rect
+        x: 980
+        "y": 160
+        width: 140
+        height: 120
+        fill: "#FFFFFF"
+      - id: auto-delay
+        type: rect
+        x: 980
+        "y": 420
+        width: 140
+        height: 120
+        fill: "#A6A6A6"
+    animations:
+      - id: manual-keyframe-delay
+        targetId: manual-delay
+        type: update
+        tween:
+          x:
+            initialValue: 120
+            keyframes:
+              - delay: 300
+                duration: 400
+                value: 500
+                easing: linear
+              - delay: 400
+                duration: 400
+                value: 980
+                easing: linear
+      - id: auto-tween-delay
+        targetId: auto-delay
+        type: update
+        tween:
+          x:
+            auto:
+              delay: 300
+              duration: 1200
+              easing: linear

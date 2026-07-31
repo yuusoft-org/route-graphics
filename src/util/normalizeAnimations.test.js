@@ -45,6 +45,179 @@ const createCompositor = (overrides = {}) => ({
 });
 
 describe("normalizeAnimations shader support", () => {
+  it("normalizes delays for manual, auto, filter, mask, and compositor tracks", () => {
+    const [updateAnimation, transitionAnimation] = normalizeAnimations([
+      {
+        id: "delayed-update",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ delay: 100, duration: 200, value: 50 }],
+          },
+          alpha: {
+            auto: { delay: 150, duration: 250 },
+          },
+          y: {
+            auto: { delay: 0, duration: 250 },
+          },
+          filters: {
+            grade: {
+              tint: {
+                keyframes: [
+                  { delay: 300, duration: 400, value: [0.2, 0.4, 0.6] },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        id: "delayed-transition",
+        targetId: "scene",
+        type: "transition",
+        mask: {
+          kind: "single",
+          texture: "wipe",
+          progress: {
+            keyframes: [{ delay: 500, duration: 600, value: 1 }],
+          },
+        },
+        compositor: createCompositor({
+          parameters: { edgeWidth: 0.04 },
+          tween: {
+            progress: {
+              keyframes: [{ delay: 700, duration: 800, value: 1 }],
+            },
+            edgeWidth: {
+              keyframes: [{ delay: 900, duration: 1000, value: 0.12 }],
+            },
+          },
+        }),
+      },
+    ]);
+
+    expect(updateAnimation.tween.x.keyframes[0]).toMatchObject({
+      delay: 100,
+      duration: 200,
+      value: 50,
+    });
+    expect(updateAnimation.tween.alpha.auto).toEqual({
+      delay: 150,
+      duration: 250,
+      easing: "linear",
+    });
+    expect(updateAnimation.tween.y.auto).toEqual({
+      duration: 250,
+      easing: "linear",
+    });
+    expect(updateAnimation.filterTweens.grade.tint.keyframes[0]).toMatchObject({
+      delay: 300,
+      duration: 400,
+      value: [0.2, 0.4, 0.6],
+    });
+    expect(transitionAnimation.mask.progress.keyframes[0].delay).toBe(500);
+    expect(
+      transitionAnimation.compositor.tween.uProgress.keyframes[0].delay,
+    ).toBe(700);
+    expect(
+      transitionAnimation.compositor.tween.edgeWidth.keyframes[0].delay,
+    ).toBe(900);
+  });
+
+  it.each([
+    ["manual", { keyframes: [{ delay: -1, duration: 100, value: 1 }] }],
+    ["auto", { auto: { delay: -1, duration: 100 } }],
+    [
+      "fractional negative",
+      { keyframes: [{ delay: -0.001, duration: 100, value: 1 }] },
+    ],
+    [
+      "non-finite manual",
+      {
+        keyframes: [
+          { delay: Number.POSITIVE_INFINITY, duration: 100, value: 1 },
+        ],
+      },
+    ],
+    ["non-finite auto", { auto: { delay: Number.NaN, duration: 100 } }],
+    [
+      "negative infinite auto",
+      { auto: { delay: Number.NEGATIVE_INFINITY, duration: 100 } },
+    ],
+    ["string manual", { keyframes: [{ delay: "0", duration: 100, value: 1 }] }],
+    ["null auto", { auto: { delay: null, duration: 100 } }],
+  ])("rejects invalid %s delays", (_name, x) => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "invalid-delay",
+          targetId: "panel",
+          type: "update",
+          tween: { x },
+        },
+      ]),
+    ).toThrow(/delay must be a finite number greater than or equal to 0/);
+  });
+
+  it.each([
+    [
+      "filter parameter",
+      {
+        id: "invalid-filter-delay",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          filters: {
+            grade: {
+              amount: {
+                keyframes: [{ delay: -1, duration: 100, value: 1 }],
+              },
+            },
+          },
+        },
+      },
+      "animations[0].tween.filters.grade.amount.keyframes[0].delay",
+    ],
+    [
+      "mask progress",
+      {
+        id: "invalid-mask-delay",
+        targetId: "scene",
+        type: "transition",
+        mask: {
+          kind: "single",
+          texture: "wipe",
+          progress: {
+            keyframes: [{ delay: -1, duration: 100, value: 1 }],
+          },
+        },
+      },
+      "animations[0].mask.progress.keyframes[0].delay",
+    ],
+    [
+      "compositor progress",
+      {
+        id: "invalid-compositor-delay",
+        targetId: "scene",
+        type: "transition",
+        compositor: createCompositor({
+          tween: {
+            progress: {
+              keyframes: [{ delay: -1, duration: 100, value: 1 }],
+            },
+          },
+        }),
+      },
+      "animations[0].compositor.tween.progress.keyframes[0].delay",
+    ],
+  ])("reports the exact invalid %s delay path", (_name, animation, path) => {
+    expect(() => normalizeAnimations([animation])).toThrow(
+      `${path} must be a finite number greater than or equal to 0.`,
+    );
+  });
+
   it("keeps ordinary update tweens unchanged", () => {
     const [animation] = normalizeAnimations([
       {
@@ -743,7 +916,7 @@ describe("normalizeAnimations rect style support", () => {
           width: { auto: { duration: 300 } },
           height: {
             initialValue: 80,
-            keyframes: [{ duration: 300, value: 120 }],
+            keyframes: [{ delay: 50, duration: 300, value: 120 }],
           },
           fill: {
             start: {
@@ -785,6 +958,7 @@ describe("normalizeAnimations rect style support", () => {
       "rect.cornerRadius.topLeft",
       "rect.cornerRadius.bottomRight",
     ]);
+    expect(animation.tween["rect.height"].keyframes[0].delay).toBe(50);
     expect(animation.tween["rect.fill.stops.1.color"].initialValue).toEqual([
       1, 0, 0, 1,
     ]);

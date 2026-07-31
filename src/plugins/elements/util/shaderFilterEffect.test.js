@@ -818,6 +818,83 @@ describe("shader filter resources", () => {
     displayObject.destroy();
   });
 
+  it("holds element and filter parameters during delayed segments", () => {
+    const displayObject = {
+      label: "shader-target",
+      width: 32,
+      height: 32,
+      alpha: 0.2,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    const filters = normalizeElementShaderFilters([
+      {
+        id: "grade",
+        type: "shader",
+        parameters: { amount: 0.2 },
+        source: shaderSource,
+      },
+    ]);
+    syncShaderFilters(displayObject, filters, { width: 32, height: 32 });
+
+    const completionTracker = {
+      getVersion: () => 7,
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const animationBus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: [
+        {
+          id: "delayed-filter",
+          targetId: "shader-target",
+          type: "update",
+          tween: {
+            alpha: {
+              keyframes: [
+                { delay: 100, duration: 100, value: 1, easing: "linear" },
+              ],
+            },
+          },
+          filterTweens: {
+            grade: {
+              amount: {
+                keyframes: [
+                  { delay: 100, duration: 100, value: 1, easing: "linear" },
+                ],
+              },
+            },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker,
+      element: displayObject,
+      targetState: { alpha: 1 },
+    });
+
+    animationBus.flush();
+    animationBus.tick(99);
+
+    expect(displayObject.alpha).toBeCloseTo(0.2);
+    expect(
+      displayObject.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.2);
+    expect(completionTracker.complete).not.toHaveBeenCalled();
+
+    animationBus.tick(51);
+
+    expect(displayObject.alpha).toBeCloseTo(0.6);
+    expect(
+      displayObject.filters[0].resources.shaderUniforms.uniforms.uAmount,
+    ).toBeCloseTo(0.6);
+
+    animationBus.tick(50);
+    expect(completionTracker.complete).toHaveBeenCalledWith(7);
+
+    displayObject.destroy();
+  });
+
   it("animates progress only on the explicitly targeted filter", () => {
     const displayObject = {
       label: "shader-target",

@@ -49,6 +49,56 @@ const mountRect = (parent, element, animationBus, animations = []) => {
 };
 
 describe("rect style animation", () => {
+  it("holds rect style values during delayed auto and color segments", () => {
+    const parent = new Container();
+    const animationBus = createAnimationBus();
+    const prevElement = createRect({ width: 200, fill: "#ff0000" });
+    const nextElement = createRect({ width: 300, fill: "#0000ff" });
+    const rect = mountRect(parent, prevElement, animationBus);
+    const animations = normalizeAnimations([
+      {
+        id: "delayed-style",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          width: { auto: { delay: 300, duration: 700 } },
+          fill: {
+            color: {
+              initialValue: "#ff0000",
+              keyframes: [{ delay: 300, duration: 700, value: "#0000ff" }],
+            },
+          },
+        },
+      },
+    ]);
+
+    updateRect({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations,
+      animationBus,
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+    animationBus.flush();
+    animationBus.tick(299);
+
+    expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(200);
+    expect(getRectStyleAnimationValue(rect, "rect.fill.color")).toEqual([
+      1, 0, 0, 1,
+    ]);
+
+    animationBus.tick(351);
+
+    expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(250);
+    expect(getRectStyleAnimationValue(rect, "rect.fill.color")).toEqual([
+      0.5, 0, 0.5, 1,
+    ]);
+  });
+
   it("animates dimensions, solid colors, border, and independent corners", () => {
     const parent = new Container();
     const animationBus = createAnimationBus();

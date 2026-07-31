@@ -298,7 +298,8 @@ animations:
               - duration: 400
                 value: 1
                 easing: easeInOutSine
-              - duration: 400
+              - delay: 200
+                duration: 400
                 value: 0.2
                 easing: easeInOutSine
           tint:
@@ -312,6 +313,11 @@ Ordinary element properties and any number of filter ids may coexist in one
 `tween`. A missing `initialValue` is read from the current filter parameter.
 Scalar, vector, and matrix values interpolate component by component. Relative
 keyframes require matching shapes.
+
+Shader tracks use the same delay contract as ordinary tweens. An optional
+finite, non-negative `delay` holds the preceding scalar, vector, or matrix
+value before interpolation. It contributes to total duration and repeats in a
+loop.
 
 Only one active animation may write the same
 `targetId + filterId + parameter` channel in one state.

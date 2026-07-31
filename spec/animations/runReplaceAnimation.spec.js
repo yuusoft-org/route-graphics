@@ -349,7 +349,9 @@ describe("runReplaceAnimation", () => {
           tween: {
             alpha: {
               initialValue: 0,
-              keyframes: [{ duration: 300, value: 1, easing: "linear" }],
+              keyframes: [
+                { delay: 100, duration: 300, value: 1, easing: "linear" },
+              ],
             },
           },
         },
@@ -377,6 +379,16 @@ describe("runReplaceAnimation", () => {
 
     const dispatched = animationBus.dispatch.mock.calls[0][0];
     expect(dispatched.payload.deferCompletionUntilNextFrame).toBe(false);
+    expect(dispatched.payload.duration).toBe(400);
+
+    const overlay = parent.children.find(
+      (child) => child !== nextDisplayObject,
+    );
+    dispatched.payload.applyFrame(99);
+    expect(overlay.children[0].alpha).toBe(0);
+    dispatched.payload.applyFrame(250);
+    expect(overlay.children[0].alpha).toBeCloseTo(0.5);
+
     dispatched.payload.onComplete();
 
     expect(parent.children).toEqual([nextDisplayObject]);
@@ -853,12 +865,15 @@ describe("runReplaceAnimation", () => {
       tween: {
         ...passthroughCompositor.tween,
         amount: {
-          keyframes: [{ duration: 600, value: 0.8, easing: "linear" }],
+          keyframes: [
+            { delay: 100, duration: 500, value: 0.8, easing: "linear" },
+          ],
         },
         tint: {
           keyframes: [
             {
-              duration: 300,
+              delay: 100,
+              duration: 200,
               value: [0.8, 0.6, 0.4],
               easing: "linear",
             },
@@ -908,7 +923,7 @@ describe("runReplaceAnimation", () => {
     );
 
     const dispatched = animationBus.dispatch.mock.calls[0][0];
-    dispatched.payload.applyFrame(150);
+    dispatched.payload.applyFrame(50);
 
     expect(snapshotCalls).toEqual([
       { x: 0, y: 0, scaleX: 1, scaleY: 1, alpha: 1 },
@@ -953,14 +968,14 @@ describe("runReplaceAnimation", () => {
       width: compositorSprite.texture.width,
       height: compositorSprite.texture.height,
     });
-    expect(shaderUniforms.uniforms.uProgress).toBeCloseTo(0.5);
+    expect(shaderUniforms.uniforms.uProgress).toBeCloseTo(1 / 6);
     expect(shaderUniforms.uniforms.uTime).toBeCloseTo(7.5);
-    expect(shaderUniforms.uniforms.uAmount).toBeCloseTo(0.35);
+    expect(shaderUniforms.uniforms.uAmount).toBeCloseTo(0.2);
     expect(Array.from(shaderUniforms.uniforms.uTint)).toEqual(
       expect.arrayContaining([
-        expect.closeTo(0.5),
-        expect.closeTo(0.5),
-        expect.closeTo(0.5),
+        expect.closeTo(0.2),
+        expect.closeTo(0.4),
+        expect.closeTo(0.6),
       ]),
     );
     expect(filterManager.calculateSpriteMatrix).toHaveBeenCalledWith(
@@ -975,6 +990,18 @@ describe("runReplaceAnimation", () => {
       Texture.EMPTY,
       Texture.EMPTY,
       true,
+    );
+
+    dispatched.payload.applyFrame(150);
+    compositorFilter.apply(filterManager, Texture.EMPTY, Texture.EMPTY, true);
+    expect(shaderUniforms.uniforms.uProgress).toBeCloseTo(0.5);
+    expect(shaderUniforms.uniforms.uAmount).toBeCloseTo(0.26);
+    expect(Array.from(shaderUniforms.uniforms.uTint)).toEqual(
+      expect.arrayContaining([
+        expect.closeTo(0.35),
+        expect.closeTo(0.45),
+        expect.closeTo(0.55),
+      ]),
     );
 
     shaderClock = 9.25;
@@ -2415,7 +2442,9 @@ describe("runReplaceAnimation", () => {
           channel: "red",
           progress: {
             initialValue: 0,
-            keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+            keyframes: [
+              { delay: 200, duration: 800, value: 1, easing: "linear" },
+            ],
           },
         },
       },
@@ -2436,7 +2465,8 @@ describe("runReplaceAnimation", () => {
     const dispatched = animationBus.dispatch.mock.calls[0][0];
 
     expect(app.renderer.extract.pixels).not.toHaveBeenCalled();
-    dispatched.payload.applyFrame(500);
+    expect(dispatched.payload.duration).toBe(1000);
+    dispatched.payload.applyFrame(199);
 
     expect(app.renderer.extract.pixels).not.toHaveBeenCalled();
     const overlay = parent.children.find(
@@ -2447,6 +2477,12 @@ describe("runReplaceAnimation", () => {
     expect(
       maskFilter.resources.replaceMaskUniforms.uniforms.uMaskDirectReveal,
     ).toBe(0);
+    expect(maskFilter.resources.replaceMaskUniforms.uniforms.uProgress).toBe(0);
+
+    dispatched.payload.applyFrame(600);
+    expect(
+      maskFilter.resources.replaceMaskUniforms.uniforms.uProgress,
+    ).toBeCloseTo(0.5);
   });
 
   it("routes single alpha masks through the alpha preprocessing filter", () => {

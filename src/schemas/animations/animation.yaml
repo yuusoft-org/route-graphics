@@ -19,6 +19,11 @@ $defs:
       duration:
         type: number
         description: Duration to reach this value in milliseconds.
+      delay:
+        type: number
+        minimum: 0
+        default: 0
+        description: Time in milliseconds to hold the previous value before starting this keyframe segment.
       easing:
         type: string
         description: Easing function to use.
@@ -74,6 +79,11 @@ $defs:
         description: Target color value.
       duration:
         type: number
+      delay:
+        type: number
+        minimum: 0
+        default: 0
+        description: Time in milliseconds to hold the previous color before starting this keyframe segment.
       easing:
         type: string
         enum:
@@ -146,6 +156,11 @@ $defs:
       duration:
         type: number
         description: Duration in milliseconds for the generated tween.
+      delay:
+        type: number
+        minimum: 0
+        default: 0
+        description: Time in milliseconds to hold the current value before starting the generated tween.
       easing:
         type: string
         description: Easing function to use.

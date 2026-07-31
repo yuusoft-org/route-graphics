@@ -97,6 +97,7 @@ const buildPropertyTimelines = (
         const timeline = buildTimeline([
           { value: currentValue },
           {
+            delay: config.auto.delay,
             duration: config.auto.duration,
             value: targetValue,
             easing: config.auto.easing,
