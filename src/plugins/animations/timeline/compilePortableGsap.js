@@ -817,6 +817,13 @@ export const compilePortableGsapAnimation = (
         anchors,
         path: stepPath,
       });
+      if (
+        typeof scheduledStart === "number" &&
+        typeof origin === "number" &&
+        scheduledStart < origin
+      ) {
+        throw new Error(`${stepPath} resolves before its containing group.`);
+      }
       let duration = 0;
       let markName = null;
       if (

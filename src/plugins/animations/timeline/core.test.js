@@ -4,6 +4,7 @@ import {
   canonicalizeProgram,
   bindTimelineProgram,
   checkedTimeAdd,
+  getEasingCriticalProgresses,
   getDomainLocalDuration,
   getDomainParentDuration,
   interpolateTimelineValues,
@@ -99,6 +100,40 @@ describe("timeline values and easings", () => {
         ],
       }),
     ).toThrow(/strictly increasing/);
+  });
+
+  it("reports sampled knots and analytic easing extrema", () => {
+    expect(
+      getEasingCriticalProgresses({
+        kind: "sampled",
+        samples: [
+          [0, 0],
+          [0.1, 2],
+          [0.25, 0.5],
+          [1, 1],
+        ],
+      }),
+    ).toEqual([0.1, 0.25]);
+
+    for (const easing of [
+      "easeInOutBack",
+      "easeOutBounce",
+      "easeOutElastic",
+      { kind: "cubicBezier", points: [0.25, 2, 0.75, -1] },
+    ]) {
+      const critical = [0, ...getEasingCriticalProgresses(easing), 1].map(
+        (progress) => sampleEasing(easing, progress),
+      );
+      const dense = Array.from({ length: 10_001 }, (_, index) =>
+        sampleEasing(easing, index / 10_000),
+      );
+      expect(Math.min(...critical)).toBeLessThanOrEqual(
+        Math.min(...dense) + 1e-4,
+      );
+      expect(Math.max(...critical)).toBeGreaterThanOrEqual(
+        Math.max(...dense) - 1e-4,
+      );
+    }
   });
 });
 

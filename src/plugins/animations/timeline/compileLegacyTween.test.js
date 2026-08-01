@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { normalizeAnimations } from "../../../util/normalizeAnimations.js";
 import { compileLegacyTweenAnimation } from "./compileLegacyTween.js";
+import { bindTimelineProgram } from "./bindProgram.js";
+import { evaluateTimelineInstance } from "./evaluateInstance.js";
 
 const compile = (animation) =>
   compileLegacyTweenAnimation(normalizeAnimations([animation])[0], {
@@ -8,6 +10,82 @@ const compile = (animation) =>
   });
 
 describe("legacy tween TimelineProgram compiler", () => {
+  it("accumulates consecutive relative keyframes exactly once", () => {
+    const program = compile({
+      id: "relative-chain",
+      targetId: "hero",
+      type: "update",
+      tween: {
+        x: {
+          keyframes: [
+            { value: 10, relative: true, duration: 100, easing: "linear" },
+            { value: 20, relative: true, duration: 100, easing: "linear" },
+          ],
+        },
+      },
+    });
+    const target = { x: 0 };
+    const instance = bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: { hero: { handle: target, identity: "hero" } },
+      channelRegistry: {
+        "transform.x": {
+          get: (handle) => handle.x,
+          apply: (handle, value) => {
+            handle.x = value;
+          },
+        },
+      },
+    });
+    const sample = (time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(100)).toBe(10);
+    expect(sample(150)).toBe(20);
+    expect(sample(200)).toBe(30);
+  });
+
+  it("accumulates consecutive subject-relative keyframes from the live position", () => {
+    const program = compile({
+      id: "relative-translate-chain",
+      targetId: "hero",
+      type: "update",
+      tween: {
+        translateX: {
+          keyframes: [
+            { value: 0.25, relative: true, duration: 100, easing: "linear" },
+            { value: 0.5, relative: true, duration: 100, easing: "linear" },
+          ],
+        },
+      },
+    });
+    const target = { x: 40 };
+    const instance = bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: {
+        hero: {
+          handle: target,
+          identity: "hero",
+          subject: { x: 40, width: 200 },
+        },
+      },
+      channelRegistry: {
+        "transform.x": {
+          get: (handle) => handle.x,
+          apply: (handle, value) => {
+            handle.x = value;
+          },
+        },
+      },
+    });
+    const sample = (time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(100)).toBe(90);
+    expect(sample(150)).toBe(140);
+    expect(sample(200)).toBe(190);
+  });
+
   it("compiles parallel property chains and longest-track duration", () => {
     const program = compile({
       id: "move",
@@ -37,7 +115,7 @@ describe("legacy tween TimelineProgram compiler", () => {
       sampler: {
         to: {
           kind: "add",
-          left: { kind: "constant", value: 20 },
+          left: { kind: "underlying" },
           right: { kind: "constant", value: 5 },
         },
       },

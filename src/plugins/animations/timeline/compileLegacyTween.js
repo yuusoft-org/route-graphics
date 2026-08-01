@@ -23,6 +23,21 @@ const toSubjectCoordinate = (property, expression) => {
   };
 };
 
+const addRelativeValue = (property, expression) => ({
+  kind: "add",
+  left: underlying(),
+  right: isSubjectRelativeProperty(property)
+    ? {
+        kind: "multiply",
+        left: {
+          kind: "subjectDimension",
+          axis: property === "translateX" ? "width" : "height",
+        },
+        right: expression,
+      }
+    : expression,
+});
+
 const toIterations = (playback = {}) => {
   if (playback.loop === true || playback.repeat === "infinite") return null;
   return (playback.repeat ?? 0) + 1;
@@ -78,16 +93,13 @@ export const compileLegacyTweenAnimation = (
     });
     requirements.add(channelInfo.requirement);
 
-    let currentAuthoredExpression =
+    const initialExpression =
       config.initialValue === undefined
         ? isSubjectRelativeProperty(property)
           ? constant(0)
           : underlying()
         : constant(config.initialValue);
-    let currentExpression = toSubjectCoordinate(
-      property,
-      currentAuthoredExpression,
-    );
+    let currentExpression = toSubjectCoordinate(property, initialExpression);
     let cursor = 0;
 
     clips.push({
@@ -156,17 +168,9 @@ export const compileLegacyTweenAnimation = (
           `${propertyPath}.keyframes[${index}].delay`,
         );
         const authored = constant(frame.value);
-        const nextAuthoredExpression = frame.relative
-          ? {
-              kind: "add",
-              left: currentAuthoredExpression,
-              right: authored,
-            }
-          : authored;
-        const nextExpression = toSubjectCoordinate(
-          property,
-          nextAuthoredExpression,
-        );
+        const nextExpression = frame.relative
+          ? addRelativeValue(property, authored)
+          : toSubjectCoordinate(property, authored);
         clips.push({
           id: `clip-${clips.length}`,
           sourcePath: `${propertyPath}.keyframes[${index}]`,
@@ -193,8 +197,7 @@ export const compileLegacyTweenAnimation = (
           frame.duration,
           `${propertyPath}.keyframes[${index}].duration`,
         );
-        currentAuthoredExpression = nextAuthoredExpression;
-        currentExpression = nextExpression;
+        currentExpression = frame.relative ? underlying() : nextExpression;
       }
     }
 

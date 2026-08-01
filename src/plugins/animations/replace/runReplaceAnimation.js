@@ -13,6 +13,7 @@ import {
   bindTimelineProgram,
   compileTransitionAnimation,
   createGsapTimelineEvaluator,
+  getEasingCriticalProgresses,
 } from "../timeline/index.js";
 import {
   clearDeferredMountOperations,
@@ -374,9 +375,15 @@ const createTransitionTimelineController = ({
       sampleTimes.add(segment.rootEnd);
       const span = segment.rootEnd - segment.rootStart;
       if (span > 0) {
-        sampleTimes.add(segment.rootStart + span * 0.25);
-        sampleTimes.add(segment.rootStart + span * 0.5);
-        sampleTimes.add(segment.rootStart + span * 0.75);
+        const progresses = new Set([
+          0.25,
+          0.5,
+          0.75,
+          ...getEasingCriticalProgresses(segment.easing),
+        ]);
+        for (const progress of progresses) {
+          sampleTimes.add(segment.rootStart + span * progress);
+        }
       }
     }
   }

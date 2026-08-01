@@ -467,9 +467,13 @@ export const bindTimelineProgram = (rawProgram, context) => {
         expressionContext,
         `${clip.sourcePath ?? clip.id}.from`,
       );
+      const toExpressionContext =
+        clip.sampler.to.kind === "underlying"
+          ? expressionContext
+          : { ...expressionContext, underlying: from };
       const to = evaluateExpression(
         clip.sampler.to,
-        { ...expressionContext, underlying: from },
+        toExpressionContext,
         `${clip.sourcePath ?? clip.id}.to`,
       );
       validateTimelineValueType(
@@ -530,9 +534,13 @@ export const bindTimelineProgram = (rawProgram, context) => {
                 iterationContext,
                 `${clip.sourcePath ?? clip.id}.from`,
               );
+              const iterationToContext =
+                clip.sampler.to.kind === "underlying"
+                  ? iterationContext
+                  : { ...iterationContext, underlying: iterationFrom };
               const iterationTo = evaluateExpression(
                 clip.sampler.to,
-                { ...iterationContext, underlying: iterationFrom },
+                iterationToContext,
                 `${clip.sourcePath ?? clip.id}.to`,
               );
               valueCache.set(iteration, {

@@ -231,6 +231,93 @@ const cubicCoordinate = (time, first, second) => {
   );
 };
 
+const directionCriticalProgresses = (progresses, direction) => {
+  const result = [];
+  for (const progress of progresses) {
+    if (direction === "in") result.push(progress);
+    else if (direction === "out") result.push(1 - progress);
+    else result.push(progress / 2, 1 - progress / 2);
+  }
+  if (direction === "inOut") result.push(0.5);
+  return result;
+};
+
+const solveQuadratic = (a, b, c) => {
+  if (Math.abs(a) < Number.EPSILON) {
+    return Math.abs(b) < Number.EPSILON ? [] : [-c / b];
+  }
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return [];
+  const root = Math.sqrt(discriminant);
+  return [(-b - root) / (2 * a), (-b + root) / (2 * a)];
+};
+
+/** Progress knots where a supported easing can change direction or value. */
+export const getEasingCriticalProgresses = (input) => {
+  const descriptor = normalizeEasing(input);
+  let progresses = [];
+  if (descriptor.kind === "sampled") {
+    progresses = descriptor.samples.map(([time]) => time);
+  } else if (descriptor.kind === "steps") {
+    progresses = Array.from(
+      { length: descriptor.count + 1 },
+      (_, index) => index / descriptor.count,
+    );
+  } else if (descriptor.kind === "cubicBezier") {
+    const [x1, y1, x2, y2] = descriptor.points;
+    const roots = solveQuadratic(9 * (y1 - y2) + 3, -12 * y1 + 6 * y2, 3 * y1);
+    progresses = roots
+      .filter((time) => time > 0 && time < 1)
+      .map((time) => cubicCoordinate(time, x1, x2));
+  } else if (descriptor.kind === "back") {
+    const progress =
+      (2 * descriptor.overshoot) / (3 * (descriptor.overshoot + 1));
+    progresses = directionCriticalProgresses(
+      progress > 0 && progress < 1 ? [progress] : [],
+      descriptor.direction,
+    );
+  } else if (descriptor.kind === "bounce") {
+    const d1 = 2.75;
+    const bounceOutCritical = [
+      1 / d1,
+      1.5 / d1,
+      2 / d1,
+      2.25 / d1,
+      2.5 / d1,
+      2.625 / d1,
+    ];
+    progresses = directionCriticalProgresses(
+      bounceOutCritical.map((progress) => 1 - progress),
+      descriptor.direction,
+    );
+  } else if (descriptor.kind === "elastic") {
+    const angularFrequency = (2 * Math.PI) / descriptor.period;
+    const decay = 10 * Math.LN2;
+    const shift =
+      (descriptor.period / (2 * Math.PI)) * Math.asin(1 / descriptor.amplitude);
+    const phase = Math.atan(angularFrequency / decay);
+    const firstIndex = Math.ceil((-angularFrequency * shift - phase) / Math.PI);
+    const easeOutCritical = [];
+    for (let offset = 0; offset < 4; offset++) {
+      const theta = phase + (firstIndex + offset) * Math.PI;
+      const progress = shift + theta / angularFrequency;
+      if (progress > 0 && progress < 1) easeOutCritical.push(progress);
+    }
+    progresses = directionCriticalProgresses(
+      easeOutCritical.map((progress) => 1 - progress),
+      descriptor.direction,
+    );
+  }
+
+  return [
+    ...new Set(
+      progresses.filter(
+        (progress) => Number.isFinite(progress) && progress > 0 && progress < 1,
+      ),
+    ),
+  ].sort((left, right) => left - right);
+};
+
 const sampleCubicBezier = (progress, [x1, y1, x2, y2]) => {
   let low = 0;
   let high = 1;

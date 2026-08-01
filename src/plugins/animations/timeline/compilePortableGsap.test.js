@@ -23,6 +23,30 @@ const createAdapter = (property, valueType = "scalar") => ({
 });
 
 describe("portable GSAP frontend compiler", () => {
+  it("animates from an authored value back to the captured base", () => {
+    const program = compile({
+      id: "from-base",
+      targetId: "hero",
+      type: "update",
+      gsap: {
+        profile: "portable-v1",
+        steps: [{ kind: "from", values: { x: 100 }, duration: 100 }],
+      },
+    });
+    const target = { x: 0 };
+    const instance = bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: { hero: { handle: target, identity: "hero" } },
+      channelRegistry: { "transform.x": createAdapter("x") },
+    });
+    const sample = (time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(0)).toBe(100);
+    expect(sample(50)).toBe(50);
+    expect(sample(100)).toBe(0);
+  });
+
   it("rejects statically invalid channel expressions before binding", () => {
     expect(() =>
       compile({
@@ -124,6 +148,33 @@ describe("portable GSAP frontend compiler", () => {
     });
     expect(program.duration).toBe(370);
     expect(program.debug.marks["after-entrance"]).toBe(200);
+  });
+
+  it("rejects a nested child that starts before its containing group", () => {
+    expect(() =>
+      compile({
+        id: "contained-schedule",
+        targetId: "hero",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            { kind: "wait", duration: 100 },
+            {
+              kind: "parallel",
+              steps: [
+                {
+                  kind: "to",
+                  values: { x: 10 },
+                  duration: 20,
+                  start: { anchor: "group.start", offset: -50 },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ).toThrow(/before its containing group/);
   });
 
   it("binds multi-target stagger, expressions, relative values, and modifiers", () => {

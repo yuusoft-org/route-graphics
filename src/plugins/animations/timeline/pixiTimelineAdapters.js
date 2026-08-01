@@ -207,6 +207,8 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
   });
 
   let committed = false;
+  let sourceDestroy = null;
+  let destroyWithTextUnits = null;
   const originalRenderable = textElement.renderable;
   const originalFilters = textElement.filters;
   const preparation = {
@@ -238,6 +240,12 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
         parent.setChildIndex?.(container, originalIndex);
       }
       textElement[PIXI_TIMELINE_TEXT_UNITS] = preparation;
+      sourceDestroy = textElement.destroy;
+      destroyWithTextUnits = function destroyTextWithUnits(...args) {
+        preparation.destroy({ sourceDestroying: true });
+        return sourceDestroy.apply(this, args);
+      };
+      textElement.destroy = destroyWithTextUnits;
       pendingTextUnitPreparations.delete(textElement);
       committed = true;
     },
@@ -252,15 +260,18 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
     matches: (text, style) =>
       getTextUnitFingerprint(String(text ?? ""), style, query) === fingerprint,
     sync: () => copyDisplayTransform(textElement, container),
-    destroy: () => {
+    destroy: ({ sourceDestroying = false } = {}) => {
       pendingTextUnitPreparations.delete(textElement);
+      if (textElement.destroy === destroyWithTextUnits && sourceDestroy) {
+        textElement.destroy = sourceDestroy;
+      }
       if (originalFilters?.length) container.filters = [];
       if (!container.destroyed) container.destroy({ children: true });
       if (textElement[PIXI_TIMELINE_TEXT_UNITS] === preparation) {
         delete textElement[PIXI_TIMELINE_TEXT_UNITS];
       }
       if (!textElement.destroyed) {
-        textElement.renderable = originalRenderable;
+        if (!sourceDestroying) textElement.renderable = originalRenderable;
         if (originalFilters?.length) textElement.filters = originalFilters;
       }
     },

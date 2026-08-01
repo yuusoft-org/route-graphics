@@ -328,7 +328,7 @@ export const createAnimationBus = () => {
     context,
     previousTime,
     currentTime,
-    { seek = false, replay = false } = {},
+    { seek = false, replay = false, includeInitial = false } = {},
   ) => {
     if (!context.instance?.events?.length) return;
     const events = collectTimelineEventCrossings(
@@ -340,6 +340,7 @@ export const createAnimationBus = () => {
         replay,
         emittedOnce: context.emittedTimelineEvents,
         emittedOccurrences: context.emittedTimelineOccurrences,
+        includeInitial,
       },
     );
     for (const event of events) {
@@ -401,6 +402,9 @@ export const createAnimationBus = () => {
       sampledTime !== null && applyTimeToContext(context, sampledTime);
 
     emit("started", { id: context.id });
+    if (sampledTime === null) {
+      deliverTimelineEvents(context, 0, 0, { includeInitial: true });
+    }
 
     if (completed) {
       fireCompleteEvent(context);
@@ -1115,7 +1119,7 @@ export const createAnimationBus = () => {
       targetId: pendingContext.targetId,
       signature: pendingContext.signature,
       continuity: pendingContext.continuity,
-      playbackSpeed: pendingContext.playbackSpeed,
+      playbackSpeed: payload.playbackSpeed ?? pendingContext.playbackSpeed,
       loop: payload.loop ?? pendingContext.loop,
       onContinuationUpdate:
         payload.onContinuationUpdate ?? pendingContext.onContinuationUpdate,

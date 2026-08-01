@@ -282,11 +282,12 @@ export const dispatchUpdateAnimations = ({
       ? createAnimationSubjectState(element)
       : undefined;
 
-    applyInitialUpdateAnimationState(
+    const preparedGsap = applyInitialUpdateAnimationState(
       element,
       animationsToStart,
       undefined,
       animationBaseState,
+      targetState,
     );
 
     queueDeferredUpdateAnimationStart(renderContext, {
@@ -296,6 +297,7 @@ export const dispatchUpdateAnimations = ({
       element,
       targetState,
       animationBaseState,
+      preparedGsap,
     });
 
     return true;

@@ -843,6 +843,122 @@ describe("dispatchUpdateAnimations", () => {
     );
   });
 
+  it("stages a GSAP time-zero frame before a suppressed mount snapshot", () => {
+    const animationBus = createAnimationBus();
+    const completionTracker = {
+      getVersion: () => 8,
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const renderContext = createRenderContext({ suppressAnimations: true });
+    const element = {
+      label: "hidden-gsap",
+      children: [],
+      destroyed: false,
+      x: 0,
+      y: 0,
+      alpha: 1,
+      width: 100,
+      height: 50,
+      scale: { x: 1, y: 1 },
+    };
+    const animations = groupAnimationsByTarget([
+      {
+        id: "hidden-gsap-enter",
+        targetId: "hidden-gsap",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            { kind: "set", values: { alpha: 0 } },
+            { kind: "from", values: { x: 100 }, duration: 100 },
+          ],
+        },
+      },
+    ]);
+
+    expect(
+      dispatchUpdateAnimations({
+        animations,
+        targetId: "hidden-gsap",
+        animationBus,
+        completionTracker,
+        element,
+        targetState: { x: 0, alpha: 1 },
+        renderContext,
+      }),
+    ).toBe(true);
+    expect(element).toMatchObject({ x: 100, alpha: 0 });
+    expect(animationBus.getState().activeCount).toBe(0);
+
+    flushDeferredMountOperations(renderContext);
+    animationBus.flush();
+    expect(element).toMatchObject({ x: 100, alpha: 0 });
+    animationBus.tick(50);
+    expect(element.x).toBe(50);
+  });
+
+  it("preserves live GSAP filter channels while settling an infinite update", () => {
+    const animationBus = createAnimationBus();
+    const completionTracker = {
+      getVersion: vi.fn(),
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const element = {
+      label: "filtered-loop",
+      destroyed: false,
+      children: [],
+      width: 32,
+      height: 32,
+      scale: { x: 1, y: 1 },
+      destroy() {},
+    };
+    syncShaderFilters(element, createAnimatedShaderFilterFixture(), {
+      width: 32,
+      height: 32,
+    });
+    const amount = () =>
+      element.filters[0].resources.shaderUniforms.uniforms.uAmount;
+
+    expect(
+      dispatchUpdateAnimations({
+        animations: groupAnimationsByTarget([
+          {
+            id: "filtered-loop-animation",
+            targetId: "filtered-loop",
+            type: "update",
+            playback: { repeat: "infinite" },
+            gsap: {
+              profile: "portable-v1",
+              steps: [
+                {
+                  kind: "to",
+                  values: { filters: { grade: { amount: { by: 0.2 } } } },
+                  duration: 100,
+                },
+              ],
+            },
+          },
+        ]),
+        targetId: "filtered-loop",
+        animationBus,
+        completionTracker,
+        element,
+        targetState: { filters: [] },
+        onComplete: () => {
+          element.filters[0].resources.shaderUniforms.uniforms.uAmount = 0.9;
+        },
+      }),
+    ).toBe(true);
+
+    expect(amount()).toBeCloseTo(0.2);
+    animationBus.flush();
+    animationBus.tick(50);
+    expect(amount()).toBeCloseTo(0.3);
+    element.destroy();
+  });
+
   it("applies filter initial values before capturing a suppressed mount", () => {
     const animationBus = { dispatch: vi.fn() };
     const completionTracker = {

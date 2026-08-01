@@ -8,7 +8,10 @@ import {
   getAnimationProperty,
   isTranslateAnimationProperty,
 } from "./animationPropertyUtils.js";
-import { validateShaderFilterAnimationTarget } from "../elements/util/shaderFilterEffect.js";
+import {
+  getShaderFilterAnimationTarget,
+  validateShaderFilterAnimationTarget,
+} from "../elements/util/shaderFilterEffect.js";
 import {
   getRectStyleAnimationBatchHooks,
   validateRectStyleAnimationTarget,
@@ -16,9 +19,13 @@ import {
 import {
   canonicalizeProgram,
   assertDisjointTimelineWriteSets,
+  applyTimelineFrame,
   bindTimelineProgram,
+  cloneTimelineValue,
   compilePortableGsapAnimation,
   createPixiTimelineBindingContext,
+  evaluateTimelineInstance,
+  getLegacyPropertyForChannel,
 } from "./timeline/index.js";
 import { createLegacyTimelineContext } from "./animationBus.js";
 
@@ -38,6 +45,46 @@ const animationsUseTranslate = (animations) =>
   animations.some((animation) =>
     Object.keys(animation.tween ?? {}).some(isTranslateAnimationProperty),
   );
+
+const queryIncludesOwner = (
+  targetQueries,
+  alias,
+  ownerId,
+  seen = new Set(),
+) => {
+  if (seen.has(alias)) return false;
+  seen.add(alias);
+  const query = targetQueries[alias];
+  if (!query) return false;
+  if (query.kind === "element") return query.elementId === ownerId;
+  if (query.kind === "elements") return query.elementIds.includes(ownerId);
+  if (query.kind === "union") {
+    return query.aliases.some((child) =>
+      queryIncludesOwner(targetQueries, child, ownerId, seen),
+    );
+  }
+  return false;
+};
+
+const getGsapOwnerChannels = (animation) => {
+  if (!animation.gsap) return [];
+  const program = compilePortableGsapAnimation(animation);
+  const channels = new Set();
+  for (const clip of program.clipTemplates) {
+    if (
+      !queryIncludesOwner(program.targetQueries, clip.targets, program.ownerId)
+    ) {
+      continue;
+    }
+    channels.add(clip.channel);
+  }
+  return [...channels];
+};
+
+const parseFilterChannel = (channel) => {
+  const match = /^filter\.([^.]+)\.parameter\.(.+)$/.exec(channel);
+  return match ? { filterId: match[1], parameter: match[2] } : null;
+};
 
 const createCurrentElementResolver = (element) => {
   const parent = element?.parent;
@@ -68,25 +115,63 @@ const captureLiveTweenValues = (
 ) => {
   const values = new Map();
 
+  const captureProperty = (property) => {
+    const liveProperty = getLiveTweenProperty(property);
+    const key = `property:${liveProperty}`;
+    if (values.has(key)) return;
+    const value = getAnimationProperty(element, liveProperty, propertyPathMap);
+    if (value !== undefined) {
+      values.set(key, {
+        kind: "property",
+        property: liveProperty,
+        value: cloneTimelineValue(value),
+      });
+    }
+  };
+
+  const captureFilter = (filterId, parameter, animationId) => {
+    const key = `filter:${filterId}:${parameter}`;
+    if (values.has(key)) return;
+    const target = getShaderFilterAnimationTarget(
+      element,
+      filterId,
+      animationId,
+    );
+    values.set(key, {
+      kind: "filter",
+      filterId,
+      parameter,
+      animationId,
+      value: cloneTimelineValue(target[parameter]),
+    });
+  };
+
   for (const animation of animations) {
     for (const property of Object.keys(animation.tween ?? {})) {
-      const liveProperty = getLiveTweenProperty(property);
-      if (values.has(liveProperty)) {
+      captureProperty(property);
+    }
+    for (const [filterId, tween] of Object.entries(
+      animation.filterTweens ?? {},
+    )) {
+      for (const parameter of Object.keys(tween)) {
+        captureFilter(filterId, parameter, animation.id);
+      }
+    }
+
+    for (const channel of getGsapOwnerChannels(animation)) {
+      const property = getLegacyPropertyForChannel(channel);
+      if (property) {
+        captureProperty(property);
         continue;
       }
-
-      const value = getAnimationProperty(
-        element,
-        liveProperty,
-        propertyPathMap,
-      );
-      if (value !== undefined) {
-        values.set(liveProperty, value);
+      const filter = parseFilterChannel(channel);
+      if (filter) {
+        captureFilter(filter.filterId, filter.parameter, animation.id);
       }
     }
   }
 
-  return values;
+  return [...values.values()];
 };
 
 const restoreLiveTweenValues = (
@@ -98,13 +183,28 @@ const restoreLiveTweenValues = (
     return;
   }
 
-  for (const [property, value] of values) {
-    applyAnimationProperty({
-      object: element,
-      property,
-      propertyPathMap,
-      value,
-    });
+  const frameHooks = getRectStyleAnimationBatchHooks(element);
+  frameHooks.beforeApplyFrame?.();
+  try {
+    for (const entry of values) {
+      if (entry.kind === "filter") {
+        const target = getShaderFilterAnimationTarget(
+          element,
+          entry.filterId,
+          entry.animationId,
+        );
+        target[entry.parameter] = cloneTimelineValue(entry.value);
+        continue;
+      }
+      applyAnimationProperty({
+        object: element,
+        property: entry.property,
+        propertyPathMap,
+        value: cloneTimelineValue(entry.value),
+      });
+    }
+  } finally {
+    frameHooks.afterApplyFrame?.();
   }
 };
 
@@ -150,8 +250,10 @@ export const applyInitialUpdateAnimationState = (
   animations,
   propertyPathMap = TRANSITION_PROPERTY_PATH_MAP,
   animationBaseState,
+  targetState,
 ) => {
   let subjectState = animationBaseState;
+  const preparedGsap = new Map();
 
   for (const animation of animations) {
     validateRectStyleAnimationTarget(element, animation);
@@ -195,7 +297,46 @@ export const applyInitialUpdateAnimationState = (
         }
       }
     }
+
+    if (animation.gsap) {
+      const program = compilePortableGsapAnimation(animation);
+      const bindingContext = createPixiTimelineBindingContext({
+        program,
+        ownerElement: element,
+        ownerTargetState: targetState,
+        animationId: animation.id,
+      });
+      try {
+        const instance = bindTimelineProgram(program, bindingContext);
+        preparedGsap.set(animation.id, {
+          program,
+          bindingContext,
+          instance,
+        });
+      } catch (error) {
+        bindingContext.rollback?.();
+        throw error;
+      }
+    }
   }
+
+  const stagedInstances = [...preparedGsap.values()];
+  try {
+    assertDisjointTimelineWriteSets(
+      stagedInstances.map(({ instance }) => instance),
+    );
+    for (const { bindingContext, instance } of stagedInstances) {
+      bindingContext.commit?.();
+      applyTimelineFrame(evaluateTimelineInstance(instance, 0));
+    }
+  } catch (error) {
+    for (const { bindingContext } of stagedInstances) {
+      bindingContext.rollback?.();
+    }
+    throw error;
+  }
+
+  return preparedGsap;
 };
 
 export const dispatchUpdateAnimationsNow = ({
@@ -206,12 +347,23 @@ export const dispatchUpdateAnimationsNow = ({
   targetState,
   onComplete,
   animationBaseState,
+  preparedGsap: stagedGsap = new Map(),
 }) => {
   const animationsToDispatch = animations.filter(
     (animation) =>
       typeof animationBus?.hasContext !== "function" ||
       !animationBus.hasContext(animation.id),
   );
+  const preparedGsap = new Map(stagedGsap);
+  const dispatchIds = new Set(
+    animationsToDispatch.map((animation) => animation.id),
+  );
+  for (const [animationId, prepared] of preparedGsap) {
+    if (!dispatchIds.has(animationId)) {
+      prepared.bindingContext.rollback?.();
+      preparedGsap.delete(animationId);
+    }
+  }
 
   for (const animation of animationsToDispatch) {
     if (animation.gsap) {
@@ -243,12 +395,17 @@ export const dispatchUpdateAnimationsNow = ({
       ? createAnimationSubjectState(dispatchElement)
       : animationBaseState;
 
-  const preparedGsap = new Map();
   const preparedLegacy = new Map();
   const stagedBindingContexts = [];
   try {
     for (const animation of animationsToDispatch) {
       if (animation.gsap) {
+        if (preparedGsap.has(animation.id)) {
+          stagedBindingContexts.push(
+            preparedGsap.get(animation.id).bindingContext,
+          );
+          continue;
+        }
         const program = compilePortableGsapAnimation(animation);
         const bindingContext = createPixiTimelineBindingContext({
           program,

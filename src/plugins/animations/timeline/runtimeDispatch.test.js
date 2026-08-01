@@ -17,6 +17,72 @@ const display = (label, children = []) => ({
 });
 
 describe("portable GSAP update runtime integration", () => {
+  it("keeps an explicitly normalized speed when activating a pending transition", () => {
+    const bus = createAnimationBus();
+    const frames = [];
+    bus.registerPending({
+      id: "fast-transition",
+      animationType: "transition",
+      targetId: "scene",
+      continuity: "persistent",
+      playbackSpeed: 2,
+    });
+
+    expect(
+      bus.activatePending("fast-transition", {
+        driver: "custom",
+        duration: 50,
+        playbackSpeed: 1,
+        applyFrame: (time) => frames.push(time),
+      }),
+    ).toBe(true);
+    bus.tick(25);
+
+    expect(frames.at(-1)).toBe(25);
+    expect(bus.getState().animations[0]).toMatchObject({
+      currentTime: 25,
+      duration: 50,
+      playbackSpeed: 1,
+    });
+  });
+
+  it("preserves live GSAP owner channels while settling an infinite update", () => {
+    const root = display("root");
+    root.x = 25;
+    const animation = normalizeAnimations([
+      {
+        id: "infinite-relative",
+        targetId: "root",
+        type: "update",
+        playback: { repeat: "infinite" },
+        gsap: {
+          profile: "portable-v1",
+          steps: [{ kind: "to", values: { x: { by: 10 } }, duration: 100 }],
+        },
+      },
+    ]);
+    const tracker = createCompletionTracker();
+    tracker.reset("settled-gsap");
+    const bus = createAnimationBus();
+    const onComplete = () => {
+      root.x = 100;
+    };
+
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: { x: 100 },
+      onComplete,
+    });
+    expect(root.x).toBe(25);
+    bus.flush();
+    expect(root.x).toBe(25);
+    bus.tick(50);
+    expect(root.x).toBe(30);
+  });
+
   it("rejects mixed legacy/GSAP write conflicts before either time-zero frame", () => {
     const root = display("root");
     const animations = normalizeAnimations([
@@ -257,6 +323,45 @@ describe("portable GSAP update runtime integration", () => {
     expect(emitted).toEqual([]);
   });
 
+  it("delivers a leading event when an event-only timeline is activated", () => {
+    const root = display("root");
+    const animation = normalizeAnimations([
+      {
+        id: "leading-event",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [{ kind: "emit", event: "ready" }],
+        },
+      },
+    ]);
+    const tracker = createCompletionTracker();
+    tracker.reset("leading-event-state");
+    const bus = createAnimationBus();
+    const emitted = [];
+    bus.on("timelineEvent", (event) => emitted.push(event));
+
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: {},
+    });
+    bus.flush();
+
+    expect(emitted).toMatchObject([
+      {
+        id: "leading-event",
+        event: "ready",
+        time: 0,
+        direction: "forward",
+        iteration: [0],
+      },
+    ]);
+  });
+
   it("delivers repeat/yoyo event crossings and supports player controls", () => {
     const root = display("root");
     const animation = normalizeAnimations([
@@ -389,6 +494,56 @@ describe("portable GSAP update runtime integration", () => {
     expect(unitContainer.children.map((child) => child.alpha)).toEqual([
       0.6, 0.5, 0.4,
     ]);
+    root.destroy({ children: true });
+  });
+
+  it("destroys a split-text sibling when its source text is destroyed", () => {
+    const root = new Container({ label: "root" });
+    const title = new Text({
+      label: "title",
+      text: "A",
+      style: { fontSize: 20 },
+    });
+    root.addChild(title);
+    const animation = normalizeAnimations([
+      {
+        id: "split-lifecycle",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          targets: {
+            character: {
+              textUnits: {
+                elementId: "title",
+                unit: "grapheme",
+                order: "logical",
+              },
+            },
+          },
+          steps: [{ kind: "set", targets: "character", values: { alpha: 0 } }],
+        },
+      },
+    ]);
+    const tracker = createCompletionTracker();
+    tracker.reset("split-lifecycle-state");
+    const bus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: {},
+    });
+    bus.flush();
+    const unitContainer = root.children.find((child) =>
+      child.label?.startsWith("__timeline-text-units:"),
+    );
+
+    title.destroy({ children: true });
+
+    expect(unitContainer.destroyed).toBe(true);
+    expect(root.children).not.toContain(unitContainer);
     root.destroy({ children: true });
   });
 

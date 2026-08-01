@@ -64,7 +64,6 @@ const updatePlainTextDisplayObject = (displayObject, textComputedNode) => {
     timelineTextUnits?.matches(textComputedNode.content, displayObject.style)
   ) {
     timelineTextUnits.originalText = String(textComputedNode.content ?? "");
-    timelineTextUnits.sync();
   } else {
     timelineTextUnits?.destroy();
     displayObject.text = textComputedNode.content;
@@ -72,6 +71,11 @@ const updatePlainTextDisplayObject = (displayObject, textComputedNode) => {
   syncTextAnchorRatios(displayObject, textComputedNode);
   positionTextInLayoutBox(displayObject, textComputedNode);
   displayObject.alpha = textComputedNode.alpha;
+  if (
+    timelineTextUnits?.matches(textComputedNode.content, displayObject.style)
+  ) {
+    timelineTextUnits.sync();
+  }
 };
 
 const updateTextDisplayObject = ({
