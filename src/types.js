@@ -805,6 +805,8 @@ export const WhiteListAnimationProps = {
   rotation: "rotation",
   blurX: "blurX",
   blurY: "blurY",
+  width: "width",
+  height: "height",
   uProgress: "uProgress",
 };
 
@@ -834,6 +836,8 @@ export const TRANSITION_PROPERTY_PATH_MAP = {
   rotation: ["rotation"],
   blurX: ["_routeGraphicsBlur", "x"],
   blurY: ["_routeGraphicsBlur", "y"],
+  width: ["width"],
+  height: ["height"],
   uProgress: ["uProgress"],
 };
 
@@ -869,6 +873,9 @@ export const AnimationType = {
  * @property {"render" | "persistent"} [continuity="render"] - Whether an in-flight animation may continue across compatible renders
  * @property {number} [speed=1] - Positive finite playback speed multiplier
  * @property {boolean} [loop=false] - Whether an update animation repeats indefinitely without blocking render completion
+ * @property {number | "infinite"} [repeat=0] - Additional timeline iterations; infinite is update-only
+ * @property {number} [repeatDelay=0] - Non-negative integer milliseconds held between iterations
+ * @property {boolean} [yoyo=false] - Alternate forward and reverse iteration direction
  */
 
 /**

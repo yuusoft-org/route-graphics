@@ -214,7 +214,7 @@ describe("normalizeAnimations shader support", () => {
     ],
   ])("reports the exact invalid %s delay path", (_name, animation, path) => {
     expect(() => normalizeAnimations([animation])).toThrow(
-      `${path} must be a finite number greater than or equal to 0.`,
+      `${path} must be a finite number greater than or equal to 0 and an integer number of milliseconds.`,
     );
   });
 
@@ -1133,5 +1133,89 @@ describe("normalizeAnimations rect style support", () => {
         },
       ]),
     ).toThrow(message);
+  });
+
+  it.each([
+    ["negative manual duration", { keyframes: [{ duration: -1, value: 1 }] }],
+    [
+      "fractional manual duration",
+      { keyframes: [{ duration: 1.5, value: 1 }] },
+    ],
+    ["non-finite auto duration", { auto: { duration: Infinity } }],
+    ["fractional auto duration", { auto: { duration: 0.5 } }],
+    [
+      "unsafe auto duration",
+      { auto: { duration: Number.MAX_SAFE_INTEGER + 1 } },
+    ],
+  ])("rejects %s", (_name, x) => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "invalid-duration",
+          targetId: "panel",
+          type: "update",
+          tween: { x },
+        },
+      ]),
+    ).toThrow(/duration must be .*integer number of milliseconds/);
+  });
+
+  it("rejects fractional animation delays", () => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "fractional-delay",
+          targetId: "panel",
+          type: "update",
+          tween: {
+            x: { keyframes: [{ delay: 0.5, duration: 10, value: 1 }] },
+          },
+        },
+      ]),
+    ).toThrow(/delay must be .*integer number of milliseconds/);
+  });
+
+  it("rejects duplicate animation ids even when targets differ", () => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "duplicate",
+          targetId: "first",
+          type: "update",
+          tween: { x: { auto: { duration: 100 } } },
+        },
+        {
+          id: "duplicate",
+          targetId: "second",
+          type: "update",
+          tween: { y: { auto: { duration: 100 } } },
+        },
+      ]),
+    ).toThrow(/Animation ids must be unique/);
+  });
+
+  it("rejects more than one transition for the same target", () => {
+    const transitionSide = {
+      tween: {
+        alpha: { keyframes: [{ duration: 100, value: 0 }] },
+      },
+    };
+
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "first-transition",
+          targetId: "panel",
+          type: "transition",
+          prev: transitionSide,
+        },
+        {
+          id: "second-transition",
+          targetId: "panel",
+          type: "transition",
+          next: transitionSide,
+        },
+      ]),
+    ).toThrow(/second transition for target "panel"/);
   });
 });

@@ -57,8 +57,18 @@ const replaceTextDisplayObject = ({
 };
 
 const updatePlainTextDisplayObject = (displayObject, textComputedNode) => {
-  displayObject.text = textComputedNode.content;
   applyTextStyle(displayObject, textComputedNode.textStyle);
+  const timelineTextUnits =
+    displayObject[Symbol.for("routeGraphics.timelineTextUnits")];
+  if (
+    timelineTextUnits?.matches(textComputedNode.content, displayObject.style)
+  ) {
+    timelineTextUnits.originalText = String(textComputedNode.content ?? "");
+    timelineTextUnits.sync();
+  } else {
+    timelineTextUnits?.destroy();
+    displayObject.text = textComputedNode.content;
+  }
   syncTextAnchorRatios(displayObject, textComputedNode);
   positionTextInLayoutBox(displayObject, textComputedNode);
   displayObject.alpha = textComputedNode.alpha;

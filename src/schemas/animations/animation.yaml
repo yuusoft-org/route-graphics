@@ -17,11 +17,14 @@ $defs:
         type: number
         description: The target value for this keyframe.
       duration:
-        type: number
+        type: integer
+        minimum: 0
+        maximum: 9007199254740991
         description: Duration to reach this value in milliseconds.
       delay:
-        type: number
+        type: integer
         minimum: 0
+        maximum: 9007199254740991
         default: 0
         description: Time in milliseconds to hold the previous value before starting this keyframe segment.
       easing:
@@ -78,10 +81,13 @@ $defs:
         type: string
         description: Target color value.
       duration:
-        type: number
-      delay:
-        type: number
+        type: integer
         minimum: 0
+        maximum: 9007199254740991
+      delay:
+        type: integer
+        minimum: 0
+        maximum: 9007199254740991
         default: 0
         description: Time in milliseconds to hold the previous color before starting this keyframe segment.
       easing:
@@ -154,11 +160,14 @@ $defs:
     type: object
     properties:
       duration:
-        type: number
+        type: integer
+        minimum: 0
+        maximum: 9007199254740991
         description: Duration in milliseconds for the generated tween.
       delay:
-        type: number
+        type: integer
         minimum: 0
+        maximum: 9007199254740991
         default: 0
         description: Time in milliseconds to hold the current value before starting the generated tween.
       easing:
@@ -443,6 +452,380 @@ $defs:
             anyOf:
               - required: [texture]
               - required: [softness]
+  gsapEasing:
+    oneOf:
+      - type: string
+      - type: object
+        required: [kind]
+        properties:
+          kind:
+            enum: [linear, power, sine, expo, circ, back, bounce, elastic, steps, cubicBezier, sampled]
+          direction:
+            enum: [in, out, inOut]
+          exponent:
+            type: integer
+            minimum: 1
+            maximum: 5
+          overshoot:
+            type: number
+            minimum: 0
+          amplitude:
+            type: number
+            minimum: 1
+          period:
+            type: number
+            exclusiveMinimum: 0
+          count:
+            type: integer
+            minimum: 1
+          position:
+            enum: [start, end]
+          points:
+            type: array
+            minItems: 4
+            maxItems: 4
+            items: { type: number }
+          samples:
+            type: array
+            minItems: 2
+            items:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items: { type: number }
+        additionalProperties: false
+  gsapDefaults:
+    type: object
+    properties:
+      duration: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      easing: { $ref: "#/$defs/gsapEasing" }
+      overwrite: { enum: [auto, all, none, error] }
+      repeat:
+        oneOf:
+          - { type: integer, minimum: 0, maximum: 9007199254740991 }
+          - { const: infinite }
+      repeatDelay: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      yoyo: { type: boolean }
+      repeatRefresh: { type: boolean }
+    additionalProperties: false
+  gsapTarget:
+    type: object
+    oneOf:
+      - required: [element]
+        properties: { element: { type: string, minLength: 1 } }
+        additionalProperties: false
+      - required: [elements]
+        properties:
+          elements:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items: { type: string, minLength: 1 }
+        additionalProperties: false
+      - required: [textUnits]
+        properties:
+          textUnits:
+            type: object
+            required: [elementId, unit]
+            properties:
+              elementId: { type: string, minLength: 1 }
+              unit: { enum: [grapheme, word, line] }
+              order: { enum: [logical, visual], default: logical }
+              allowEmpty: { type: boolean, default: false }
+            additionalProperties: false
+        additionalProperties: false
+      - required: [transitionSurface]
+        properties: { transitionSurface: { enum: [prev, next] } }
+        additionalProperties: false
+      - required: [transitionMask]
+        properties: { transitionMask: { const: true } }
+        additionalProperties: false
+      - required: [transitionCompositor]
+        properties: { transitionCompositor: { const: true } }
+        additionalProperties: false
+  gsapStart:
+    type: object
+    oneOf:
+      - required: [time]
+        properties:
+          time: { type: integer, minimum: 0, maximum: 9007199254740991 }
+        additionalProperties: false
+      - required: [anchor]
+        properties:
+          anchor: { type: string, minLength: 1 }
+          edge: { enum: [start, end] }
+          offset: { type: integer, minimum: -9007199254740991, maximum: 9007199254740991 }
+        additionalProperties: false
+  gsapStagger:
+    type: object
+    properties:
+      each: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      amount: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      from:
+        oneOf:
+          - { enum: [start, center, end, edges, random] }
+          - { type: integer, minimum: 0 }
+      easing: { $ref: "#/$defs/gsapEasing" }
+      grid:
+        type: object
+        required: [columns]
+        properties:
+          columns: { type: integer, minimum: 1 }
+        additionalProperties: false
+      axis: { enum: [x, y] }
+    oneOf:
+      - required: [each]
+        not: { required: [amount] }
+      - required: [amount]
+        not: { required: [each] }
+    additionalProperties: false
+  gsapFrame:
+    type: object
+    required: [values, duration]
+    properties:
+      values: { type: object, minProperties: 1 }
+      duration: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      delay: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      easing: { $ref: "#/$defs/gsapEasing" }
+    additionalProperties: false
+  gsapModifier:
+    oneOf:
+      - type: object
+        required: [kind]
+        properties:
+          kind: { const: snap }
+          increment: { type: number, exclusiveMinimum: 0 }
+          values:
+            type: array
+            minItems: 1
+            items: { type: number }
+        oneOf:
+          - required: [increment]
+            not: { required: [values] }
+          - required: [values]
+            not: { required: [increment] }
+        additionalProperties: false
+      - type: object
+        required: [kind, precision]
+        properties:
+          kind: { const: round }
+          precision: { type: integer, minimum: 0, maximum: 15 }
+        additionalProperties: false
+      - type: object
+        required: [kind, min, max]
+        properties:
+          kind: { enum: [clamp, wrap, wrapYoyo] }
+          min: { type: number }
+          max: { type: number }
+        additionalProperties: false
+  gsapModifiers:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: array
+      minItems: 1
+      items: { $ref: "#/$defs/gsapModifier" }
+  gsapStep:
+    type: object
+    required: [kind]
+    properties:
+      kind: { enum: [set, to, from, fromTo, keyframes, sequence, parallel, wait, mark, emit] }
+      id: { type: string, minLength: 1 }
+      delay: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      overlap: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      start: { $ref: "#/$defs/gsapStart" }
+      targets:
+        oneOf:
+          - { type: string, minLength: 1 }
+          - type: array
+            minItems: 1
+            uniqueItems: true
+            items: { type: string, minLength: 1 }
+      values: { type: object, minProperties: 1 }
+      from: { type: object, minProperties: 1 }
+      to: { type: object, minProperties: 1 }
+      duration: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      easing: { $ref: "#/$defs/gsapEasing" }
+      stagger: { $ref: "#/$defs/gsapStagger" }
+      overwrite: { enum: [auto, all, none, error] }
+      modifiers: { $ref: "#/$defs/gsapModifiers" }
+      repeat:
+        oneOf:
+          - { type: integer, minimum: 0, maximum: 9007199254740991 }
+          - { const: infinite }
+      repeatDelay: { type: integer, minimum: 0, maximum: 9007199254740991 }
+      yoyo: { type: boolean }
+      repeatRefresh: { type: boolean }
+      speed: { type: number, exclusiveMinimum: 0 }
+      frames:
+        type: array
+        minItems: 1
+        items: { $ref: "#/$defs/gsapFrame" }
+      steps:
+        type: array
+        minItems: 1
+        items: { $ref: "#/$defs/gsapStep" }
+      defaults: { $ref: "#/$defs/gsapDefaults" }
+      name: { type: string, minLength: 1 }
+      event: { type: string, minLength: 1 }
+      payload: {}
+      direction: { enum: [forward, reverse, both] }
+      occurrence: { enum: [once, eachIteration] }
+      seekPolicy: { enum: [suppress, crossed] }
+    additionalProperties: false
+    allOf:
+      - if: { properties: { kind: { const: set } }, required: [kind] }
+        then:
+          required: [values]
+          not:
+            anyOf:
+              - required: [from]
+              - required: [to]
+              - required: [frames]
+              - required: [steps]
+              - required: [duration]
+              - required: [easing]
+              - required: [repeat]
+              - required: [repeatDelay]
+              - required: [yoyo]
+              - required: [repeatRefresh]
+              - required: [speed]
+              - required: [name]
+              - required: [event]
+      - if:
+          properties: { kind: { enum: [to, from] } }
+          required: [kind]
+        then:
+          required: [values]
+          not:
+            anyOf:
+              - required: [from]
+              - required: [to]
+              - required: [frames]
+              - required: [steps]
+              - required: [name]
+              - required: [event]
+      - if: { properties: { kind: { const: fromTo } }, required: [kind] }
+        then:
+          required: [from, to]
+          not:
+            anyOf:
+              - required: [values]
+              - required: [frames]
+              - required: [steps]
+              - required: [name]
+              - required: [event]
+      - if: { properties: { kind: { const: keyframes } }, required: [kind] }
+        then:
+          required: [frames]
+          not:
+            anyOf:
+              - required: [values]
+              - required: [from]
+              - required: [to]
+              - required: [steps]
+              - required: [duration]
+              - required: [name]
+              - required: [event]
+      - if:
+          properties: { kind: { enum: [sequence, parallel] } }
+          required: [kind]
+        then:
+          required: [steps]
+          not:
+            anyOf:
+              - required: [targets]
+              - required: [values]
+              - required: [from]
+              - required: [to]
+              - required: [frames]
+              - required: [duration]
+              - required: [easing]
+              - required: [stagger]
+              - required: [overwrite]
+              - required: [modifiers]
+              - required: [name]
+              - required: [event]
+      - if: { properties: { kind: { const: wait } }, required: [kind] }
+        then:
+          required: [duration]
+          not:
+            anyOf:
+              - required: [targets]
+              - required: [values]
+              - required: [from]
+              - required: [to]
+              - required: [frames]
+              - required: [steps]
+              - required: [easing]
+              - required: [stagger]
+              - required: [overwrite]
+              - required: [modifiers]
+              - required: [repeat]
+              - required: [repeatDelay]
+              - required: [yoyo]
+              - required: [repeatRefresh]
+              - required: [speed]
+              - required: [name]
+              - required: [event]
+      - if: { properties: { kind: { const: mark } }, required: [kind] }
+        then:
+          required: [name]
+          not:
+            anyOf:
+              - required: [targets]
+              - required: [values]
+              - required: [from]
+              - required: [to]
+              - required: [frames]
+              - required: [steps]
+              - required: [duration]
+              - required: [easing]
+              - required: [stagger]
+              - required: [overwrite]
+              - required: [modifiers]
+              - required: [repeat]
+              - required: [repeatDelay]
+              - required: [yoyo]
+              - required: [repeatRefresh]
+              - required: [speed]
+              - required: [event]
+      - if: { properties: { kind: { const: emit } }, required: [kind] }
+        then:
+          required: [event]
+          not:
+            anyOf:
+              - required: [targets]
+              - required: [values]
+              - required: [from]
+              - required: [to]
+              - required: [frames]
+              - required: [steps]
+              - required: [duration]
+              - required: [easing]
+              - required: [stagger]
+              - required: [overwrite]
+              - required: [modifiers]
+              - required: [repeat]
+              - required: [repeatDelay]
+              - required: [yoyo]
+              - required: [repeatRefresh]
+              - required: [speed]
+              - required: [name]
+  gsap:
+    type: object
+    required: [profile, steps]
+    properties:
+      profile: { const: portable-v1 }
+      defaults: { $ref: "#/$defs/gsapDefaults" }
+      targets:
+        type: object
+        additionalProperties: { $ref: "#/$defs/gsapTarget" }
+      steps:
+        type: array
+        minItems: 1
+        items: { $ref: "#/$defs/gsapStep" }
+    additionalProperties: false
   playback:
     type: object
     properties:
@@ -458,7 +841,28 @@ $defs:
         type: boolean
         default: false
         description: Repeat an update animation indefinitely without blocking render completion. Not supported for transitions.
+      repeat:
+        oneOf:
+          - type: integer
+            minimum: 0
+            maximum: 9007199254740991
+          - const: infinite
+        default: 0
+        description: Additional iterations after the first. Infinite repetition is update-only.
+      repeatDelay:
+        type: integer
+        minimum: 0
+        maximum: 9007199254740991
+        default: 0
+        description: Hold time in milliseconds between iterations.
+      yoyo:
+        type: boolean
+        default: false
+        description: Alternate playback direction on repeated iterations.
     additionalProperties: false
+    allOf:
+      - not:
+          required: [loop, repeat]
 properties:
   id:
     type: string
@@ -481,6 +885,8 @@ properties:
     $ref: "#/$defs/playback"
   tween:
     $ref: "#/$defs/updateTween"
+  gsap:
+    $ref: "#/$defs/gsap"
   prev:
     $ref: "#/$defs/transitionSide"
   next:
@@ -496,7 +902,11 @@ allOf:
         type:
           const: update
     then:
-      required: [tween]
+      oneOf:
+        - required: [tween]
+          not: { required: [gsap] }
+        - required: [gsap]
+          not: { required: [tween] }
       not:
         anyOf:
           - required: [prev]
@@ -513,8 +923,19 @@ allOf:
         - required: [next]
         - required: [mask]
         - required: [compositor]
+        - required: [gsap]
       not:
         required: [tween]
+  - if:
+      required: [gsap]
+      properties:
+        type:
+          const: transition
+    then:
+      not:
+        anyOf:
+          - required: [prev]
+          - required: [next]
   - if:
       required: [playback]
       properties:

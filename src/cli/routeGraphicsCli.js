@@ -15,15 +15,24 @@ import {
 import { getRendererBrowserLaunchOptions } from "./browserLaunch.js";
 import { renderMp4 } from "./renderVideo.js";
 import { parseStateSelection } from "./stateSelection.js";
+import { inspectTimelineFile } from "./inspectTimeline.js";
 
 const cliModuleDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(cliModuleDir, "..", "..");
 const bundlePath = path.join(projectRoot, "dist", "RouteGraphics.js");
 
 const SUPPORTED_FORMATS = new Set(["png", "mp4"]);
+const INSPECT_TIMELINE_OPTIONS = new Set([
+  "-h",
+  "--help",
+  "--state",
+  "--animation",
+  "--compact",
+]);
 
 const usage = `Usage:
   route-graphics render <input.yaml> -o <output> [options]
+  route-graphics inspect-timeline <input.yaml> [options]
 
 Options:
   -o, --output <path>              Output path. Supports .png and .mp4
@@ -50,6 +59,11 @@ Runtime options:
   --ffmpeg <path>                  ffmpeg path for MP4 output (default: ffmpeg)
   --timeout <ms>                   Browser-side render timeout (default: 15000)
   -h, --help                       Show this help
+
+Timeline inspection options:
+  --state <index>                  State index (default: 0)
+  --animation <id>                 Inspect one animation id
+  --compact                        Emit compact JSON instead of indented JSON
 `;
 
 const renderCommandUsage = usage;
@@ -223,12 +237,20 @@ export const parseRouteGraphicsCliArgs = (argv) => {
     };
   }
 
-  if (command !== "render") {
+  if (command !== "render" && command !== "inspect-timeline") {
     throw new Error(`Unknown command: ${command}`);
   }
 
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index];
+
+    if (
+      command === "inspect-timeline" &&
+      token.startsWith("-") &&
+      !INSPECT_TIMELINE_OPTIONS.has(token)
+    ) {
+      throw new Error(`${token} is not supported by inspect-timeline.`);
+    }
 
     switch (token) {
       case "-h":
@@ -267,6 +289,19 @@ export const parseRouteGraphicsCliArgs = (argv) => {
           { min: 0 },
         );
         index += 1;
+        break;
+      case "--animation":
+        if (command !== "inspect-timeline") {
+          throw new Error("--animation is only supported by inspect-timeline.");
+        }
+        options.animationId = readOptionValue(rest, index, token);
+        index += 1;
+        break;
+      case "--compact":
+        if (command !== "inspect-timeline") {
+          throw new Error("--compact is only supported by inspect-timeline.");
+        }
+        options.compact = true;
         break;
       case "--states":
         options.stateSelection = readOptionValue(rest, index, token);
@@ -890,6 +925,19 @@ export const runRouteGraphicsCli = async ({
   }
 
   try {
+    if (cliOptions.command === "inspect-timeline") {
+      const inspection = await inspectTimelineFile({
+        inputPath: cliOptions.inputPath,
+        cwd,
+        stateIndex: cliOptions.stateIndex ?? 0,
+        animationId: cliOptions.animationId,
+      });
+      stdout.write(
+        `${JSON.stringify(inspection, null, cliOptions.compact ? 0 : 2)}\n`,
+      );
+      return 0;
+    }
+
     const result = await runRender({ cliOptions, cwd });
     const totalDurationMS = performance.now() - startedAt;
 

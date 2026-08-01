@@ -1087,6 +1087,181 @@ describe("animationBus auto tween shorthand", () => {
     expect(animationBus.getState().activeCount).toBe(0);
   });
 
+  it.each(["tick", "setTime"])(
+    "disposes a completed backend exactly once through %s",
+    (completionMethod) => {
+      const animationBus = createAnimationBus();
+      const dispose = vi.fn();
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: `dispose-complete-${completionMethod}`,
+          driver: "custom",
+          duration: 100,
+          dispose,
+        },
+      });
+      animationBus.flush();
+
+      animationBus[completionMethod](100);
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+
+      animationBus.cancelAll();
+      animationBus.destroy();
+      expect(dispose).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([
+    "cancel",
+    "cancelAll",
+    "destroy",
+    "invalid-target-tick",
+    "invalid-target-setTime",
+  ])("disposes a backend exactly once after %s cancellation", (method) => {
+    const animationBus = createAnimationBus();
+    const dispose = vi.fn();
+    const onCancel = vi.fn();
+    const applyTargetState = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: `dispose-${method}`,
+        driver: "custom",
+        duration: 100,
+        dispose,
+        onCancel,
+        applyTargetState,
+        isValid: () => !method.startsWith("invalid-target"),
+      },
+    });
+    animationBus.flush();
+
+    if (method === "cancel") {
+      animationBus.dispatch({ type: "CANCEL", id: `dispose-${method}` });
+      animationBus.flush();
+    } else if (method.startsWith("invalid-target")) {
+      animationBus[method.endsWith("setTime") ? "setTime" : "tick"](1);
+    } else {
+      animationBus[method]();
+    }
+
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(applyTargetState).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+
+    animationBus.destroy();
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["tick", "setTime"])(
+    "cleans up a failed backend exactly once through %s",
+    (failureMethod) => {
+      const animationBus = createAnimationBus();
+      const failure = new Error(`${failureMethod} render failed`);
+      const dispose = vi.fn();
+      const onCancel = vi.fn();
+      const applyTargetState = vi.fn();
+      const failed = vi.fn();
+      animationBus.on("failed", failed);
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: `dispose-failure-${failureMethod}`,
+          driver: "custom",
+          duration: 100,
+          dispose,
+          onCancel,
+          applyTargetState,
+          applyFrame: (time) => {
+            if (time > 0) throw failure;
+          },
+        },
+      });
+      animationBus.flush();
+
+      animationBus[failureMethod](50);
+      expect(failed).toHaveBeenCalledWith({
+        id: `dispose-failure-${failureMethod}`,
+        error: failure,
+      });
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(applyTargetState).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+
+      animationBus.destroy();
+      expect(dispose).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("disposes every newly activated backend once when queue activation rolls back", () => {
+    const animationBus = createAnimationBus();
+    const firstDispose = vi.fn();
+    const secondDispose = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "rollback-first",
+        driver: "custom",
+        duration: 100,
+        dispose: firstDispose,
+      },
+    });
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "rollback-second",
+        driver: "custom",
+        duration: 100,
+        dispose: secondDispose,
+        applyFrame: () => {
+          throw new Error("activation failed");
+        },
+      },
+    });
+
+    expect(() => animationBus.flush()).toThrow("activation failed");
+    expect(firstDispose).toHaveBeenCalledTimes(1);
+    expect(secondDispose).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+
+    animationBus.destroy();
+    expect(firstDispose).toHaveBeenCalledTimes(1);
+    expect(secondDispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retain a completed context when backend disposal throws", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const dispose = vi.fn(() => {
+      throw new Error("cleanup failed");
+    });
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "throwing-disposal",
+        driver: "custom",
+        duration: 10,
+        dispose,
+        onComplete,
+      },
+    });
+    animationBus.flush();
+
+    expect(() => animationBus.tick(10)).not.toThrow();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
   it("keeps explicitly preserved persistent animations active across selective cancellation", () => {
     const animationBus = createAnimationBus();
     const onCancel = vi.fn();

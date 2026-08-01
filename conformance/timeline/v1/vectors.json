@@ -1,0 +1,207 @@
+{
+  "schema": "route.timeline-conformance/v1",
+  "numericTolerance": 1e-12,
+  "programCases": [
+    {
+      "name": "scalar-repeat-gap-event",
+      "canonical": "{\"clipTemplates\":[{\"channel\":\"transform.x\",\"composite\":\"replace\",\"domain\":\"root\",\"duration\":100,\"fanout\":null,\"fill\":\"forwards\",\"id\":\"move-x\",\"modifiers\":[],\"overwrite\":\"none\",\"priority\":0,\"sampler\":{\"easing\":\"linear\",\"from\":{\"kind\":\"constant\",\"value\":0},\"kind\":\"interpolate\",\"to\":{\"kind\":\"constant\",\"value\":10}},\"sourcePath\":\"vectors.scalar-repeat-gap-event\",\"start\":0,\"targets\":\"self\",\"valueType\":\"scalar\"}],\"domains\":{\"root\":{\"cycleDuration\":100,\"direction\":\"forward\",\"iterationGap\":20,\"iterations\":2,\"parent\":null,\"rate\":1,\"refresh\":\"never\",\"start\":0}},\"duration\":220,\"easings\":{\"linear\":{\"kind\":\"linear\"}},\"events\":[{\"direction\":\"both\",\"domain\":\"root\",\"id\":\"middle\",\"name\":\"middle\",\"occurrence\":\"eachIteration\",\"payload\":{\"fixture\":true},\"priority\":0,\"seekPolicy\":\"crossed\",\"time\":50}],\"ownerId\":\"hero\",\"programId\":\"conformance-move\",\"requirements\":[\"channel.transform2d\",\"target.element\"],\"schedules\":{},\"schema\":\"route.timeline/v1\",\"targetQueries\":{\"self\":{\"elementId\":\"hero\",\"kind\":\"element\"}},\"timeUnit\":\"milliseconds\"}",
+      "program": {
+        "schema": "route.timeline/v1",
+        "timeUnit": "milliseconds",
+        "programId": "conformance-move",
+        "ownerId": "hero",
+        "duration": 220,
+        "requirements": ["channel.transform2d", "target.element"],
+        "targetQueries": {
+          "self": { "kind": "element", "elementId": "hero" }
+        },
+        "schedules": {},
+        "domains": {
+          "root": {
+            "parent": null,
+            "start": 0,
+            "cycleDuration": 100,
+            "iterations": 2,
+            "iterationGap": 20,
+            "direction": "forward",
+            "rate": 1,
+            "refresh": "never"
+          }
+        },
+        "easings": { "linear": { "kind": "linear" } },
+        "clipTemplates": [
+          {
+            "id": "move-x",
+            "sourcePath": "vectors.scalar-repeat-gap-event",
+            "domain": "root",
+            "targets": "self",
+            "fanout": null,
+            "channel": "transform.x",
+            "valueType": "scalar",
+            "start": 0,
+            "duration": 100,
+            "sampler": {
+              "kind": "interpolate",
+              "from": { "kind": "constant", "value": 0 },
+              "to": { "kind": "constant", "value": 10 },
+              "easing": "linear"
+            },
+            "modifiers": [],
+            "composite": "replace",
+            "priority": 0,
+            "fill": "forwards",
+            "overwrite": "none"
+          }
+        ],
+        "events": [
+          {
+            "id": "middle",
+            "domain": "root",
+            "time": 50,
+            "name": "middle",
+            "payload": { "fixture": true },
+            "direction": "both",
+            "occurrence": "eachIteration",
+            "seekPolicy": "crossed",
+            "priority": 0
+          }
+        ]
+      },
+      "mockBindings": {
+        "targets": { "hero": { "x": 0 } },
+        "channels": { "transform.x": "x" }
+      },
+      "samples": [
+        { "time": 0, "values": { "hero/transform.x": 0 } },
+        { "time": 25, "values": { "hero/transform.x": 2.5 } },
+        { "time": 100, "values": { "hero/transform.x": 10 } },
+        { "time": 110, "values": { "hero/transform.x": 10 } },
+        { "time": 120, "values": { "hero/transform.x": 0 } },
+        { "time": 170, "values": { "hero/transform.x": 5 } },
+        { "time": 220, "values": { "hero/transform.x": 10 } }
+      ],
+      "eventCrossings": [
+        {
+          "from": 0,
+          "to": 220,
+          "events": [
+            {
+              "name": "middle",
+              "time": 50,
+              "direction": "forward",
+              "iterations": [0]
+            },
+            {
+              "name": "middle",
+              "time": 170,
+              "direction": "forward",
+              "iterations": [1]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "canonicalDataCases": [
+    {
+      "value": { "z": 0, "a": "é", "n": 1e-7 },
+      "canonical": "{\"a\":\"é\",\"n\":1e-7,\"z\":0}"
+    }
+  ],
+  "domainCases": [
+    {
+      "domain": {
+        "start": 10,
+        "cycleDuration": 100,
+        "iterations": 3,
+        "iterationGap": 20,
+        "direction": "alternate",
+        "rate": 2
+      },
+      "samples": [
+        { "parentTime": 5, "iteration": 0, "localTime": 0, "active": false },
+        { "parentTime": 35, "iteration": 0, "localTime": 50, "active": true },
+        { "parentTime": 70, "iteration": 1, "localTime": 100, "active": true },
+        { "parentTime": 125, "iteration": 1, "localTime": 0, "active": true }
+      ]
+    }
+  ],
+  "easingCases": [
+    {
+      "easing": { "kind": "linear" },
+      "samples": [
+        [0, 0],
+        [0.25, 0.25],
+        [1, 1]
+      ]
+    },
+    {
+      "easing": { "kind": "power", "exponent": 3, "direction": "out" },
+      "samples": [
+        [0, 0],
+        [0.5, 0.875],
+        [1, 1]
+      ]
+    }
+  ],
+  "expressionCases": [
+    {
+      "expression": {
+        "kind": "add",
+        "left": { "kind": "targetIndex" },
+        "right": { "kind": "subjectDimension", "axis": "width" }
+      },
+      "context": { "targetIndex": 2, "subject": { "width": 200 } },
+      "result": 202
+    }
+  ],
+  "modifierCases": [
+    {
+      "input": 17.6,
+      "modifiers": [
+        { "kind": "snap", "increment": 5 },
+        { "kind": "clamp", "min": 0, "max": 18 }
+      ],
+      "result": 18
+    },
+    {
+      "input": -1,
+      "modifiers": [{ "kind": "wrap", "min": 0, "max": 10 }],
+      "result": 9
+    }
+  ],
+  "randomCases": [
+    {
+      "seedParts": ["portable-v1", "hero", "x", 0],
+      "initialState": "0x20869d221d1c2e05",
+      "outputs": [
+        {
+          "state": "0xbebe16db9c66aa1a",
+          "bits": "0x2e6c73081b697302",
+          "unit": 0.18134230564047527
+        },
+        {
+          "state": "0x5cf590951bb1262f",
+          "bits": "0xbadba3b44888d65f",
+          "unit": 0.7299139323372714
+        },
+        {
+          "state": "0xfb2d0a4e9afba244",
+          "bits": "0x584e538b00fb9f7e",
+          "unit": 0.34494516509674467
+        }
+      ]
+    }
+  ],
+  "textSegmentationCases": [
+    {
+      "unicodeVersion": "17.0.0",
+      "text": "é👨‍👩‍👧‍👦🇸🇬",
+      "graphemes": [
+        { "start": 0, "end": 2 },
+        { "start": 2, "end": 13 },
+        { "start": 13, "end": 17 }
+      ]
+    }
+  ]
+}

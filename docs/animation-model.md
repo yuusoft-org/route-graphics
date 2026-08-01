@@ -1,11 +1,12 @@
 # Animation Model
 
-Last updated: 2026-07-31
+Last updated: 2026-08-01
 
 See also:
 
 - `docs/animation-type-semantics.md`
 - `docs/animation-implementation-plan.md`
+- `docs/portable-gsap-timelines.md`
 - `docs/shader-interface.md`
 
 ## Goal
@@ -23,12 +24,12 @@ The runtime now exposes:
 
 - top-level `animations`
 - required `type: update | transition`
-- `tween` as the motion payload
+- mutually exclusive `tween` and portable `gsap` motion payloads
 - `mask` only inside `transition`
 - optional `playback.continuity: render | persistent` on `update` and `transition`
 - optional positive `playback.speed` on `update` and `transition`
-- optional infinite `playback.loop` on `update`
-- optional non-negative per-segment `delay`
+- finite/infinite repeat, repeat delay, yoyo, and the `loop` compatibility alias
+- integer-millisecond duration, delay, overlap, and start values
 - independently targeted shader parameter timelines
 - inline single-pass and multi-pass transition compositors
 - composable mask plus compositor transitions
@@ -114,12 +115,21 @@ behavior; lifecycle tightening remains tracked in
 
 `update` supports:
 
-- `tween`
+- exactly one of `tween` or `gsap`
 - `playback.continuity`
 - `playback.speed`
 - `playback.loop`
 - ordinary properties and `filters.<filterId>` parameter timelines inside
   `tween`
+- structured sequences, parallel groups, target aliases, text units, stagger,
+  expressions, modifiers, events, and controls through `gsap`
+
+In the PixiJS/JavaScript renderer, both `tween` and `gsap` compile to the same
+renderer-neutral TimelineProgram and use the pinned GSAP backend for numeric
+interpolation and native easing. Route Graphics retains the millisecond clock,
+playback lifecycle, conflict rules, and renderer writes. The `gsap` field does
+not accept arbitrary JavaScript or plugins, and native renderers use the same
+TimelineProgram through their own conforming evaluator.
 
 `update` does not support:
 
@@ -134,6 +144,11 @@ behavior; lifecycle tightening remains tracked in
 
 - `prev`
 - `next`
+
+It has two exclusive authoring modes: existing shorthand fields
+(`prev.tween`, `next.tween`, mask progress, and compositor tween) or one
+top-level portable `gsap` timeline that coordinates synthetic previous/next,
+mask, and compositor targets. See `docs/portable-gsap-timelines.md`.
 
 Use it for:
 
@@ -197,7 +212,7 @@ from the previous value. The first authored keyframe controls the segment from
 the same rule for the single segment from the current live value to the next
 state value.
 
-Each keyframe may define a finite, non-negative `delay` in milliseconds. The
+Each keyframe may define a non-negative integer `delay` in milliseconds. The
 runtime holds the previous value for that delay and then interpolates for the
 keyframe's `duration`. A first-keyframe delay holds `initialValue` or the
 current live value; a later delay creates a gap between segments. Total track
@@ -355,7 +370,8 @@ of these remain true:
 
 - the animation `id` is the same
 - the `targetId` is the same
-- the normalized `tween`, `shader`, and `playback` config are the same
+- the canonical compiled timeline (from `tween` or `gsap`) and `playback`
+  semantics are the same
 - the target element still exists as the same live display object
 
 ### Meaning For `transition`

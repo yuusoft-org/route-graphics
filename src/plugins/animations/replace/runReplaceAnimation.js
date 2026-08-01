@@ -10,10 +10,10 @@ import {
   UniformGroup,
 } from "pixi.js";
 import {
-  buildTimeline,
-  calculateMaxDuration,
-  getValueAtTime,
-} from "../../../util/animationTimeline.js";
+  bindTimelineProgram,
+  compileTransitionAnimation,
+  createGsapTimelineEvaluator,
+} from "../timeline/index.js";
 import {
   clearDeferredMountOperations,
   createRenderContext,
@@ -37,15 +37,6 @@ import {
   setShaderTimeInTree,
   validateShaderEffectParameterValue,
 } from "../../elements/util/shaderFilterEffect.js";
-const DEFAULT_SUBJECT_VALUES = {
-  translateX: 0,
-  translateY: 0,
-  alpha: 1,
-  scaleX: 1,
-  scaleY: 1,
-  rotation: 0,
-};
-
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
 
 const smoothstep = (edge0, edge1, value) => {
@@ -177,92 +168,226 @@ const hasAnimatedSpriteInTree = (displayObject) => {
 
 const isLiveSubject = (subject) => subject?.live === true;
 
-const getSubjectDefaultValue = (property, base) => {
-  switch (property) {
-    case "x":
-      return base.x;
-    case "y":
-      return base.y;
-    default:
-      return DEFAULT_SUBJECT_VALUES[property] ?? 0;
-  }
+const getZeroForValueType = (valueType) => {
+  const length = {
+    vec2: 2,
+    vec3: 3,
+    vec4: 4,
+    mat3: 9,
+    mat4: 16,
+    colorSrgb: 4,
+    colorLinear: 4,
+  }[valueType];
+  return length === undefined ? 0 : Array(length).fill(0);
 };
 
-const buildSubjectTimelines = (tween = {}, base) =>
-  Object.entries(tween).map(([property, config]) => ({
-    property,
-    timeline: buildTimeline([
-      {
-        value: config.initialValue ?? getSubjectDefaultValue(property, base),
-      },
-      ...config.keyframes,
-    ]),
-  }));
-
-const createSubjectController = (subject, tween) => {
-  if (!subject?.wrapper || !tween) {
-    return {
-      duration: 0,
-      timelines: [],
-      apply: () => {},
-    };
-  }
-
-  const wrapper = subject.wrapper;
+const createTransitionSurfaceTarget = (surface, subject) => {
+  const wrapper = subject?.wrapper;
   const base = {
-    x: wrapper.x,
-    y: wrapper.y,
-    alpha: wrapper.alpha,
-    scaleX: wrapper.scale.x,
-    scaleY: wrapper.scale.y,
-    rotation: wrapper.rotation,
-    width: subject.width,
-    height: subject.height,
+    x: wrapper?.x ?? 0,
+    y: wrapper?.y ?? 0,
+    alpha: wrapper?.alpha ?? 1,
+    scaleX: wrapper?.scale?.x ?? 1,
+    scaleY: wrapper?.scale?.y ?? 1,
+    rotation: wrapper?.rotation ?? 0,
   };
-  const timelines = buildSubjectTimelines(tween, base);
-
   return {
-    duration: calculateMaxDuration(timelines),
-    timelines,
-    apply: (time) => {
-      wrapper.x = base.x;
-      wrapper.y = base.y;
-      wrapper.alpha = base.alpha;
-      wrapper.scale.x = base.scaleX;
-      wrapper.scale.y = base.scaleY;
-      wrapper.rotation = base.rotation;
+    handle: { kind: "surface", surface, subject, wrapper, base },
+    identity: `transition:${surface}`,
+    subject: {
+      x: base.x,
+      y: base.y,
+      width: subject?.width ?? 1,
+      height: subject?.height ?? 1,
+    },
+  };
+};
 
-      for (const { property, timeline } of timelines) {
-        const value = getValueAtTime(timeline, time);
+const createTransitionTimelineController = ({
+  animation,
+  program,
+  prevSubject,
+  nextSubject,
+  maskController,
+  compositorEffect,
+  validateTerminal = false,
+}) => {
+  const valueTypes = new Map(
+    program.clipTemplates.map((clip) => [clip.channel, clip.valueType]),
+  );
+  const maskHandle = {
+    kind: "mask",
+    progress: animation.mask?.progress?.initialValue ?? 0,
+    apply: (value) => maskController?.apply(clamp01(value)),
+  };
+  const compositorHandle = {
+    kind: "compositor",
+    progress:
+      animation.compositor?.tween?.progress?.initialValue ??
+      animation.compositor?.tween?.uProgress?.initialValue ??
+      0,
+  };
+  const transitionTargets = {
+    prev: createTransitionSurfaceTarget("prev", prevSubject),
+    next: createTransitionSurfaceTarget("next", nextSubject),
+    mask: { handle: maskHandle, identity: "transition:mask" },
+    compositor: {
+      handle: compositorHandle,
+      identity: "transition:compositor",
+    },
+  };
 
-        switch (property) {
-          case "x":
-            wrapper.x = value;
-            break;
-          case "y":
-            wrapper.y = value;
-            break;
-          case "translateX":
-            wrapper.x = base.x + value * base.width;
-            break;
-          case "translateY":
-            wrapper.y = base.y + value * base.height;
-            break;
-          case "alpha":
-            wrapper.alpha = base.alpha * value;
-            break;
-          case "scaleX":
-            wrapper.scale.x = base.scaleX * value;
-            break;
-          case "scaleY":
-            wrapper.scale.y = base.scaleY * value;
-            break;
-          case "rotation":
-            wrapper.rotation = base.rotation + degreesToRadians(value);
-            break;
+  const resolveChannel = (target, channel) => {
+    const valueType = valueTypes.get(channel);
+    if (target.handle.kind === "surface") {
+      const { wrapper, base } = target.handle;
+      const properties = {
+        "transform.x": [
+          () => base.x,
+          (value) => {
+            if (wrapper) wrapper.x = value;
+          },
+        ],
+        "transform.y": [
+          () => base.y,
+          (value) => {
+            if (wrapper) wrapper.y = value;
+          },
+        ],
+        "transform.scale.x": [
+          () => 1,
+          (value) => {
+            if (wrapper) wrapper.scale.x = base.scaleX * value;
+          },
+        ],
+        "transform.scale.y": [
+          () => 1,
+          (value) => {
+            if (wrapper) wrapper.scale.y = base.scaleY * value;
+          },
+        ],
+        "transform.rotation.degrees": [
+          () => 0,
+          (value) => {
+            if (wrapper)
+              wrapper.rotation = base.rotation + degreesToRadians(value);
+          },
+        ],
+        "appearance.alpha": [
+          () => 1,
+          (value) => {
+            if (wrapper) wrapper.alpha = base.alpha * value;
+          },
+        ],
+      };
+      const pair = properties[channel];
+      return pair
+        ? { valueType, get: pair[0], apply: (_handle, value) => pair[1](value) }
+        : null;
+    }
+    if (
+      target.handle.kind === "mask" &&
+      channel === "transition.mask.progress"
+    ) {
+      return {
+        valueType,
+        get: () => target.handle.progress,
+        apply: (_handle, value) => {
+          target.handle.progress = value;
+          target.handle.apply(value);
+        },
+      };
+    }
+    if (target.handle.kind === "compositor") {
+      if (channel === "transition.compositor.progress") {
+        return {
+          valueType,
+          get: () => target.handle.progress,
+          apply: (_handle, value) => {
+            target.handle.progress = value;
+            if (compositorEffect)
+              setShaderEffectProgress(compositorEffect, value);
+          },
+        };
+      }
+      const match = /^transition\.compositor\.parameter\.(.+)$/.exec(channel);
+      if (match) {
+        const parameter = match[1];
+        return {
+          valueType,
+          get: () => {
+            if (!compositorEffect) return getZeroForValueType(valueType);
+            const value = getShaderEffectParameter(compositorEffect, parameter);
+            if (value === undefined) {
+              throw new Error(
+                `Transition animation "${animation.id}" cannot target unknown compositor parameter "${parameter}".`,
+              );
+            }
+            return value;
+          },
+          apply: (_handle, value) => {
+            if (compositorEffect) {
+              setShaderEffectParameter(compositorEffect, parameter, value);
+            }
+          },
+        };
+      }
+    }
+    return null;
+  };
+
+  const instance = bindTimelineProgram(program, {
+    capabilities: new Set(program.requirements),
+    transitionTargets,
+    channelRegistry: { resolve: resolveChannel },
+  });
+  if (!Number.isFinite(instance.duration)) {
+    throw new Error(`Transition animation "${animation.id}" must be finite.`);
+  }
+  const timelineEvaluator = createGsapTimelineEvaluator(instance);
+  try {
+    const terminalFrame = timelineEvaluator.evaluate(instance.duration);
+    if (validateTerminal && animation.gsap) {
+      for (const [configured, channel, label] of [
+        [animation.mask, "transition.mask.progress", "mask"],
+        [animation.compositor, "transition.compositor.progress", "compositor"],
+      ]) {
+        if (!configured) continue;
+        const value = terminalFrame.values.find(
+          (item) => item.channel === channel,
+        )?.value;
+        if (value !== 1) {
+          throw new Error(
+            `Transition animation "${animation.id}" ${label} must have effective terminal progress 1.`,
+          );
         }
       }
-    },
+    }
+  } catch (error) {
+    timelineEvaluator.destroy();
+    throw error;
+  }
+  const sampleTimes = new Set([0, instance.duration]);
+  for (const track of instance.tracks) {
+    for (const segment of track.segments) {
+      sampleTimes.add(segment.rootStart);
+      sampleTimes.add(segment.rootEnd);
+      const span = segment.rootEnd - segment.rootStart;
+      if (span > 0) {
+        sampleTimes.add(segment.rootStart + span * 0.25);
+        sampleTimes.add(segment.rootStart + span * 0.5);
+        sampleTimes.add(segment.rootStart + span * 0.75);
+      }
+    }
+  }
+  return {
+    program,
+    instance,
+    backend: timelineEvaluator.backend,
+    duration: instance.duration,
+    sampleTimes: [...sampleTimes].sort((left, right) => left - right),
+    apply: timelineEvaluator.apply,
+    destroy: timelineEvaluator.destroy,
   };
 };
 
@@ -270,6 +395,7 @@ const collectControllerSampleTimes = (controllers) => {
   const sampleTimes = new Set([0]);
 
   for (const controller of controllers) {
+    for (const time of controller.sampleTimes ?? []) sampleTimes.add(time);
     sampleTimes.add(controller.duration);
 
     for (const { timeline } of controller.timelines ?? []) {
@@ -316,22 +442,6 @@ const unionRectangles = (rectangles) => {
 
   return new Rectangle(minX, minY, maxX - minX, maxY - minY);
 };
-
-const createMaskProgressTimeline = (mask) =>
-  buildTimeline([
-    {
-      value: mask?.progress?.initialValue ?? 0,
-    },
-    ...(mask?.progress?.keyframes ?? []),
-  ]);
-
-const createCompositorProgressTimeline = (animation) =>
-  buildTimeline([
-    {
-      value: animation.compositor?.tween?.uProgress?.initialValue ?? 0,
-    },
-    ...(animation.compositor?.tween?.uProgress?.keyframes ?? []),
-  ]);
 
 const REPLACE_MASK_FILTER_VERTEX = `
 in vec2 aPosition;
@@ -919,8 +1029,6 @@ export const selectSequenceMaskFrameState = ({
 };
 
 const createMaskTextureController = (app, mask, width, height, filter) => {
-  const progressTimeline = createMaskProgressTimeline(mask);
-  const duration = calculateMaxDuration([{ timeline: progressTimeline }]);
   const softness = Math.max(mask?.softness ?? 0.001, 0.0001);
   const { textures, channelWeights, invert, destroy } = createMaskTextures(
     app,
@@ -933,8 +1041,6 @@ const createMaskTextureController = (app, mask, width, height, filter) => {
   let lastToIndex = -1;
 
   return {
-    duration,
-    progressTimeline,
     apply: (progress) => {
       const selection =
         mask?.kind === "sequence"
@@ -1196,6 +1302,7 @@ const resolveOverlaySubjects = ({
 const createPlainOverlay = ({
   app,
   animation,
+  program,
   prevSubject,
   nextSubject,
   zIndex,
@@ -1213,25 +1320,24 @@ const createPlainOverlay = ({
     overlay.addChild(nextOverlaySubject.subject.wrapper);
   }
 
-  const prevController = createSubjectController(
-    prevOverlaySubject.subject,
-    animation.prev?.tween,
-  );
-  const nextController = createSubjectController(
-    nextOverlaySubject.subject,
-    animation.next?.tween,
-  );
+  const timelineController = createTransitionTimelineController({
+    animation,
+    program,
+    prevSubject: prevOverlaySubject.subject,
+    nextSubject: nextOverlaySubject.subject,
+  });
 
   return {
     overlay,
-    duration: Math.max(prevController.duration, nextController.duration),
+    duration: timelineController.duration,
+    timelineController,
     apply: (time) => {
       prevOverlaySubject.render();
       nextOverlaySubject.render();
-      prevController.apply(time);
-      nextController.apply(time);
+      timelineController.apply(time);
     },
     destroy: () => {
+      timelineController.destroy();
       overlay.removeFromParent();
       cleanupParticlesInTree({ app, root: overlay });
       overlay.destroy({ children: true });
@@ -1246,28 +1352,21 @@ const createPlainOverlay = ({
 const createCompositorOverlay = ({
   app,
   animation,
+  program,
   prevSubject,
   nextSubject,
   zIndex,
   getShaderTime,
 }) => {
-  const prevController = createSubjectController(
+  const boundsTimelineController = createTransitionTimelineController({
+    animation,
+    program,
     prevSubject,
-    animation.prev?.tween,
-  );
-  const nextController = createSubjectController(
     nextSubject,
-    animation.next?.tween,
-  );
-  const progressTimeline = createCompositorProgressTimeline(animation);
-  const progressDuration = calculateMaxDuration([
-    {
-      timeline: progressTimeline,
-    },
-  ]);
+  });
   const unionBounds = getAnimatedUnionBounds(
     [prevSubject, nextSubject],
-    [prevController, nextController],
+    [boundsTimelineController],
   );
   const prevRoot = new Container();
   const nextRoot = new Container();
@@ -1307,7 +1406,10 @@ const createCompositorOverlay = ({
     effect: animation.compositor,
     width: unionBounds.width,
     height: unionBounds.height,
-    progress: getValueAtTime(progressTimeline, 0),
+    progress:
+      animation.compositor?.tween?.progress?.initialValue ??
+      animation.compositor?.tween?.uProgress?.initialValue ??
+      0,
     time: getShaderTime(),
     nextTextureSource: nextTexture.source,
     name: `route-graphics-transition-compositor-${animation.id}`,
@@ -1342,8 +1444,10 @@ const createCompositorOverlay = ({
     };
   }
 
-  const parameterTimelines = Object.entries(animation.compositor.tween ?? {})
-    .filter(([parameter]) => parameter !== "uProgress")
+  Object.entries(animation.compositor.tween ?? {})
+    .filter(
+      ([parameter]) => parameter !== "uProgress" && parameter !== "progress",
+    )
     .map(([parameter, config]) => {
       const currentValue = getShaderEffectParameter(
         compositorEffect,
@@ -1361,15 +1465,8 @@ const createCompositorOverlay = ({
       for (const value of parameterValues) {
         validateShaderEffectParameterValue(compositorEffect, parameter, value);
       }
-      return {
-        parameter,
-        timeline: buildTimeline([
-          { value: config.initialValue ?? currentValue },
-          ...config.keyframes,
-        ]),
-      };
+      return parameter;
     });
-  const parameterDuration = calculateMaxDuration(parameterTimelines);
 
   let maskFilter = null;
   let maskTextureController = null;
@@ -1408,6 +1505,16 @@ const createCompositorOverlay = ({
     ...compositorEffect.filters,
   ];
 
+  const timelineController = createTransitionTimelineController({
+    animation,
+    program,
+    prevSubject,
+    nextSubject,
+    maskController: maskTextureController,
+    compositorEffect,
+    validateTerminal: true,
+  });
+
   let prevStaticRendered = false;
   let nextStaticRendered = false;
 
@@ -1433,20 +1540,14 @@ const createCompositorOverlay = ({
 
   return {
     overlay,
-    duration: Math.max(
-      prevController.duration,
-      nextController.duration,
-      progressDuration,
-      parameterDuration,
-      maskTextureController?.duration ?? 0,
-    ),
+    duration: timelineController.duration,
+    timelineController,
     apply: (time) => {
-      prevController.apply(time);
-      nextController.apply(time);
+      timelineController.apply(time);
 
       if (
         prevSubject?.wrapper &&
-        (prevController.duration > 0 || !prevStaticRendered)
+        (timelineController.duration > 0 || !prevStaticRendered)
       ) {
         renderOffscreenContainer({
           app,
@@ -1459,7 +1560,7 @@ const createCompositorOverlay = ({
 
       if (
         nextSubject?.wrapper &&
-        (nextController.duration > 0 || !nextStaticRendered)
+        (timelineController.duration > 0 || !nextStaticRendered)
       ) {
         renderOffscreenContainer({
           app,
@@ -1470,31 +1571,15 @@ const createCompositorOverlay = ({
         nextStaticRendered = true;
       }
 
-      if (maskTextureController) {
-        maskTextureController.apply(
-          clamp01(getValueAtTime(maskTextureController.progressTimeline, time)),
-        );
-      }
-
       setShaderEffectResolution(
         compositorEffect,
         unionBounds.width,
         unionBounds.height,
       );
-      setShaderEffectProgress(
-        compositorEffect,
-        getValueAtTime(progressTimeline, time),
-      );
       setShaderEffectTime(compositorEffect, getShaderTime());
-      for (const { parameter, timeline } of parameterTimelines) {
-        setShaderEffectParameter(
-          compositorEffect,
-          parameter,
-          getValueAtTime(timeline, time),
-        );
-      }
     },
     destroy: () => {
+      timelineController.destroy();
       overlay.removeFromParent();
       sprite.filters = [];
       maskFilter?.destroy();
@@ -1517,21 +1602,20 @@ const createCompositorOverlay = ({
 const createMaskedOverlay = ({
   app,
   animation,
+  program,
   prevSubject,
   nextSubject,
   zIndex,
 }) => {
-  const prevController = createSubjectController(
+  const boundsTimelineController = createTransitionTimelineController({
+    animation,
+    program,
     prevSubject,
-    animation.prev?.tween,
-  );
-  const nextController = createSubjectController(
     nextSubject,
-    animation.next?.tween,
-  );
+  });
   const unionBounds = getAnimatedUnionBounds(
     [prevSubject, nextSubject],
-    [prevController, nextController],
+    [boundsTimelineController],
   );
   const prevRoot = new Container();
   const nextRoot = new Container();
@@ -1598,6 +1682,14 @@ const createMaskedOverlay = ({
     unionBounds.height,
     maskFilter,
   );
+  const timelineController = createTransitionTimelineController({
+    animation,
+    program,
+    prevSubject,
+    nextSubject,
+    maskController: maskTextureController,
+    validateTerminal: true,
+  });
   let prevStaticRendered = false;
   let nextStaticRendered = false;
 
@@ -1621,18 +1713,14 @@ const createMaskedOverlay = ({
 
   return {
     overlay,
-    duration: Math.max(
-      prevController.duration,
-      nextController.duration,
-      maskTextureController.duration,
-    ),
+    duration: timelineController.duration,
+    timelineController,
     apply: (time) => {
-      prevController.apply(time);
-      nextController.apply(time);
+      timelineController.apply(time);
 
       if (
         prevSubject?.wrapper &&
-        (prevController.duration > 0 || !prevStaticRendered)
+        (timelineController.duration > 0 || !prevStaticRendered)
       ) {
         renderOffscreenContainer({
           app,
@@ -1645,7 +1733,7 @@ const createMaskedOverlay = ({
 
       if (
         nextSubject?.wrapper &&
-        (nextController.duration > 0 || !nextStaticRendered)
+        (timelineController.duration > 0 || !nextStaticRendered)
       ) {
         renderOffscreenContainer({
           app,
@@ -1655,13 +1743,9 @@ const createMaskedOverlay = ({
         });
         nextStaticRendered = true;
       }
-
-      const progress = clamp01(
-        getValueAtTime(maskTextureController.progressTimeline, time),
-      );
-      maskTextureController.apply(progress);
     },
     destroy: () => {
+      timelineController.destroy();
       overlay.removeFromParent();
       sprite.filters = [];
       maskFilter.destroy();
@@ -1683,6 +1767,7 @@ const createMaskedOverlay = ({
 const createReplaceOverlay = ({
   app,
   animation,
+  program,
   prevSubject,
   nextSubject,
   zIndex,
@@ -1694,6 +1779,7 @@ const createReplaceOverlay = ({
     replaceOverlay = createCompositorOverlay({
       app,
       animation,
+      program,
       prevSubject,
       nextSubject,
       zIndex,
@@ -1703,6 +1789,7 @@ const createReplaceOverlay = ({
     replaceOverlay = createMaskedOverlay({
       app,
       animation,
+      program,
       prevSubject,
       nextSubject,
       zIndex,
@@ -1711,6 +1798,7 @@ const createReplaceOverlay = ({
     replaceOverlay = createPlainOverlay({
       app,
       animation,
+      program,
       prevSubject,
       nextSubject,
       zIndex,
@@ -1828,6 +1916,29 @@ export const runReplaceAnimation = ({
   if (signal?.aborted || parent.destroyed) {
     return;
   }
+
+  const transitionProgram = compileTransitionAnimation(animation, {
+    sourcePath: `animation.${animation.id}`,
+  });
+  for (const query of Object.values(transitionProgram.targetQueries)) {
+    if (query.kind === "transitionMask" && !animation.mask) {
+      throw new Error(
+        `Transition animation "${animation.id}" targets a mask but has no mask resource.`,
+      );
+    }
+    if (query.kind === "transitionCompositor" && !animation.compositor) {
+      throw new Error(
+        `Transition animation "${animation.id}" targets a compositor but has no compositor resource.`,
+      );
+    }
+  }
+  // Pure virtual binding validates capabilities, finite duration, value
+  // shapes, and orchestrated terminal progress before snapshots/GPU resources.
+  createTransitionTimelineController({
+    animation,
+    program: transitionProgram,
+    validateTerminal: true,
+  });
 
   const prevDisplayObject = prevElement
     ? (parent.children.find((child) => child.label === prevElement.id) ?? null)
@@ -2141,6 +2252,7 @@ export const runReplaceAnimation = ({
       const replaceOverlay = createReplaceOverlay({
         app,
         animation,
+        program: transitionProgram,
         prevSubject: overlaySubjects.prevSubject,
         nextSubject: overlaySubjects.nextSubject,
         zIndex: currentZIndex,
@@ -2165,11 +2277,15 @@ export const runReplaceAnimation = ({
       const animationPayload = {
         id: animation.id,
         driver: "custom",
+        program: transitionProgram,
+        instance: replaceOverlay.timelineController.instance,
+        animationBackend: replaceOverlay.timelineController.backend,
+        dispose: replaceOverlay.timelineController.destroy,
         animationType: animation.type,
         targetId: animation.targetId,
         signature: continuitySignature,
         continuity: isPersistent ? "persistent" : "render",
-        playbackSpeed: animation.playback?.speed,
+        playbackSpeed: 1,
         onContinuationUpdate: handleContinuationUpdate,
         duration: replaceOverlay.duration,
         deferCompletionUntilNextFrame: animation.compositor !== undefined,

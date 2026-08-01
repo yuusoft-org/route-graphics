@@ -13,6 +13,14 @@ import {
   getRectStyleAnimationBatchHooks,
   validateRectStyleAnimationTarget,
 } from "../elements/rect/rectStyleRuntime.js";
+import {
+  canonicalizeProgram,
+  assertDisjointTimelineWriteSets,
+  bindTimelineProgram,
+  compilePortableGsapAnimation,
+  createPixiTimelineBindingContext,
+} from "./timeline/index.js";
+import { createLegacyTimelineContext } from "./animationBus.js";
 
 const getLiveTweenProperty = (property) => {
   if (property === "translateX") {
@@ -107,7 +115,9 @@ const settleLoopingUpdateState = ({
   onComplete,
 }) => {
   const loopingAnimation = animations.find(
-    (animation) => animation.playback?.loop === true,
+    (animation) =>
+      animation.playback?.loop === true ||
+      animation.playback?.repeat === "infinite",
   );
   if (!loopingAnimation || targetState == null || !onComplete) {
     return { didSettle: false, element };
@@ -204,6 +214,9 @@ export const dispatchUpdateAnimationsNow = ({
   );
 
   for (const animation of animationsToDispatch) {
+    if (animation.gsap) {
+      continue;
+    }
     validateRectStyleAnimationTarget(element, animation);
     for (const [property, config] of Object.entries(animation.tween ?? {})) {
       if (
@@ -230,35 +243,81 @@ export const dispatchUpdateAnimationsNow = ({
       ? createAnimationSubjectState(dispatchElement)
       : animationBaseState;
 
-  for (const animation of animationsToDispatch) {
-    const propertyGroups = [
-      {
-        element: dispatchElement,
-        properties: animation.tween ?? {},
-        targetState,
-        animationBaseState: dispatchAnimationBaseState,
-        ...getRectStyleAnimationBatchHooks(dispatchElement),
-      },
-    ];
-    for (const [filterId, tween] of Object.entries(
-      animation.filterTweens ?? {},
-    )) {
-      propertyGroups.push({
-        element: validateShaderFilterAnimationTarget(
-          dispatchElement,
-          filterId,
-          animation.id,
-          tween,
-        ),
-        properties: tween,
-        propertyPathMap: {},
-        validateProperty: false,
-      });
-    }
+  const preparedGsap = new Map();
+  const preparedLegacy = new Map();
+  const stagedBindingContexts = [];
+  try {
+    for (const animation of animationsToDispatch) {
+      if (animation.gsap) {
+        const program = compilePortableGsapAnimation(animation);
+        const bindingContext = createPixiTimelineBindingContext({
+          program,
+          ownerElement: dispatchElement,
+          ownerTargetState: targetState,
+          animationId: animation.id,
+        });
+        stagedBindingContexts.push(bindingContext);
+        const instance = bindTimelineProgram(program, bindingContext);
+        preparedGsap.set(animation.id, { program, bindingContext, instance });
+        continue;
+      }
 
+      const propertyGroups = [
+        {
+          element: dispatchElement,
+          properties: animation.tween ?? {},
+          targetState,
+          animationBaseState: dispatchAnimationBaseState,
+          ...getRectStyleAnimationBatchHooks(dispatchElement),
+        },
+      ];
+      for (const [filterId, tween] of Object.entries(
+        animation.filterTweens ?? {},
+      )) {
+        propertyGroups.push({
+          filterId,
+          element: validateShaderFilterAnimationTarget(
+            dispatchElement,
+            filterId,
+            animation.id,
+            tween,
+          ),
+          properties: tween,
+          propertyPathMap: {},
+          validateProperty: false,
+        });
+      }
+      const timeline = createLegacyTimelineContext({
+        id: animation.id,
+        targetId: animation.targetId,
+        propertyGroups,
+        playbackSpeed: animation.playback?.speed,
+        loop: animation.playback?.loop === true,
+        repeat: animation.playback?.repeat,
+        repeatDelay: animation.playback?.repeatDelay,
+        yoyo: animation.playback?.yoyo,
+      });
+      preparedLegacy.set(animation.id, { propertyGroups, timeline });
+    }
+    assertDisjointTimelineWriteSets([
+      ...[...preparedGsap.values()].map(({ instance }) => instance),
+      ...[...preparedLegacy.values()]
+        .map(({ timeline }) => timeline?.instance)
+        .filter(Boolean),
+    ]);
+  } catch (error) {
+    for (const bindingContext of stagedBindingContexts) {
+      bindingContext.rollback?.();
+    }
+    throw error;
+  }
+
+  for (const animation of animationsToDispatch) {
+    const isInfinite =
+      animation.playback?.loop === true ||
+      animation.playback?.repeat === "infinite";
     const trackCompletion =
-      animation.playback?.continuity !== "persistent" &&
-      animation.playback?.loop !== true;
+      animation.playback?.continuity !== "persistent" && !isInfinite;
     const stateVersion = trackCompletion
       ? completionTracker.getVersion()
       : null;
@@ -266,6 +325,64 @@ export const dispatchUpdateAnimationsNow = ({
     if (trackCompletion) {
       completionTracker.track(stateVersion);
     }
+
+    const complete = () => {
+      if (trackCompletion) {
+        completionTracker.complete(stateVersion);
+      }
+
+      if (!settlement.didSettle) {
+        onComplete?.(animation);
+      }
+    };
+
+    if (animation.gsap) {
+      const { program, bindingContext, instance } = preparedGsap.get(
+        animation.id,
+      );
+      const frameHooks = getRectStyleAnimationBatchHooks(dispatchElement);
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          driver: "timeline",
+          id: animation.id,
+          animationType: animation.type,
+          targetId: animation.targetId,
+          continuity: animation.playback?.continuity ?? "render",
+          signature: animation.signature ?? canonicalizeProgram(program),
+          program,
+          bindingContext,
+          instance,
+          applyTargetState: () => {
+            if (!dispatchElement || dispatchElement.destroyed || !targetState) {
+              return;
+            }
+            frameHooks.beforeApplyFrame?.();
+            try {
+              for (const [property, value] of Object.entries(targetState)) {
+                try {
+                  applyAnimationProperty({
+                    object: dispatchElement,
+                    property,
+                    propertyPathMap: TRANSITION_PROPERTY_PATH_MAP,
+                    subjectState: createAnimationSubjectState(dispatchElement),
+                    value,
+                  });
+                } catch {
+                  // Renderer reconciliation owns unsupported settlement fields.
+                }
+              }
+            } finally {
+              frameHooks.afterApplyFrame?.();
+            }
+          },
+          onComplete: complete,
+        },
+      });
+      continue;
+    }
+
+    const { propertyGroups, timeline } = preparedLegacy.get(animation.id);
 
     animationBus.dispatch({
       type: "START",
@@ -287,17 +404,13 @@ export const dispatchUpdateAnimationsNow = ({
         element: dispatchElement,
         properties: animation.tween ?? {},
         propertyGroups,
+        preparedTimeline: timeline,
         targetState,
         animationBaseState: dispatchAnimationBaseState,
-        onComplete: () => {
-          if (trackCompletion) {
-            completionTracker.complete(stateVersion);
-          }
-
-          if (!settlement.didSettle) {
-            onComplete?.(animation);
-          }
-        },
+        repeat: animation.playback?.repeat,
+        repeatDelay: animation.playback?.repeatDelay,
+        yoyo: animation.playback?.yoyo,
+        onComplete: complete,
       },
     });
   }

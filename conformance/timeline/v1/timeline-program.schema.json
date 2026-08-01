@@ -1,0 +1,659 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://route.graphics/schemas/timeline/route.timeline.v1.json",
+  "title": "Route Graphics TimelineProgram v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "timeUnit",
+    "programId",
+    "ownerId",
+    "duration",
+    "requirements",
+    "targetQueries",
+    "schedules",
+    "domains",
+    "easings",
+    "clipTemplates",
+    "events"
+  ],
+  "properties": {
+    "schema": { "const": "route.timeline/v1" },
+    "timeUnit": { "const": "milliseconds" },
+    "programId": { "$ref": "#/$defs/nonEmptyString" },
+    "ownerId": { "$ref": "#/$defs/nonEmptyString" },
+    "duration": {
+      "oneOf": [{ "$ref": "#/$defs/time" }, { "enum": ["binding", "infinite"] }]
+    },
+    "requirements": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "targetQueries": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/nonEmptyString" },
+      "additionalProperties": { "$ref": "#/$defs/targetQuery" }
+    },
+    "schedules": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/nonEmptyString" },
+      "additionalProperties": { "$ref": "#/$defs/schedule" }
+    },
+    "domains": {
+      "type": "object",
+      "required": ["root"],
+      "propertyNames": { "$ref": "#/$defs/nonEmptyString" },
+      "additionalProperties": { "$ref": "#/$defs/domain" }
+    },
+    "easings": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/nonEmptyString" },
+      "additionalProperties": { "$ref": "#/$defs/easing" }
+    },
+    "clipTemplates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/clip" }
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "debug": { "$ref": "#/$defs/jsonObject" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "time": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "jsonValue": {
+      "oneOf": [
+        { "type": ["null", "boolean", "number", "string"] },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/jsonValue" }
+        },
+        { "$ref": "#/$defs/jsonObject" }
+      ]
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+    },
+    "timingExpression": {
+      "oneOf": [
+        { "$ref": "#/$defs/time" },
+        {
+          "type": "object",
+          "required": ["kind", "targets"],
+          "properties": {
+            "kind": { "const": "targetCount" },
+            "targets": { "$ref": "#/$defs/nonEmptyString" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "targets", "stagger"],
+          "properties": {
+            "kind": { "const": "staggerSpan" },
+            "targets": { "$ref": "#/$defs/nonEmptyString" },
+            "stagger": { "$ref": "#/$defs/stagger" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "child"],
+          "properties": {
+            "kind": { "enum": ["childStart", "childEnd"] },
+            "child": { "$ref": "#/$defs/nonEmptyString" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "schedule"],
+          "properties": {
+            "kind": { "const": "scheduleEnd" },
+            "schedule": { "$ref": "#/$defs/nonEmptyString" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "values"],
+          "properties": {
+            "kind": { "enum": ["add", "subtract", "max"] },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/timingExpression" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value", "rate"],
+          "properties": {
+            "kind": { "const": "ceilDivide" },
+            "value": { "$ref": "#/$defs/timingExpression" },
+            "rate": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value", "factor"],
+          "properties": {
+            "kind": { "const": "multiply" },
+            "value": { "$ref": "#/$defs/timingExpression" },
+            "factor": { "$ref": "#/$defs/time" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "schedule": {
+      "oneOf": [
+        { "$ref": "#/$defs/timingExpression" },
+        {
+          "type": "object",
+          "required": ["end"],
+          "properties": {
+            "end": { "$ref": "#/$defs/timingExpression" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "targetQuery": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "elementId"],
+          "properties": {
+            "kind": { "const": "element" },
+            "elementId": { "$ref": "#/$defs/nonEmptyString" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "elementIds"],
+          "properties": {
+            "kind": { "const": "elements" },
+            "elementIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "elementId", "unit", "order", "segmentation"],
+          "properties": {
+            "kind": { "const": "textUnits" },
+            "elementId": { "$ref": "#/$defs/nonEmptyString" },
+            "unit": { "enum": ["grapheme", "word", "line"] },
+            "order": { "enum": ["logical", "visual"] },
+            "allowEmpty": { "type": "boolean" },
+            "segmentation": {
+              "type": "object",
+              "required": ["standard", "version"],
+              "properties": {
+                "standard": { "const": "unicode-uax29" },
+                "version": { "const": "17.0.0" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "aliases"],
+          "properties": {
+            "kind": { "const": "union" },
+            "aliases": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "surface"],
+          "properties": {
+            "kind": { "const": "transitionSurface" },
+            "surface": { "enum": ["prev", "next"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["transitionMask", "transitionCompositor"] }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "stagger": {
+      "type": "object",
+      "properties": {
+        "each": { "$ref": "#/$defs/time" },
+        "amount": { "$ref": "#/$defs/time" },
+        "from": {
+          "oneOf": [
+            { "$ref": "#/$defs/time" },
+            { "enum": ["start", "center", "end", "edges", "random"] }
+          ]
+        },
+        "easing": { "$ref": "#/$defs/easing" },
+        "grid": {
+          "type": "object",
+          "required": ["columns"],
+          "properties": {
+            "columns": { "$ref": "#/$defs/positiveInteger" }
+          },
+          "additionalProperties": false
+        },
+        "axis": { "enum": ["x", "y"] }
+      },
+      "oneOf": [
+        { "required": ["each"], "not": { "required": ["amount"] } },
+        { "required": ["amount"], "not": { "required": ["each"] } }
+      ],
+      "dependentRequired": { "axis": ["grid"] },
+      "additionalProperties": false
+    },
+    "easing": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": { "kind": { "const": "linear" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "direction", "exponent"],
+          "properties": {
+            "kind": { "const": "power" },
+            "direction": { "$ref": "#/$defs/easeDirection" },
+            "exponent": { "type": "integer", "minimum": 1, "maximum": 5 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "direction"],
+          "properties": {
+            "kind": { "enum": ["sine", "expo", "circ", "bounce"] },
+            "direction": { "$ref": "#/$defs/easeDirection" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "direction", "overshoot"],
+          "properties": {
+            "kind": { "const": "back" },
+            "direction": { "$ref": "#/$defs/easeDirection" },
+            "overshoot": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "direction", "amplitude", "period"],
+          "properties": {
+            "kind": { "const": "elastic" },
+            "direction": { "$ref": "#/$defs/easeDirection" },
+            "amplitude": { "type": "number", "minimum": 1 },
+            "period": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "count", "position"],
+          "properties": {
+            "kind": { "const": "steps" },
+            "count": { "$ref": "#/$defs/positiveInteger" },
+            "position": { "enum": ["start", "end"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "points"],
+          "properties": {
+            "kind": { "const": "cubicBezier" },
+            "points": {
+              "type": "array",
+              "prefixItems": [
+                { "type": "number", "minimum": 0, "maximum": 1 },
+                { "type": "number" },
+                { "type": "number", "minimum": 0, "maximum": 1 },
+                { "type": "number" }
+              ],
+              "items": false,
+              "minItems": 4
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "samples"],
+          "properties": {
+            "kind": { "const": "sampled" },
+            "samples": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "array",
+                "prefixItems": [{ "type": "number" }, { "type": "number" }],
+                "items": false,
+                "minItems": 2
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "easeDirection": { "enum": ["in", "out", "inOut"] },
+    "expression": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "constant" },
+            "value": { "$ref": "#/$defs/jsonValue" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "enum": ["underlying", "targetIndex", "targetCount", "iteration"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "targetState" },
+            "property": { "$ref": "#/$defs/nonEmptyString" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "axis"],
+          "properties": {
+            "kind": { "enum": ["subjectDimension", "subjectBase"] },
+            "axis": { "enum": ["x", "y", "width", "height"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "left", "right"],
+          "properties": {
+            "kind": { "enum": ["add", "subtract", "multiply", "divide"] },
+            "left": { "$ref": "#/$defs/expression" },
+            "right": { "$ref": "#/$defs/expression" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "values"],
+          "properties": {
+            "kind": { "enum": ["min", "max"] },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/expression" }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value", "min", "max"],
+          "properties": {
+            "kind": { "const": "clamp" },
+            "value": { "$ref": "#/$defs/expression" },
+            "min": { "$ref": "#/$defs/expression" },
+            "max": { "$ref": "#/$defs/expression" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "min", "max"],
+          "properties": {
+            "kind": { "const": "randomNumber" },
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "step": { "type": "number", "exclusiveMinimum": 0 },
+            "seed": { "$ref": "#/$defs/nonEmptyString" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "choices"],
+          "properties": {
+            "kind": { "const": "randomChoice" },
+            "choices": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/jsonValue" }
+            },
+            "seed": { "$ref": "#/$defs/nonEmptyString" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "modifier": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "snap" },
+            "increment": { "type": "number", "exclusiveMinimum": 0 },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "number" }
+            }
+          },
+          "oneOf": [
+            { "required": ["increment"], "not": { "required": ["values"] } },
+            { "required": ["values"], "not": { "required": ["increment"] } }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "precision"],
+          "properties": {
+            "kind": { "const": "round" },
+            "precision": { "type": "integer", "minimum": 0, "maximum": 15 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "min", "max"],
+          "properties": {
+            "kind": { "enum": ["clamp", "wrap", "wrapYoyo"] },
+            "min": { "type": "number" },
+            "max": { "type": "number" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "domain": {
+      "type": "object",
+      "required": [
+        "parent",
+        "start",
+        "cycleDuration",
+        "iterations",
+        "iterationGap",
+        "direction",
+        "rate",
+        "refresh"
+      ],
+      "properties": {
+        "parent": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/nonEmptyString" }]
+        },
+        "start": { "$ref": "#/$defs/timingExpression" },
+        "cycleDuration": { "$ref": "#/$defs/timingExpression" },
+        "iterations": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/positiveInteger" }]
+        },
+        "iterationGap": { "$ref": "#/$defs/time" },
+        "direction": { "enum": ["forward", "reverse", "alternate"] },
+        "rate": { "type": "number", "exclusiveMinimum": 0 },
+        "refresh": { "enum": ["never", "iteration"] }
+      },
+      "additionalProperties": false
+    },
+    "sampler": {
+      "type": "object",
+      "required": ["kind", "from", "to", "easing"],
+      "properties": {
+        "kind": { "const": "interpolate" },
+        "from": { "$ref": "#/$defs/expression" },
+        "to": { "$ref": "#/$defs/expression" },
+        "easing": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "clip": {
+      "type": "object",
+      "required": [
+        "id",
+        "domain",
+        "targets",
+        "fanout",
+        "channel",
+        "valueType",
+        "start",
+        "duration",
+        "sampler",
+        "modifiers",
+        "composite",
+        "priority",
+        "fill"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "sourcePath": { "type": "string" },
+        "domain": { "$ref": "#/$defs/nonEmptyString" },
+        "targets": { "$ref": "#/$defs/nonEmptyString" },
+        "fanout": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["stagger"],
+              "properties": {
+                "stagger": { "$ref": "#/$defs/stagger" }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "channel": { "$ref": "#/$defs/nonEmptyString" },
+        "valueType": {
+          "enum": [
+            "scalar",
+            "integer",
+            "angleDegrees",
+            "vec2",
+            "vec3",
+            "vec4",
+            "mat3",
+            "mat4",
+            "colorSrgb",
+            "colorLinear",
+            "boolean",
+            "string",
+            "discrete"
+          ]
+        },
+        "start": { "$ref": "#/$defs/timingExpression" },
+        "duration": { "$ref": "#/$defs/timingExpression" },
+        "sampler": { "$ref": "#/$defs/sampler" },
+        "modifiers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/modifier" }
+        },
+        "composite": { "enum": ["replace", "add", "multiply"] },
+        "overwrite": { "enum": ["auto", "all", "none", "error"] },
+        "priority": { "$ref": "#/$defs/time" },
+        "fill": { "enum": ["none", "forwards", "backwards", "both"] }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": [
+        "id",
+        "domain",
+        "time",
+        "name",
+        "direction",
+        "occurrence",
+        "seekPolicy",
+        "priority"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "domain": { "$ref": "#/$defs/nonEmptyString" },
+        "time": { "$ref": "#/$defs/timingExpression" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "payload": { "$ref": "#/$defs/jsonValue" },
+        "direction": { "enum": ["forward", "reverse", "both"] },
+        "occurrence": { "enum": ["once", "eachIteration"] },
+        "seekPolicy": { "enum": ["suppress", "crossed"] },
+        "priority": { "$ref": "#/$defs/time" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

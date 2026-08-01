@@ -185,4 +185,33 @@ describe("getAnimationContinuitySignature", () => {
       getAnimationContinuitySignature(withoutDelay),
     );
   });
+
+  it("uses the compiled semantic program for portable gsap continuity", () => {
+    const base = {
+      id: "portable",
+      targetId: "portrait",
+      type: "update",
+      playback: { continuity: "persistent" },
+      gsap: {
+        profile: "portable-v1",
+        defaults: { duration: 100 },
+        steps: [{ kind: "to", values: { x: 100 } }],
+      },
+    };
+    expect(getAnimationContinuitySignature(base)).toBe(
+      getAnimationContinuitySignature({
+        ...base,
+        gsap: {
+          ...base.gsap,
+          defaults: { ...base.gsap.defaults, easing: "linear" },
+        },
+      }),
+    );
+    expect(getAnimationContinuitySignature(base)).not.toBe(
+      getAnimationContinuitySignature({
+        ...base,
+        gsap: { ...base.gsap, defaults: { duration: 200 } },
+      }),
+    );
+  });
 });

@@ -1,0 +1,29 @@
+states:
+  - id: portable-gsap-example
+    elements: []
+    animations:
+      - id: card-entrance
+        targetId: card
+        type: update
+        playback: { repeat: 1, yoyo: true }
+        gsap:
+          profile: portable-v1
+          defaults:
+            duration: 300
+            easing: power2.out
+            overwrite: auto
+          steps:
+            - kind: set
+              values: { alpha: 0, scaleX: 0.8, scaleY: 0.8 }
+            - kind: parallel
+              steps:
+                - kind: to
+                  values: { alpha: 1 }
+                - kind: to
+                  values: { scaleX: 1, scaleY: 1 }
+            - kind: emit
+              event: cardReady
+              direction: forward
+              occurrence: eachIteration
+              start: { time: 300 }
+
