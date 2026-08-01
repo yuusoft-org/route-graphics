@@ -1037,9 +1037,16 @@
               : requestedTime;
 
             const waitForPresentedVideoFrame = () => {
+              video.muted = true;
               if (typeof video.requestVideoFrameCallback === "function") {
+                // A paused seek can complete before Chromium presents the
+                // decoded frame. Resume until the presentation callback;
+                // commitVideoFrame pauses playback again.
                 video.requestVideoFrameCallback(commitVideoFrame);
+                void video.play().catch(() => {});
+                return;
               }
+              void video.play().catch(() => {});
               requestAnimationFrame(() => {
                 requestAnimationFrame(commitVideoFrame);
               });
