@@ -65,6 +65,7 @@ const executeDeferredMountOperation = (operation) => {
         completionTracker: operation.completionTracker,
         element: operation.element,
         targetState: operation.targetState,
+        targetStates: operation.targetStates,
         animationBaseState: operation.animationBaseState,
         preparedGsap: operation.preparedGsap,
       });

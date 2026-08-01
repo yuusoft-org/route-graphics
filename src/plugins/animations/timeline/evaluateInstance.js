@@ -101,9 +101,11 @@ export const sampleBoundTrack = (
     maximumPriority = Infinity,
     domainCache = new Map(),
     sampleSegment = sampleReferenceSegment,
+    baseValue = track.baseValue,
+    ignoreTrimsAtOrAfterPriority = Infinity,
   } = {},
 ) => {
-  let result = cloneTimelineValue(track.baseValue);
+  let result = cloneTimelineValue(baseValue);
   for (const segment of track.segments) {
     if (segment.priority > maximumPriority) continue;
     const domainState = mapDomain(
@@ -113,15 +115,23 @@ export const sampleBoundTrack = (
       domainCache,
     );
     if (!domainState.active) continue;
-    if (segment.trimDomain !== undefined) {
+    const ignoreTrim =
+      segment.trimmedByPriority !== undefined &&
+      segment.trimmedByPriority >= ignoreTrimsAtOrAfterPriority;
+    if (!ignoreTrim && segment.trimDomain !== undefined) {
       const trimState = mapDomain(
         instance,
         segment.trimDomain,
         rootTime,
         domainCache,
       );
-      if (trimState.active && trimState.localTime >= segment.trimAt) continue;
+      const reachedTrim =
+        trimState.direction === "reverse"
+          ? trimState.localTime <= segment.trimAt
+          : trimState.localTime >= segment.trimAt;
+      if (trimState.active && reachedTrim) continue;
     } else if (
+      !ignoreTrim &&
       segment.trimRootAt !== undefined &&
       rootTime >= segment.trimRootAt
     ) {

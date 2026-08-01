@@ -4,6 +4,7 @@ import { dispatchUpdateAnimationsNow } from "../updateAnimationDispatch.js";
 import { createCompletionTracker } from "../../../util/completionTracker.js";
 import { normalizeAnimations } from "../../../util/normalizeAnimations.js";
 import { Container, Text } from "pixi.js";
+import { setElementRenderState } from "../../elements/elementRenderState.js";
 
 const display = (label, children = []) => ({
   label,
@@ -288,6 +289,112 @@ describe("portable GSAP update runtime integration", () => {
     ]);
   });
 
+  it("settles descendant aliases to their mounted target states on cancellation", () => {
+    const child = display("child");
+    const root = display("root", [child]);
+    setElementRenderState(child, {
+      id: "child",
+      type: "container",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 50,
+      alpha: 1,
+    });
+    const animation = normalizeAnimations([
+      {
+        id: "descendant-cancel",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          targets: { child: { element: "child" } },
+          steps: [
+            {
+              kind: "to",
+              targets: "child",
+              values: { x: 100 },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]);
+    const tracker = createCompletionTracker();
+    tracker.reset("descendant-cancel-state");
+    const bus = createAnimationBus();
+
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: { x: 0, y: 0, alpha: 1 },
+      targetStates: new Map([
+        [
+          "child",
+          {
+            id: "child",
+            type: "container",
+            x: 100,
+            y: 0,
+            width: 100,
+            height: 50,
+            alpha: 1,
+          },
+        ],
+      ]),
+    });
+    bus.flush();
+    bus.tick(50);
+    expect(child.x).toBe(50);
+
+    bus.cancelAllExcept(new Set());
+    expect(child.x).toBe(100);
+    expect(bus.getState().activeCount).toBe(0);
+  });
+
+  it("rejects rect-only channels on targets without a rect runtime", () => {
+    const root = new Container({ label: "root" });
+    const title = new Text({ label: "title", text: "not a rect" });
+    root.addChild(title);
+    const animation = normalizeAnimations([
+      {
+        id: "invalid-rect-channel",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          targets: { title: { element: "title" } },
+          steps: [
+            {
+              kind: "to",
+              targets: "title",
+              values: { "rect.width": 200 },
+              duration: 100,
+            },
+          ],
+        },
+      },
+    ]);
+    const tracker = createCompletionTracker();
+    tracker.reset("invalid-rect-channel-state");
+    const bus = createAnimationBus();
+
+    expect(() =>
+      dispatchUpdateAnimationsNow({
+        animations: animation,
+        animationBus: bus,
+        completionTracker: tracker,
+        element: root,
+        targetState: {},
+      }),
+    ).toThrow(/does not support channel "geometry\.rect\.width"/);
+    expect(title._routeGraphicsRectStyle).toBeUndefined();
+    root.destroy({ children: true });
+  });
+
   it("manual setTime is history-independent and does not emit timeline events", () => {
     const root = display("root");
     const animation = normalizeAnimations([
@@ -494,6 +601,125 @@ describe("portable GSAP update runtime integration", () => {
     expect(unitContainer.children.map((child) => child.alpha)).toEqual([
       0.6, 0.5, 0.4,
     ]);
+    root.destroy({ children: true });
+  });
+
+  it("keeps retained text units synced during later tween and GSAP self animations", () => {
+    const root = new Container({ label: "root" });
+    const title = new Text({
+      label: "title",
+      text: "A",
+      style: { fontSize: 20 },
+    });
+    root.addChild(title);
+    const tracker = createCompletionTracker();
+    tracker.reset("retained-text-state");
+    const bus = createAnimationBus();
+    const [splitAnimation] = normalizeAnimations([
+      {
+        id: "split-once",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          targets: {
+            character: {
+              textUnits: {
+                elementId: "title",
+                unit: "grapheme",
+                order: "logical",
+              },
+            },
+          },
+          steps: [
+            {
+              kind: "from",
+              targets: "character",
+              values: { alpha: 0 },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]);
+    dispatchUpdateAnimationsNow({
+      animations: [splitAnimation],
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: {},
+    });
+    bus.flush();
+    bus.tick(100);
+    const unitContainer = root.children.find((child) =>
+      child.label?.startsWith("__timeline-text-units:"),
+    );
+    expect(title.renderable).toBe(false);
+
+    const [ordinaryTween] = normalizeAnimations([
+      {
+        id: "move-retained-text",
+        targetId: "title",
+        type: "update",
+        tween: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ value: 100, duration: 100, easing: "linear" }],
+          },
+          alpha: {
+            initialValue: 1,
+            keyframes: [{ value: 0.5, duration: 100, easing: "linear" }],
+          },
+        },
+      },
+    ]);
+    dispatchUpdateAnimationsNow({
+      animations: [ordinaryTween],
+      animationBus: bus,
+      completionTracker: tracker,
+      element: title,
+      targetState: { x: 100, alpha: 0.5 },
+    });
+    bus.flush();
+    bus.tick(50);
+    expect(title.x).toBe(50);
+    expect(unitContainer.x).toBe(50);
+    expect(title.alpha).toBe(0.75);
+    expect(unitContainer.alpha).toBe(0.75);
+    bus.tick(50);
+
+    const [gsapSelf] = normalizeAnimations([
+      {
+        id: "move-retained-text-again",
+        targetId: "title",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            {
+              kind: "to",
+              values: { x: 200, alpha: 1 },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]);
+    dispatchUpdateAnimationsNow({
+      animations: [gsapSelf],
+      animationBus: bus,
+      completionTracker: tracker,
+      element: title,
+      targetState: { x: 200, alpha: 1 },
+    });
+    bus.flush();
+    bus.tick(50);
+    expect(title.x).toBe(150);
+    expect(unitContainer.x).toBe(150);
+    expect(title.alpha).toBe(0.75);
+    expect(unitContainer.alpha).toBe(0.75);
     root.destroy({ children: true });
   });
 

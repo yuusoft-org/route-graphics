@@ -250,6 +250,7 @@ export const dispatchUpdateAnimations = ({
   completionTracker,
   element,
   targetState,
+  targetStates,
   onComplete,
   renderContext,
 }) => {
@@ -288,6 +289,7 @@ export const dispatchUpdateAnimations = ({
       undefined,
       animationBaseState,
       targetState,
+      targetStates,
     );
 
     queueDeferredUpdateAnimationStart(renderContext, {
@@ -296,6 +298,7 @@ export const dispatchUpdateAnimations = ({
       completionTracker,
       element,
       targetState,
+      targetStates,
       animationBaseState,
       preparedGsap,
     });
@@ -309,6 +312,7 @@ export const dispatchUpdateAnimations = ({
     completionTracker,
     element,
     targetState,
+    targetStates,
     onComplete,
     animationBaseState: animationsUseTranslate(animationsToStart)
       ? createAnimationSubjectState(element)

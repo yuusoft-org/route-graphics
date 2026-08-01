@@ -12,10 +12,7 @@ import {
   getShaderFilterAnimationTarget,
   validateShaderFilterAnimationTarget,
 } from "../elements/util/shaderFilterEffect.js";
-import {
-  getRectStyleAnimationBatchHooks,
-  validateRectStyleAnimationTarget,
-} from "../elements/rect/rectStyleRuntime.js";
+import { validateRectStyleAnimationTarget } from "../elements/rect/rectStyleRuntime.js";
 import {
   canonicalizeProgram,
   assertDisjointTimelineWriteSets,
@@ -26,6 +23,7 @@ import {
   createPixiTimelineBindingContext,
   evaluateTimelineInstance,
   getLegacyPropertyForChannel,
+  getPixiTimelineAnimationBatchHooks,
 } from "./timeline/index.js";
 import { createLegacyTimelineContext } from "./animationBus.js";
 
@@ -183,7 +181,7 @@ const restoreLiveTweenValues = (
     return;
   }
 
-  const frameHooks = getRectStyleAnimationBatchHooks(element);
+  const frameHooks = getPixiTimelineAnimationBatchHooks(element);
   frameHooks.beforeApplyFrame?.();
   try {
     for (const entry of values) {
@@ -205,6 +203,30 @@ const restoreLiveTweenValues = (
     }
   } finally {
     frameHooks.afterApplyFrame?.();
+  }
+};
+
+const applyBoundTimelineTargetStates = (instance) => {
+  const values = [];
+  for (const track of instance.tracks) {
+    const state = track.target.targetState;
+    if (state == null) continue;
+    const value = track.binding.getTargetStateValue
+      ? track.binding.getTargetStateValue(state)
+      : Object.prototype.hasOwnProperty.call(state, track.binding.property)
+        ? state[track.binding.property]
+        : undefined;
+    if (value === undefined) continue;
+    values.push({
+      target: track.target.handle,
+      targetIdentity: track.target.identity,
+      channel: track.channel,
+      value: cloneTimelineValue(value),
+      binding: track.binding,
+    });
+  }
+  if (values.length > 0) {
+    applyTimelineFrame({ values });
   }
 };
 
@@ -251,6 +273,7 @@ export const applyInitialUpdateAnimationState = (
   propertyPathMap = TRANSITION_PROPERTY_PATH_MAP,
   animationBaseState,
   targetState,
+  targetStates,
 ) => {
   let subjectState = animationBaseState;
   const preparedGsap = new Map();
@@ -304,6 +327,7 @@ export const applyInitialUpdateAnimationState = (
         program,
         ownerElement: element,
         ownerTargetState: targetState,
+        targetStates,
         animationId: animation.id,
       });
       try {
@@ -345,6 +369,7 @@ export const dispatchUpdateAnimationsNow = ({
   completionTracker,
   element,
   targetState,
+  targetStates,
   onComplete,
   animationBaseState,
   preparedGsap: stagedGsap = new Map(),
@@ -411,6 +436,7 @@ export const dispatchUpdateAnimationsNow = ({
           program,
           ownerElement: dispatchElement,
           ownerTargetState: targetState,
+          targetStates,
           animationId: animation.id,
         });
         stagedBindingContexts.push(bindingContext);
@@ -425,7 +451,7 @@ export const dispatchUpdateAnimationsNow = ({
           properties: animation.tween ?? {},
           targetState,
           animationBaseState: dispatchAnimationBaseState,
-          ...getRectStyleAnimationBatchHooks(dispatchElement),
+          ...getPixiTimelineAnimationBatchHooks(dispatchElement),
         },
       ];
       for (const [filterId, tween] of Object.entries(
@@ -497,7 +523,7 @@ export const dispatchUpdateAnimationsNow = ({
       const { program, bindingContext, instance } = preparedGsap.get(
         animation.id,
       );
-      const frameHooks = getRectStyleAnimationBatchHooks(dispatchElement);
+      const frameHooks = getPixiTimelineAnimationBatchHooks(dispatchElement);
       animationBus.dispatch({
         type: "START",
         payload: {
@@ -511,6 +537,7 @@ export const dispatchUpdateAnimationsNow = ({
           bindingContext,
           instance,
           applyTargetState: () => {
+            applyBoundTimelineTargetStates(instance);
             if (!dispatchElement || dispatchElement.destroyed || !targetState) {
               return;
             }

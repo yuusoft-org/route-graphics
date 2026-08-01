@@ -4,8 +4,18 @@ import {
   createAnimationSubjectState,
   getAnimationProperty,
 } from "../animationPropertyUtils.js";
-import { getRectStyleAnimationBatchHooks } from "../../elements/rect/rectStyleRuntime.js";
-import { getShaderFilterAnimationTarget } from "../../elements/util/shaderFilterEffect.js";
+import {
+  getRectStyleAnimationBatchHooks,
+  getRectStyleTargetState,
+  RECT_STYLE_STATE_KEY,
+} from "../../elements/rect/rectStyleRuntime.js";
+import {
+  getShaderFilterAnimationTarget,
+  getShaderFilterTargetState,
+} from "../../elements/util/shaderFilterEffect.js";
+import { getBlurTargetState } from "../../elements/util/blurEffect.js";
+import { getElementRenderState } from "../../elements/elementRenderState.js";
+import { getElementTransformTargetState } from "../../elements/util/transform.js";
 import {
   CanvasTextMetrics,
   Container,
@@ -197,6 +207,16 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
       handle: child,
       identity: `${query.elementId}:${fingerprint}:${unit.start}-${unit.end}`,
       stableId: `${query.elementId}:${unit.start}-${unit.end}`,
+      targetState: {
+        x: child.x,
+        y: child.y,
+        scaleX: child.scale.x,
+        scaleY: child.scale.y,
+        rotation: 0,
+        alpha: 1,
+        width: child.width,
+        height: child.height,
+      },
       subject: {
         x: child.x,
         y: child.y,
@@ -270,6 +290,9 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
       if (textElement[PIXI_TIMELINE_TEXT_UNITS] === preparation) {
         delete textElement[PIXI_TIMELINE_TEXT_UNITS];
       }
+      if (textUnitStateByHandle.get(textElement) === preparation) {
+        textUnitStateByHandle.delete(textElement);
+      }
       if (!textElement.destroyed) {
         if (!sourceDestroying) textElement.renderable = originalRenderable;
         if (originalFilters?.length) textElement.filters = originalFilters;
@@ -279,8 +302,34 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
   for (const target of targets) {
     textUnitStateByHandle.set(target.handle, preparation);
   }
+  textUnitStateByHandle.set(textElement, preparation);
   pendingTextUnitPreparations.set(textElement, preparation);
   return preparation;
+};
+
+export const getPixiTimelineAnimationBatchHooks = (handle) => {
+  const rectHooks = getRectStyleAnimationBatchHooks(handle);
+  const textUnitState =
+    handle?.[PIXI_TIMELINE_TEXT_UNITS] ?? textUnitStateByHandle.get(handle);
+  if (!textUnitState) return rectHooks;
+
+  return {
+    beforeApplyFrame: rectHooks.beforeApplyFrame,
+    afterApplyFrame: () => {
+      let primaryError;
+      try {
+        rectHooks.afterApplyFrame?.();
+      } catch (error) {
+        primaryError = error;
+      }
+      try {
+        textUnitState.sync();
+      } catch (error) {
+        primaryError ??= error;
+      }
+      if (primaryError) throw primaryError;
+    },
+  };
 };
 
 const ordinaryChannelProperties = Object.freeze({
@@ -327,6 +376,37 @@ const createTarget = (handle, identity, targetState) => ({
   targetState,
 });
 
+const addShaderParameterTargetStates = (targetState, element) => {
+  for (const filter of element?.filters ?? []) {
+    const parameters = filter.parameters ?? filter.uniforms;
+    const entries = Array.isArray(parameters)
+      ? parameters.map((parameter) => [parameter.key, parameter.value])
+      : Object.entries(parameters ?? {}).map(([key, value]) => [
+          key,
+          value?.value ?? value,
+        ]);
+    for (const [key, value] of entries) {
+      targetState[`filter.${filter.id}.parameter.${key}`] = value;
+    }
+  }
+};
+
+const getPixiTargetState = (
+  handle,
+  element = getElementRenderState(handle),
+) => {
+  if (!element) return undefined;
+  const targetState = {
+    ...element,
+    ...getElementTransformTargetState(element, { alpha: element.alpha }),
+    ...getBlurTargetState(element),
+    ...getShaderFilterTargetState(element),
+    ...(handle?.[RECT_STYLE_STATE_KEY] ? getRectStyleTargetState(element) : {}),
+  };
+  addShaderParameterTargetStates(targetState, element);
+  return targetState;
+};
+
 const getFilterChannel = (channel) => {
   const match = /^filter\.([^.]+)\.parameter\.(.+)$/.exec(channel);
   return match ? { filterId: match[1], parameter: match[2] } : null;
@@ -350,12 +430,14 @@ export const createPixiTimelineBindingContext = ({
     if (targetCache.has(elementId)) return targetCache.get(elementId);
     const handle = findInSubtree(ownerElement, elementId);
     if (!handle) return null;
+    const authoredTargetState =
+      targetStates instanceof Map
+        ? targetStates.get(elementId)
+        : targetStates?.[elementId];
     const targetState =
       elementId === program.ownerId
         ? ownerTargetState
-        : targetStates instanceof Map
-          ? targetStates.get(elementId)
-          : targetStates?.[elementId];
+        : getPixiTargetState(handle, authoredTargetState);
     const target = createTarget(handle, elementId, targetState);
     targetCache.set(elementId, target);
     return target;
@@ -363,13 +445,7 @@ export const createPixiTimelineBindingContext = ({
 
   const getGroup = (handle) => {
     if (!groupCache.has(handle)) {
-      const textUnitState = textUnitStateByHandle.get(handle);
-      groupCache.set(
-        handle,
-        textUnitState
-          ? { afterApplyFrame: () => textUnitState.sync() }
-          : getRectStyleAnimationBatchHooks(handle),
-      );
+      groupCache.set(handle, getPixiTimelineAnimationBatchHooks(handle));
     }
     return groupCache.get(handle);
   };
@@ -392,18 +468,31 @@ export const createPixiTimelineBindingContext = ({
       );
       binding = {
         property: filter.parameter,
+        getTargetStateValue: (state) =>
+          state?.[`filter.${filter.filterId}.parameter.${filter.parameter}`] ??
+          state?.[filter.parameter],
         get: () => filterTarget[filter.parameter],
         apply: (_handle, value) => {
           filterTarget[filter.parameter] = value;
         },
       };
     } else {
+      if (
+        channel.startsWith("geometry.rect.") &&
+        !target.handle?.[RECT_STYLE_STATE_KEY]
+      ) {
+        return null;
+      }
       const property = channel.startsWith("geometry.rect.")
         ? channel.slice("geometry.".length)
         : ordinaryChannelProperties[channel];
       if (!property) return null;
       binding = {
         property,
+        getTargetStateValue: (state) =>
+          state && Object.prototype.hasOwnProperty.call(state, property)
+            ? state[property]
+            : undefined,
         group: getGroup(target.handle),
         get: () =>
           getAnimationProperty(

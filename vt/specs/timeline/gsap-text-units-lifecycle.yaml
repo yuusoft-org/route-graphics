@@ -1,11 +1,12 @@
 ---
 title: GSAP Text Units Lifecycle
-description: Explicit line targets preserve layout and sibling order, then follow later source updates and destruction without requiring Unicode segmentation data from the VT browser.
+description: Explicit line targets preserve layout and sibling order, remain synchronized during later whole-text animation, and follow source destruction without requiring Unicode segmentation data from the VT browser.
 specs:
   - staggered lines should animate independently without changing the fixed-width source layout
   - the replacement text-unit container should remain between its background and foreground siblings
   - the complete text animation should restore every line to the source baseline
-  - a later position and alpha update should synchronize to the rendered unit container
+  - a later whole-text GSAP animation should visibly move and fade the retained unit container
+  - the whole-text animation should settle at its authored position and alpha
   - removing the source text should also remove every generated text-unit child
 steps:
   - action: keypress
@@ -27,6 +28,15 @@ steps:
   - action: screenshot
   - action: keypress
     key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
   - action: screenshot
   - action: keypress
     key: "n"
@@ -161,6 +171,17 @@ states:
             width: 150
             height: 120
             fill: "#737373"
+    animations:
+      - id: retained-text-motion
+        targetId: unit-title
+        type: update
+        gsap:
+          profile: portable-v1
+          steps:
+            - kind: to
+              values: { x: 700, y: 390, alpha: 0.45 }
+              duration: 400
+              easing: linear
   - id: text-units-removed
     elements:
       - id: text-root

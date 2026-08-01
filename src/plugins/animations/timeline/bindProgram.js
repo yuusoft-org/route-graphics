@@ -122,30 +122,82 @@ const validateCapabilities = (program, capabilities) => {
 };
 
 const resolveSchedules = (program, timingContext) => {
-  for (const [id, schedule] of Object.entries(program.schedules)) {
-    if (typeof schedule === "number")
-      timingContext.scheduleEnds.set(id, schedule);
-    else if (schedule?.end !== undefined) {
-      timingContext.scheduleEnds.set(
-        id,
-        evaluateTimingExpression(
-          schedule.end,
-          timingContext,
-          `schedules.${id}.end`,
-        ),
-      );
+  const visiting = new Set();
+  const resolveExpressionDependencies = (expression) => {
+    if (!expression || typeof expression !== "object") return;
+    if (expression.kind === "scheduleEnd") {
+      resolveSchedule(expression.schedule);
+      return;
     }
+    for (const child of Object.values(expression)) {
+      if (child && typeof child === "object") {
+        resolveExpressionDependencies(child);
+      }
+    }
+  };
+  const resolveSchedule = (id) => {
+    if (timingContext.scheduleEnds.has(id)) {
+      return timingContext.scheduleEnds.get(id);
+    }
+    if (!Object.prototype.hasOwnProperty.call(program.schedules, id)) {
+      throw new Error(`Schedule "${id}" is not defined.`);
+    }
+    if (visiting.has(id)) {
+      throw new Error(`Schedule "${id}" contains a dependency cycle.`);
+    }
+    visiting.add(id);
+    const schedule = program.schedules[id];
+    const expression = typeof schedule === "number" ? schedule : schedule.end;
+    resolveExpressionDependencies(expression);
+    const value = evaluateTimingExpression(
+      expression,
+      timingContext,
+      `schedules.${id}.end`,
+    );
+    timingContext.scheduleEnds.set(id, value);
+    visiting.delete(id);
+    return value;
+  };
+  for (const id of Object.keys(program.schedules)) {
+    resolveSchedule(id);
   }
 };
 
 const getTrackKey = (target, channel) => `${target.identity}\u0000${channel}`;
 
-const getRootStartForClip = (domains, domainId, localStart) => {
-  let result = localStart;
-  let current = domains[domainId];
-  while (current) {
-    result = current.start + result / current.rate;
-    current = current.parent === null ? null : domains[current.parent];
+const getIterationDirection = (domain, iteration) => {
+  if (domain.direction === "reverse") return "reverse";
+  if (domain.direction === "alternate" && iteration % 2 === 1) {
+    return "reverse";
+  }
+  return "forward";
+};
+
+const getParentTimeForDomainLocal = (domain, localTime, iteration = 0) => {
+  const direction = getIterationDirection(domain, iteration);
+  const forwardTime =
+    direction === "reverse" ? domain.cycleDuration - localTime : localTime;
+  const iterationOffset =
+    iteration * (domain.cycleDuration + domain.iterationGap);
+  return domain.start + (iterationOffset + forwardTime) / domain.rate;
+};
+
+const getRootTimeForDomainLocal = (
+  domains,
+  domainId,
+  localTime,
+  occurrenceIterations = new Map(),
+) => {
+  let result = localTime;
+  let currentId = domainId;
+  while (currentId !== null) {
+    const current = domains[currentId];
+    result = getParentTimeForDomainLocal(
+      current,
+      result,
+      occurrenceIterations.get(currentId) ?? 0,
+    );
+    currentId = current.parent;
   }
   return result;
 };
@@ -175,7 +227,7 @@ const getTimeInAncestorDomain = (
   let currentId = domainId;
   while (currentId !== ancestorDomainId) {
     const domain = domains[currentId];
-    result = domain.start + result / domain.rate;
+    result = getParentTimeForDomainLocal(domain, result);
     currentId = domain.parent;
   }
   return result;
@@ -214,6 +266,151 @@ const expressionContainsKind = (expression, kind) => {
       ? value.some((item) => expressionContainsKind(item, kind))
       : expressionContainsKind(value, kind),
   );
+};
+
+const evaluateClipValues = ({
+  clip,
+  expressionContext,
+  underlying,
+  iteration,
+}) => {
+  const context = { ...expressionContext, underlying, iteration };
+  const path = clip.sourcePath ?? clip.id;
+  const randomState = { counter: 0 };
+  const from = evaluateExpression(
+    clip.sampler.from,
+    context,
+    `${path}.from`,
+    randomState,
+  );
+  const toContext =
+    clip.sampler.to.kind === "underlying"
+      ? context
+      : { ...context, underlying: from };
+  const to = evaluateExpression(
+    clip.sampler.to,
+    toContext,
+    `${path}.to`,
+    randomState,
+  );
+  validateTimelineValueType(from, clip.valueType, `${path}.from`);
+  validateTimelineValueType(to, clip.valueType, `${path}.to`);
+  return { from, to };
+};
+
+const configureTrackRefreshResolvers = (instance, track) => {
+  const groups = new Map();
+  for (const segment of track.segments) {
+    if (!segment.refreshTemplate) continue;
+    if (!groups.has(segment.refreshDomain)) {
+      groups.set(segment.refreshDomain, []);
+    }
+    groups.get(segment.refreshDomain).push(segment);
+  }
+
+  for (const [refreshDomainId, segments] of groups) {
+    const refreshDomain = instance.domains[refreshDomainId];
+    const step = refreshDomain.direction === "alternate" ? 2 : 1;
+    const terminalCache = new Map();
+    const resolving = new Set();
+    const getRefreshIteration = (iteration) =>
+      refreshDomain.direction === "alternate"
+        ? iteration - (iteration % 2)
+        : iteration;
+
+    const ensureIteration = (iteration) => {
+      if (segments[0].refreshTemplate.valueCache.has(iteration)) return;
+      if (resolving.has(iteration)) {
+        throw new Error(
+          `Repeat-refresh recurrence for track "${track.channel}" contains a cycle.`,
+        );
+      }
+      resolving.add(iteration);
+      const previousIteration = iteration - step;
+      ensureIteration(previousIteration);
+      const iterationBase = getTerminal(previousIteration);
+      const occurrenceIterations = new Map([[refreshDomainId, iteration]]);
+
+      for (const segment of segments) {
+        const captureRootTime = getRootTimeForDomainLocal(
+          instance.domains,
+          segment.domain,
+          segment.start,
+          occurrenceIterations,
+        );
+        const underlying = sampleBoundTrack(instance, track, captureRootTime, {
+          maximumPriority: segment.priority - 1,
+          baseValue: iterationBase,
+          // Capture the value immediately before this clip's overwrite takes
+          // effect. Later binding already trimmed the earlier segment at this
+          // exact boundary, but repeat-refresh must see its terminal value.
+          ignoreTrimsAtOrAfterPriority: segment.priority,
+        });
+        const values = evaluateClipValues({
+          clip: segment.refreshTemplate.clip,
+          expressionContext: segment.refreshTemplate.expressionContext,
+          underlying,
+          iteration,
+        });
+        segment.refreshTemplate.valueCache.set(iteration, values);
+      }
+      resolving.delete(iteration);
+    };
+
+    const getTerminal = (iteration) => {
+      if (terminalCache.has(iteration)) {
+        return cloneTimelineValue(terminalCache.get(iteration));
+      }
+      ensureIteration(iteration);
+      const previousIteration = iteration - step;
+      const iterationBase =
+        iteration === 0 ? track.baseValue : getTerminal(previousIteration);
+      const terminalIteration =
+        refreshDomain.direction === "alternate" ? iteration + 1 : iteration;
+      const terminalDirection = getIterationDirection(
+        refreshDomain,
+        terminalIteration,
+      );
+      const terminalLocalTime =
+        terminalDirection === "reverse" ? 0 : refreshDomain.cycleDuration;
+      const occurrenceIterations = new Map([
+        [refreshDomainId, terminalIteration],
+      ]);
+      const rootTime = getRootTimeForDomainLocal(
+        instance.domains,
+        refreshDomainId,
+        terminalLocalTime,
+        occurrenceIterations,
+      );
+      const domainCache = new Map([
+        [
+          refreshDomainId,
+          {
+            active: true,
+            completed: true,
+            iteration: terminalIteration,
+            direction: terminalDirection,
+            inGap: false,
+            localTime: terminalLocalTime,
+          },
+        ],
+      ]);
+      const terminal = sampleBoundTrack(instance, track, rootTime, {
+        baseValue: iterationBase,
+        domainCache,
+      });
+      terminalCache.set(iteration, cloneTimelineValue(terminal));
+      return cloneTimelineValue(terminal);
+    };
+
+    for (const segment of segments) {
+      segment.resolveValues = (domainState) => {
+        const iteration = getRefreshIteration(domainState.iteration);
+        ensureIteration(iteration);
+        return segment.refreshTemplate.valueCache.get(iteration);
+      };
+    }
+  }
 };
 
 /** Bind a TimelineProgram without mutating renderer state. */
@@ -386,15 +583,28 @@ export const bindTimelineProgram = (rawProgram, context) => {
         instance.tracks.push(track);
       }
       const start = baseStart + offsets[targetIndex];
-      const rootStart = getRootStartForClip(domains, clip.domain, start);
-      const rootEnd = getRootStartForClip(
+      const captureRootTime = getRootTimeForDomainLocal(
+        domains,
+        clip.domain,
+        start,
+      );
+      const mappedRootEnd = getRootTimeForDomainLocal(
         domains,
         clip.domain,
         start + duration,
       );
-      const capturedUnderlying = sampleBoundTrack(instance, track, rootStart, {
-        maximumPriority: clip.priority - 1,
-      });
+      const rootStart = Math.min(captureRootTime, mappedRootEnd);
+      const rootEnd = Math.max(captureRootTime, mappedRootEnd);
+      const physicalStartLocal =
+        captureRootTime <= mappedRootEnd ? start : start + duration;
+      const capturedUnderlying = sampleBoundTrack(
+        instance,
+        track,
+        captureRootTime,
+        {
+          maximumPriority: clip.priority - 1,
+        },
+      );
 
       const overwrite = clip.overwrite ?? "none";
       const earlierTracks =
@@ -435,17 +645,17 @@ export const bindTimelineProgram = (rawProgram, context) => {
               );
               segment.trimRootAt = rootStart;
               segment.trimDomain = trimDomain;
+              segment.trimmedByPriority = clip.priority;
               segment.trimAt = getTimeInAncestorDomain(
                 domains,
                 clip.domain,
-                start,
+                physicalStartLocal,
                 trimDomain,
               );
             }
           }
         }
       }
-      const underlying = capturedUnderlying;
       const expressionContext = {
         programId: program.programId,
         sourcePath: clip.sourcePath ?? clip.id,
@@ -460,32 +670,14 @@ export const bindTimelineProgram = (rawProgram, context) => {
           target.targetState ??
           getRegistryValue(context.targetStates, target.identity) ??
           context.getTargetState?.(target),
-        underlying,
+        underlying: capturedUnderlying,
       };
-      const from = evaluateExpression(
-        clip.sampler.from,
+      const { from, to } = evaluateClipValues({
+        clip,
         expressionContext,
-        `${clip.sourcePath ?? clip.id}.from`,
-      );
-      const toExpressionContext =
-        clip.sampler.to.kind === "underlying"
-          ? expressionContext
-          : { ...expressionContext, underlying: from };
-      const to = evaluateExpression(
-        clip.sampler.to,
-        toExpressionContext,
-        `${clip.sourcePath ?? clip.id}.to`,
-      );
-      validateTimelineValueType(
-        from,
-        clip.valueType,
-        `${clip.sourcePath ?? clip.id}.from`,
-      );
-      validateTimelineValueType(
-        to,
-        clip.valueType,
-        `${clip.sourcePath ?? clip.id}.to`,
-      );
+        underlying: capturedUnderlying,
+        iteration: 0,
+      });
       if (
         clip.modifiers.length > 0 &&
         !new Set(["scalar", "angleDegrees", "integer"]).has(clip.valueType)
@@ -505,52 +697,6 @@ export const bindTimelineProgram = (rawProgram, context) => {
           `${clip.sourcePath ?? clip.id} uses iteration outside repeatRefresh.`,
         );
       }
-      const valueCache = new Map([[0, { from, to }]]);
-      const resolveValues = refreshDomain
-        ? (domainState) => {
-            const refreshIteration =
-              refreshDomain.direction === "alternate"
-                ? domainState.iteration - (domainState.iteration % 2)
-                : domainState.iteration;
-            const step = refreshDomain.direction === "alternate" ? 2 : 1;
-            for (
-              let iteration = step;
-              iteration <= refreshIteration;
-              iteration += step
-            ) {
-              if (valueCache.has(iteration)) continue;
-              const previous = valueCache.get(iteration - step);
-              const previousTerminal =
-                refreshDomain.direction === "alternate"
-                  ? previous.from
-                  : previous.to;
-              const iterationContext = {
-                ...expressionContext,
-                iteration,
-                underlying: previousTerminal,
-              };
-              const iterationFrom = evaluateExpression(
-                clip.sampler.from,
-                iterationContext,
-                `${clip.sourcePath ?? clip.id}.from`,
-              );
-              const iterationToContext =
-                clip.sampler.to.kind === "underlying"
-                  ? iterationContext
-                  : { ...iterationContext, underlying: iterationFrom };
-              const iterationTo = evaluateExpression(
-                clip.sampler.to,
-                iterationToContext,
-                `${clip.sourcePath ?? clip.id}.to`,
-              );
-              valueCache.set(iteration, {
-                from: iterationFrom,
-                to: iterationTo,
-              });
-            }
-            return valueCache.get(refreshIteration) ?? valueCache.get(0);
-          }
-        : null;
       track.segments.push({
         id: `${clip.id}@${targetIndex}`,
         sourcePath: clip.sourcePath,
@@ -567,8 +713,15 @@ export const bindTimelineProgram = (rawProgram, context) => {
         valueType: clip.valueType,
         rootStart,
         rootEnd,
-        ...(resolveValues
-          ? { resolveValues, refreshDomain: refreshDomainId }
+        ...(refreshDomain
+          ? {
+              refreshDomain: refreshDomainId,
+              refreshTemplate: {
+                clip,
+                expressionContext,
+                valueCache: new Map([[0, { from, to }]]),
+              },
+            }
           : {}),
       });
     });
@@ -576,6 +729,7 @@ export const bindTimelineProgram = (rawProgram, context) => {
 
   for (const track of instance.tracks) {
     track.segments.sort((left, right) => left.priority - right.priority);
+    configureTrackRefreshResolvers(instance, track);
   }
   instance.events = program.events.map((event) => ({
     ...event,

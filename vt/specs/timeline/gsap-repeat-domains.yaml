@@ -1,11 +1,13 @@
 ---
 title: GSAP Repeated Timeline Domains
-description: Repeated keyframes replay every segment while repeatRefresh propagates through a nested speed domain.
+description: Repeated keyframes replay every segment while chained repeatRefresh values propagate through a nested speed domain.
 specs:
   - both targets should advance through their first iteration at 50ms
-  - keyframe overwrite trimming should preserve the second half of the first iteration
+  - chained relative clips should finish their first iteration at x 300 without double counting
+  - repeatRefresh should continue from x 300 instead of jumping back at the iteration boundary
+  - both chained clips should contribute during the refreshed iteration
   - repeated keyframes should restart and replay their first frame after 200ms
-  - nested repeatRefresh should accumulate its relative endpoint from x 300 to x 500
+  - nested repeatRefresh should accumulate both relative endpoints from x 300 to x 500
   - both repeated schedules should retain their authored terminal values
 steps:
   - action: keypress
@@ -18,22 +20,27 @@ steps:
   - action: customEvent
     name: snapShotKeyFrame
     detail:
-      deltaMS: 100
+      deltaMS: 50
   - action: screenshot
   - action: customEvent
     name: snapShotKeyFrame
     detail:
-      deltaMS: 100
+      deltaMS: 25
   - action: screenshot
   - action: customEvent
     name: snapShotKeyFrame
     detail:
-      deltaMS: 100
+      deltaMS: 25
   - action: screenshot
   - action: customEvent
     name: snapShotKeyFrame
     detail:
       deltaMS: 50
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
   - action: screenshot
 ---
 states:
@@ -113,7 +120,13 @@ states:
                   steps:
                     - kind: to
                       targets: refresh
-                      values: { x: { by: 200 } }
-                      duration: 200
+                      values: { x: { by: 100 } }
+                      duration: 100
+                      speed: 2
+                      easing: linear
+                    - kind: to
+                      targets: refresh
+                      values: { x: { by: 100 } }
+                      duration: 100
                       speed: 2
                       easing: linear

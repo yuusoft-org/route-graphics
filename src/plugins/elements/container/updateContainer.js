@@ -33,6 +33,14 @@ import {
 } from "../util/transform.js";
 import { setElementRenderState } from "../elementRenderState.js";
 
+const collectDescendantTargetStates = (elements, result = new Map()) => {
+  for (const element of elements ?? []) {
+    result.set(element.id, element);
+    collectDescendantTargetStates(element.children, result);
+  }
+  return result;
+};
+
 /**
  * Update container element (synchronous)
  * @typedef {import("../elementPlugin.js").UpdateElementOptions} UpdateElementOptions
@@ -222,6 +230,7 @@ export const updateContainer = ({
         force: shouldForceShaderProgress,
       }),
     },
+    targetStates: collectDescendantTargetStates(nextElement.children),
     onComplete: () => {
       updateElement();
     },

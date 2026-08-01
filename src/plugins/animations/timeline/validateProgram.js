@@ -130,6 +130,17 @@ const validateTimingExpression = (value, path, depth = 0) => {
   }
 };
 
+const getScheduleReferences = (value, references = []) => {
+  if (!value || typeof value !== "object") return references;
+  if (value.kind === "scheduleEnd") references.push(value.schedule);
+  for (const child of Object.values(value)) {
+    if (child && typeof child === "object") {
+      getScheduleReferences(child, references);
+    }
+  }
+  return references;
+};
+
 const validateTargetQuery = (query, path) => {
   assertPlainObject(query, path);
   assertNonEmptyString(query.kind, `${path}.kind`);
@@ -668,6 +679,52 @@ const assertUniqueIds = (entries, path) => {
 };
 
 const validateReferences = (program) => {
+  const assertKnownSchedules = (expression, path) => {
+    for (const scheduleId of getScheduleReferences(expression)) {
+      if (
+        !Object.prototype.hasOwnProperty.call(program.schedules, scheduleId)
+      ) {
+        throw new Error(`${path} references unknown schedule "${scheduleId}".`);
+      }
+    }
+  };
+  const visitingSchedules = new Set();
+  const visitedSchedules = new Set();
+  const visitSchedule = (id) => {
+    if (visitedSchedules.has(id)) return;
+    if (visitingSchedules.has(id)) {
+      throw new Error(`program.schedules.${id} contains a schedule cycle.`);
+    }
+    visitingSchedules.add(id);
+    const schedule = program.schedules[id];
+    const expression = typeof schedule === "number" ? schedule : schedule.end;
+    assertKnownSchedules(expression, `program.schedules.${id}.end`);
+    for (const dependency of getScheduleReferences(expression)) {
+      visitSchedule(dependency);
+    }
+    visitingSchedules.delete(id);
+    visitedSchedules.add(id);
+  };
+  for (const id of Object.keys(program.schedules)) visitSchedule(id);
+
+  for (const [id, domain] of Object.entries(program.domains)) {
+    assertKnownSchedules(domain.start, `program.domains.${id}.start`);
+    assertKnownSchedules(
+      domain.cycleDuration,
+      `program.domains.${id}.cycleDuration`,
+    );
+  }
+  program.clipTemplates.forEach((clip, index) => {
+    assertKnownSchedules(clip.start, `program.clipTemplates[${index}].start`);
+    assertKnownSchedules(
+      clip.duration,
+      `program.clipTemplates[${index}].duration`,
+    );
+  });
+  program.events.forEach((event, index) =>
+    assertKnownSchedules(event.time, `program.events[${index}].time`),
+  );
+
   if (!program.domains.root) {
     throw new Error("program.domains.root is required.");
   }

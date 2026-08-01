@@ -4,6 +4,7 @@ import {
   canonicalizeProgram,
   bindTimelineProgram,
   checkedTimeAdd,
+  evaluateTimelineInstance,
   getEasingCriticalProgresses,
   getDomainLocalDuration,
   getDomainParentDuration,
@@ -266,6 +267,21 @@ describe("TimelineProgram validation", () => {
     events: [],
     debug: { source: "test" },
   });
+  const bindProgram = (source, target = { x: 0 }) => {
+    const program = validateTimelineProgram(source);
+    return bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: { hero: target },
+      channelRegistry: {
+        "transform.x": {
+          get: (handle) => handle.x,
+          apply: (handle, value) => {
+            handle.x = value;
+          },
+        },
+      },
+    });
+  };
 
   it("returns an immutable defensive program copy", () => {
     const source = createProgram();
@@ -299,6 +315,147 @@ describe("TimelineProgram validation", () => {
     const duplicated = createProgram();
     duplicated.clipTemplates.push({ ...duplicated.clipTemplates[0] });
     expect(() => validateTimelineProgram(duplicated)).toThrow(/duplicated/);
+  });
+
+  it("resolves forward schedule references independent of JSON key order", () => {
+    const source = createProgram();
+    source.schedules = {
+      dependent: {
+        end: {
+          kind: "add",
+          values: [{ kind: "scheduleEnd", schedule: "base" }, 5],
+        },
+      },
+      base: 20,
+    };
+    source.clipTemplates[0].start = {
+      kind: "scheduleEnd",
+      schedule: "dependent",
+    };
+
+    expect(bindProgram(source).tracks[0].segments[0].start).toBe(25);
+  });
+
+  it("rejects unknown and cyclic schedule references explicitly", () => {
+    const unknown = createProgram();
+    unknown.schedules.a = {
+      end: { kind: "scheduleEnd", schedule: "missing" },
+    };
+    expect(() => validateTimelineProgram(unknown)).toThrow(
+      /unknown schedule "missing"/,
+    );
+
+    const cyclic = createProgram();
+    cyclic.schedules = {
+      a: { end: { kind: "scheduleEnd", schedule: "b" } },
+      b: { end: { kind: "scheduleEnd", schedule: "a" } },
+    };
+    expect(() => validateTimelineProgram(cyclic)).toThrow(/schedule cycle/);
+  });
+
+  it("captures relative values at direction-mapped reverse-domain times", () => {
+    const source = createProgram();
+    source.domains.root.direction = "reverse";
+    source.clipTemplates[0].fill = "both";
+    source.clipTemplates.push({
+      ...source.clipTemplates[0],
+      id: "clip-1",
+      sourcePath: "animations[0].timeline[1]",
+      start: 20,
+      duration: 10,
+      sampler: {
+        ...source.clipTemplates[0].sampler,
+        from: { kind: "underlying" },
+        to: {
+          kind: "add",
+          left: { kind: "underlying" },
+          right: { kind: "constant", value: 10 },
+        },
+      },
+      priority: 1,
+      overwrite: "auto",
+    });
+
+    const track = bindProgram(source).tracks[0];
+    const segment = track.segments[1];
+    expect(segment.from).toBe(20);
+    expect(segment.to).toBe(30);
+    expect(segment.rootStart).toBe(70);
+    expect(segment.rootEnd).toBe(80);
+    expect(track.segments[0].trimAt).toBe(30);
+  });
+
+  it("uses distinct deterministic draws for fromTo endpoints", () => {
+    const source = createProgram();
+    source.clipTemplates[0].sampler.from = {
+      kind: "randomNumber",
+      min: 0,
+      max: 100,
+    };
+    source.clipTemplates[0].sampler.to = {
+      kind: "randomNumber",
+      min: 0,
+      max: 100,
+    };
+
+    const first = bindProgram(source).tracks[0].segments[0];
+    const second = bindProgram(source).tracks[0].segments[0];
+    expect(first.from).not.toBe(first.to);
+    expect([first.from, first.to]).toEqual([second.from, second.to]);
+  });
+
+  it("chains repeatRefresh relatives from the prior track terminal", () => {
+    const source = createProgram();
+    source.duration = 200;
+    source.domains.root = {
+      ...source.domains.root,
+      cycleDuration: 100,
+      iterations: 2,
+      refresh: "iteration",
+    };
+    source.domains["speed-first"] = {
+      parent: "root",
+      start: 0,
+      cycleDuration: 100,
+      iterations: 1,
+      iterationGap: 0,
+      direction: "forward",
+      rate: 2,
+      refresh: "never",
+    };
+    source.domains["speed-second"] = {
+      ...source.domains["speed-first"],
+      start: 50,
+    };
+    source.clipTemplates[0] = {
+      ...source.clipTemplates[0],
+      domain: "speed-first",
+      duration: 100,
+      sampler: {
+        ...source.clipTemplates[0].sampler,
+        from: { kind: "underlying" },
+        to: {
+          kind: "add",
+          left: { kind: "underlying" },
+          right: { kind: "constant", value: 10 },
+        },
+      },
+    };
+    source.clipTemplates.push({
+      ...source.clipTemplates[0],
+      id: "clip-1",
+      sourcePath: "animations[0].timeline[1]",
+      domain: "speed-second",
+      start: 0,
+      priority: 1,
+    });
+    const instance = bindProgram(source);
+
+    expect(evaluateTimelineInstance(instance, 0).values[0].value).toBe(0);
+    expect(evaluateTimelineInstance(instance, 50).values[0].value).toBe(10);
+    expect(evaluateTimelineInstance(instance, 100).values[0].value).toBe(20);
+    expect(evaluateTimelineInstance(instance, 150).values[0].value).toBe(30);
+    expect(evaluateTimelineInstance(instance, 200).values[0].value).toBe(40);
   });
 
   it("rejects invalid root graphs, union references, and segmentation drift", () => {
