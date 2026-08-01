@@ -99,9 +99,10 @@ const isExpressionValue = (value) =>
   value &&
   typeof value === "object" &&
   !Array.isArray(value) &&
-  ["by", "random", "expr", "color"].some((field) =>
+  (["by", "random", "expr"].some((field) =>
     Object.prototype.hasOwnProperty.call(value, field),
-  );
+  ) ||
+    value.color?.random !== undefined);
 
 const flattenValues = (values, prefix = "") => {
   const result = {};
@@ -123,6 +124,12 @@ const flattenValues = (values, prefix = "") => {
         !isExpressionValue(value)
       ) {
         visit(value, path);
+      } else if (
+        key === "fill" &&
+        !currentPrefix &&
+        value?.color?.random !== undefined
+      ) {
+        result["rect.fill.color"] = value;
       } else if (
         ["fill", "border"].includes(key) &&
         value &&
@@ -550,7 +557,10 @@ export const compilePortableGsapAnimation = (
           channelInfo,
           `${path}.values.${property}`,
         );
-        fromExpression = toExpression;
+        // A zero-duration set samples only its terminal value. Keeping the
+        // source side underlying avoids consuming a second random draw for a
+        // single authored expression.
+        fromExpression = underlying();
       } else if (action === "to" || action === "keyframes") {
         fromExpression = underlying();
         toExpression = authoredExpression(
