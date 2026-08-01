@@ -280,6 +280,85 @@ describe("compiled frontend to GSAP evaluator integration", () => {
     evaluator.destroy();
   });
 
+  it("replays overwrite-trimmed keyframes in every GSAP iteration", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "repeated-keyframes",
+        targetId: "hero",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            {
+              kind: "keyframes",
+              repeat: 1,
+              frames: [
+                { duration: 50, values: { x: 50 } },
+                { duration: 50, values: { x: 100 } },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+    const instance = bind(compilePortableGsapAnimation(animation), {
+      hero: { x: 0, y: 0, alpha: 1, rotation: 0, scaleX: 1 },
+    });
+    const evaluator = createGsapTimelineEvaluator(instance);
+
+    for (const [time, expected] of shuffled([
+      [25, 25],
+      [75, 75],
+      [125, 25],
+      [175, 75],
+    ])) {
+      expect(evaluator.evaluate(time).values[0].value).toBeCloseTo(expected, 8);
+    }
+    evaluator.destroy();
+  });
+
+  it("inherits group repeatRefresh through a GSAP speed domain", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "nested-refresh",
+        targetId: "hero",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            {
+              kind: "sequence",
+              repeat: 1,
+              repeatRefresh: true,
+              steps: [
+                {
+                  kind: "to",
+                  values: { x: { by: 10 } },
+                  duration: 100,
+                  speed: 2,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+    const instance = bind(compilePortableGsapAnimation(animation), {
+      hero: { x: 0, y: 0, alpha: 1, rotation: 0, scaleX: 1 },
+    });
+    const evaluator = createGsapTimelineEvaluator(instance);
+
+    for (const [time, expected] of shuffled([
+      [25, 5],
+      [50, 10],
+      [75, 15],
+      [100, 20],
+    ])) {
+      expect(evaluator.evaluate(time).values[0].value).toBeCloseTo(expected, 8);
+    }
+    evaluator.destroy();
+  });
+
   it("executes the compact tween frontend through the same GSAP backend", () => {
     const [animation] = normalizeAnimations([
       {

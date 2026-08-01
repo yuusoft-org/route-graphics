@@ -320,12 +320,14 @@ describe("portable GSAP update runtime integration", () => {
 
   it("binds grapheme units to staged Pixi targets without splitting emoji", () => {
     const root = new Container({ label: "root" });
+    const background = new Container({ label: "background" });
     const title = new Text({
       label: "title",
       text: "e\u0301👨‍👩‍👧‍👦!",
       style: { fontSize: 20 },
     });
-    root.addChild(title);
+    const foreground = new Container({ label: "foreground" });
+    root.addChild(background, title, foreground);
     const animation = normalizeAnimations([
       {
         id: "characters",
@@ -372,6 +374,9 @@ describe("portable GSAP update runtime integration", () => {
     );
     expect(title.text).toBe("e\u0301👨‍👩‍👧‍👦!");
     expect(title.renderable).toBe(false);
+    expect(root.getChildIndex(unitContainer)).toBe(1);
+    expect(root.getChildIndex(background)).toBe(0);
+    expect(root.getChildIndex(foreground)).toBe(3);
     expect(unitContainer.children.map((child) => child.text)).toEqual([
       "e\u0301",
       "👨‍👩‍👧‍👦",
@@ -386,4 +391,70 @@ describe("portable GSAP update runtime integration", () => {
     ]);
     root.destroy({ children: true });
   });
+
+  it.each([
+    [
+      "contextual shaping",
+      "مرحبا",
+      { fontSize: 20 },
+      /contextual or bidirectional shaping/,
+    ],
+    [
+      "automatic wrapping",
+      "wrapped text",
+      { fontSize: 20, wordWrap: true, wordWrapWidth: 40 },
+      /automatic wrapping/,
+    ],
+    [
+      "cross-unit kerning",
+      "AV",
+      { fontFamily: "RouteGraphicsTestSans", fontSize: 20 },
+      /kerning or ligature shaping/,
+    ],
+  ])(
+    "rejects %s that independent Pixi text units cannot preserve",
+    (_name, text, style, error) => {
+      const root = new Container({ label: "root" });
+      const title = new Text({ label: "title", text, style });
+      root.addChild(title);
+      const animation = normalizeAnimations([
+        {
+          id: "unsafe-characters",
+          targetId: "root",
+          type: "update",
+          gsap: {
+            profile: "portable-v1",
+            targets: {
+              characters: {
+                textUnits: {
+                  elementId: "title",
+                  unit: "grapheme",
+                  order: "logical",
+                },
+              },
+            },
+            steps: [
+              { kind: "set", targets: "characters", values: { alpha: 0 } },
+            ],
+          },
+        },
+      ]);
+      const tracker = createCompletionTracker();
+      tracker.reset("unsafe-text-state");
+      const bus = createAnimationBus();
+
+      expect(() =>
+        dispatchUpdateAnimationsNow({
+          animations: animation,
+          animationBus: bus,
+          completionTracker: tracker,
+          element: root,
+          targetState: {},
+        }),
+      ).toThrow(error);
+      expect(title.renderable).toBe(true);
+      expect(root.children).toEqual([title]);
+      root.destroy({ children: true });
+    },
+  );
 });

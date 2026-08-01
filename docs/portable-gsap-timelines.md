@@ -141,6 +141,12 @@ Whitespace is not emitted as a word target. A binding fingerprint includes the
 text, shaping style inputs, segmentation version, unit, and order; a changed
 fingerprint restarts instead of silently retargeting units.
 
+The Pixi adapter currently maps units to independent `Text` objects only when
+their measured advances preserve the original layout. It fails closed for
+automatic wrapping, contextual/bidirectional scripts, and kerning or ligature
+shaping that crosses a unit boundary. Backends with glyph-cluster geometry can
+support those layouts without this restriction.
+
 Stagger defines exactly one of `each` or `amount`. `from` accepts `start`,
 `center`, `end`, `edges`, `random`, or a target index. A `grid` with explicit
 `columns` may optionally select `axis: x | y`. Target order and seeded random

@@ -36,20 +36,21 @@ const scaleValue = (value, scalar, path, divide = false) => {
   return value * factor;
 };
 
-const randomParts = (expression, context) => [
+const randomParts = (expression, context, randomCounter) => [
   context.programId,
   context.sourcePath,
   context.targetIdentity,
   context.channel,
   context.iteration ?? 0,
   expression.seed ?? "",
-  context.randomCounter ?? 0,
+  randomCounter,
 ];
 
 export const evaluateExpression = (
   expression,
   context,
   path = "expression",
+  randomState = { counter: context.randomCounter ?? 0 },
 ) => {
   let result;
   switch (expression.kind) {
@@ -92,24 +93,50 @@ export const evaluateExpression = (
       break;
     case "add":
       result = addTimelineValues(
-        evaluateExpression(expression.left, context, `${path}.left`),
-        evaluateExpression(expression.right, context, `${path}.right`),
+        evaluateExpression(
+          expression.left,
+          context,
+          `${path}.left`,
+          randomState,
+        ),
+        evaluateExpression(
+          expression.right,
+          context,
+          `${path}.right`,
+          randomState,
+        ),
         path,
       );
       break;
     case "subtract":
       result = subtractValues(
-        evaluateExpression(expression.left, context, `${path}.left`),
-        evaluateExpression(expression.right, context, `${path}.right`),
+        evaluateExpression(
+          expression.left,
+          context,
+          `${path}.left`,
+          randomState,
+        ),
+        evaluateExpression(
+          expression.right,
+          context,
+          `${path}.right`,
+          randomState,
+        ),
         path,
       );
       break;
     case "multiply": {
-      const left = evaluateExpression(expression.left, context, `${path}.left`);
+      const left = evaluateExpression(
+        expression.left,
+        context,
+        `${path}.left`,
+        randomState,
+      );
       const right = evaluateExpression(
         expression.right,
         context,
         `${path}.right`,
+        randomState,
       );
       if (isNumericSequence(left) && isNumericSequence(right)) {
         throw new Error(`${path} cannot multiply two numeric shapes.`);
@@ -120,11 +147,17 @@ export const evaluateExpression = (
       break;
     }
     case "divide": {
-      const left = evaluateExpression(expression.left, context, `${path}.left`);
+      const left = evaluateExpression(
+        expression.left,
+        context,
+        `${path}.left`,
+        randomState,
+      );
       const right = evaluateExpression(
         expression.right,
         context,
         `${path}.right`,
+        randomState,
       );
       if (isNumericSequence(right)) {
         throw new Error(`${path} divisor must be a scalar.`);
@@ -135,7 +168,12 @@ export const evaluateExpression = (
     case "min":
     case "max": {
       const values = expression.values.map((item, index) =>
-        evaluateExpression(item, context, `${path}.values[${index}]`),
+        evaluateExpression(
+          item,
+          context,
+          `${path}.values[${index}]`,
+          randomState,
+        ),
       );
       values.forEach((value, index) =>
         assertFiniteNumber(value, `${path}.values[${index}]`),
@@ -148,9 +186,20 @@ export const evaluateExpression = (
         expression.value,
         context,
         `${path}.value`,
+        randomState,
       );
-      const min = evaluateExpression(expression.min, context, `${path}.min`);
-      const max = evaluateExpression(expression.max, context, `${path}.max`);
+      const min = evaluateExpression(
+        expression.min,
+        context,
+        `${path}.min`,
+        randomState,
+      );
+      const max = evaluateExpression(
+        expression.max,
+        context,
+        `${path}.max`,
+        randomState,
+      );
       [value, min, max].forEach((item, index) =>
         assertFiniteNumber(item, `${path}[${index}]`),
       );
@@ -159,7 +208,9 @@ export const evaluateExpression = (
       break;
     }
     case "randomNumber": {
-      const unit = deterministicRandomUnit(randomParts(expression, context));
+      const unit = deterministicRandomUnit(
+        randomParts(expression, context, randomState.counter++),
+      );
       if (expression.step === undefined) {
         result = expression.min + (expression.max - expression.min) * unit;
       } else {
@@ -170,7 +221,9 @@ export const evaluateExpression = (
       break;
     }
     case "randomChoice": {
-      const unit = deterministicRandomUnit(randomParts(expression, context));
+      const unit = deterministicRandomUnit(
+        randomParts(expression, context, randomState.counter++),
+      );
       result = cloneTimelineValue(
         expression.choices[Math.floor(unit * expression.choices.length)],
       );

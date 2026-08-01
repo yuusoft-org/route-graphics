@@ -6,7 +6,12 @@ import {
 } from "../animationPropertyUtils.js";
 import { getRectStyleAnimationBatchHooks } from "../../elements/rect/rectStyleRuntime.js";
 import { getShaderFilterAnimationTarget } from "../../elements/util/shaderFilterEffect.js";
-import { CanvasTextMetrics, Container, Text } from "pixi.js";
+import {
+  CanvasTextMetrics,
+  Container,
+  Text,
+  fontStringFromTextStyle,
+} from "pixi.js";
 import { fnv1a64, randomStateHex } from "./random.js";
 import { segmentPortableText } from "./textSegmentation.js";
 
@@ -66,7 +71,64 @@ const countLineBreaks = (text, end) => {
 };
 
 const measureTextWidth = (text, style) =>
-  text.length === 0 ? 0 : CanvasTextMetrics.measureText(text, style).width;
+  text.length === 0
+    ? 0
+    : CanvasTextMetrics.measureText(text, style).maxLineWidth;
+
+const measureTextAdvance = (text, style) => {
+  if (text.length === 0) return 0;
+  const context = CanvasTextMetrics._context;
+  context.font = fontStringFromTextStyle(style);
+  if ("letterSpacing" in context) context.letterSpacing = "0px";
+  if ("textLetterSpacing" in context) context.textLetterSpacing = "0px";
+  const graphemeCount = CanvasTextMetrics.graphemeSegmenter(text).length;
+  return (
+    context.measureText(text).width +
+    Math.max(0, graphemeCount - 1) * Number(style?.letterSpacing ?? 0)
+  );
+};
+
+const contextShapingScriptPattern =
+  /[\u0590-\u08ff\u0900-\u0fff\u1780-\u18af\ufb1d-\ufdff\ufe70-\ufefc]/u;
+
+const assertIndependentTextUnitsAreLayoutSafe = (
+  sourceText,
+  style,
+  units,
+  elementId,
+) => {
+  if (units.length <= 1) return;
+  if (style?.wordWrap) {
+    throw new Error(
+      `Text element "${elementId}" cannot animate text units with automatic wrapping because Pixi cannot preserve the shaped line layout.`,
+    );
+  }
+  if (contextShapingScriptPattern.test(sourceText)) {
+    throw new Error(
+      `Text element "${elementId}" uses contextual or bidirectional shaping that cannot be preserved by independent Pixi text units.`,
+    );
+  }
+
+  const letterSpacing = Number(style?.letterSpacing ?? 0);
+  for (const unit of units) {
+    const lineStart =
+      sourceText.lastIndexOf("\n", Math.max(0, unit.start - 1)) + 1;
+    const prefix = sourceText.slice(lineStart, unit.start);
+    const throughUnit = sourceText.slice(lineStart, unit.end);
+    const contextualAdvance =
+      measureTextAdvance(throughUnit, style) -
+      measureTextAdvance(prefix, style);
+    const independentAdvance =
+      measureTextAdvance(unit.segment, style) +
+      (prefix.length > 0 && unit.segment.length > 0 ? letterSpacing : 0);
+    const tolerance = Math.max(0.01, Math.abs(contextualAdvance) * 1e-6);
+    if (Math.abs(contextualAdvance - independentAdvance) > tolerance) {
+      throw new Error(
+        `Text element "${elementId}" has kerning or ligature shaping across text-unit boundaries that Pixi cannot preserve.`,
+      );
+    }
+  }
+};
 
 const createPixiTextUnitPreparation = (textTarget, query) => {
   const textElement = textTarget.handle;
@@ -90,14 +152,29 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
   }
 
   const units = segmentPortableText(sourceText, query.unit, query.order);
+  assertIndependentTextUnitsAreLayoutSafe(
+    sourceText,
+    textElement.style,
+    units,
+    query.elementId,
+  );
+  const textMetrics = CanvasTextMetrics.measureText(
+    sourceText,
+    textElement.style,
+  );
   const container = new Container({
     label: `__timeline-text-units:${query.elementId}`,
   });
   copyDisplayTransform(textElement, container);
   const bounds = textElement.getLocalBounds?.().rectangle ??
     textElement.getLocalBounds?.() ?? { x: 0, y: 0 };
-  const lineHeight =
-    textElement.style?.lineHeight || textElement.style?.fontSize || 0;
+  const lineHeight = textMetrics.lineHeight;
+  const getLineAlignmentOffset = (line) => {
+    const remaining = textMetrics.maxLineWidth - textMetrics.lineWidths[line];
+    if (textElement.style?.align === "center") return remaining / 2;
+    if (textElement.style?.align === "right") return remaining;
+    return 0;
+  };
   const targets = units.map((unit, index) => {
     const lineStart =
       sourceText.lastIndexOf("\n", Math.max(0, unit.start - 1)) + 1;
@@ -109,6 +186,7 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
     });
     child.x =
       (bounds.x ?? 0) +
+      getLineAlignmentOffset(line) +
       measureTextWidth(
         sourceText.slice(lineStart, unit.start),
         textElement.style,
@@ -144,12 +222,21 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
           `Text element "${query.elementId}" must be attached before text-unit activation.`,
         );
       }
+      const parent = textElement.parent;
+      const originalIndex = parent.getChildIndex
+        ? parent.getChildIndex(textElement)
+        : parent.children.indexOf(textElement);
       textElement.renderable = false;
       if (originalFilters?.length) {
         textElement.filters = [];
         container.filters = originalFilters;
       }
-      textElement.parent.addChild(container);
+      if (typeof parent.addChildAt === "function") {
+        parent.addChildAt(container, originalIndex);
+      } else {
+        parent.addChild(container);
+        parent.setChildIndex?.(container, originalIndex);
+      }
       textElement[PIXI_TIMELINE_TEXT_UNITS] = preparation;
       pendingTextUnitPreparations.delete(textElement);
       committed = true;

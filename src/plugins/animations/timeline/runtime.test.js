@@ -101,6 +101,88 @@ describe("TimelineProgram binder and pure evaluator", () => {
     expect(calls).toEqual(["open", "close"]);
   });
 
+  it("closes every opened batch while preserving the frame failure", () => {
+    const calls = [];
+    const firstGroup = {
+      beforeApplyFrame: () => calls.push("open:first"),
+      afterApplyFrame: () => {
+        calls.push("close:first");
+        throw new Error("first close failed");
+      },
+    };
+    const secondGroup = {
+      beforeApplyFrame: () => calls.push("open:second"),
+      afterApplyFrame: () => {
+        calls.push("close:second");
+        throw new Error("second close failed");
+      },
+    };
+    const first = { x: 1 };
+    const second = { x: 2 };
+    const frame = {
+      values: [
+        {
+          target: first,
+          value: 10,
+          binding: {
+            group: firstGroup,
+            get: (target) => target.x,
+            apply: (target, value) => {
+              target.x = value;
+            },
+          },
+        },
+        {
+          target: second,
+          value: 20,
+          binding: {
+            group: secondGroup,
+            get: (target) => target.x,
+            apply: () => {
+              throw new Error("frame apply failed");
+            },
+          },
+        },
+      ],
+    };
+
+    expect(() => applyTimelineFrame(frame)).toThrow("frame apply failed");
+    expect(first.x).toBe(1);
+    expect(second.x).toBe(2);
+    expect(calls).toEqual([
+      "open:first",
+      "open:second",
+      "close:second",
+      "close:first",
+    ]);
+  });
+
+  it("closes every batch and reports the first close failure", () => {
+    const calls = [];
+    const makeGroup = (name) => ({
+      afterApplyFrame: () => {
+        calls.push(name);
+        throw new Error(`${name} failed`);
+      },
+    });
+    const frame = {
+      values: ["first", "second"].map((name) => ({
+        target: { x: 0 },
+        value: 1,
+        binding: {
+          group: makeGroup(name),
+          get: (target) => target.x,
+          apply: (target, value) => {
+            target.x = value;
+          },
+        },
+      })),
+    };
+
+    expect(() => applyTimelineFrame(frame)).toThrow("second failed");
+    expect(calls).toEqual(["second", "first"]);
+  });
+
   it("reuses a frame buffer without changing out-of-order sampling results", () => {
     const instance = bindLegacy(
       {
@@ -336,6 +418,79 @@ describe("TimelineProgram binder and pure evaluator", () => {
       /steps\[1\].*steps\[0\].*transform\.x/,
     );
   });
+
+  it("reapplies overwrite-trimmed keyframes on every repeated iteration", () => {
+    const program = compilePortableGsapAnimation({
+      id: "repeated-keyframes",
+      targetId: "hero",
+      type: "update",
+      gsap: {
+        profile: "portable-v1",
+        steps: [
+          {
+            kind: "keyframes",
+            repeat: 1,
+            frames: [
+              { duration: 50, values: { x: 50 } },
+              { duration: 50, values: { x: 100 } },
+            ],
+          },
+        ],
+      },
+    });
+    const target = { x: 0 };
+    const instance = bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: { hero: { handle: target, identity: "hero" } },
+      channelRegistry: { "transform.x": makeAdapter("x") },
+    });
+    const sample = (time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(25)).toBe(25);
+    expect(sample(75)).toBe(75);
+    expect(sample(125)).toBe(25);
+    expect(sample(175)).toBe(75);
+  });
+
+  it("inherits repeat-refresh through a speed domain", () => {
+    const program = compilePortableGsapAnimation({
+      id: "nested-refresh",
+      targetId: "hero",
+      type: "update",
+      gsap: {
+        profile: "portable-v1",
+        steps: [
+          {
+            kind: "sequence",
+            repeat: 1,
+            repeatRefresh: true,
+            steps: [
+              {
+                kind: "to",
+                values: { x: { by: 10 } },
+                duration: 100,
+                speed: 2,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const target = { x: 0 };
+    const instance = bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: { hero: { handle: target, identity: "hero" } },
+      channelRegistry: { "transform.x": makeAdapter("x") },
+    });
+    const sample = (time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(25)).toBe(5);
+    expect(sample(50)).toBe(10);
+    expect(sample(75)).toBe(15);
+    expect(sample(100)).toBe(20);
+  });
 });
 
 describe("portable deterministic helpers", () => {
@@ -386,6 +541,40 @@ describe("portable deterministic helpers", () => {
     expect(evaluateExpression(random, context)).toBe(
       evaluateExpression(random, context),
     );
+  });
+
+  it("assigns independent deterministic draws to random expression nodes", () => {
+    const context = {
+      programId: "p",
+      sourcePath: "steps[0]",
+      targetIdentity: "hero",
+      channel: "transform.x",
+      targetIndex: 0,
+      targetCount: 1,
+      iteration: 0,
+      underlying: 0,
+      subject: {},
+    };
+    const expression = {
+      kind: "add",
+      left: { kind: "randomNumber", min: 0, max: 1 },
+      right: { kind: "randomNumber", min: 0, max: 1 },
+    };
+    const firstDraw = evaluateExpression(expression.left, context);
+    const secondDraw = deterministicRandomUnit([
+      context.programId,
+      context.sourcePath,
+      context.targetIdentity,
+      context.channel,
+      context.iteration,
+      "",
+      1,
+    ]);
+    const combined = evaluateExpression(expression, context);
+
+    expect(secondDraw).not.toBe(firstDraw);
+    expect(combined).toBeCloseTo(firstDraw + secondDraw, 15);
+    expect(evaluateExpression(expression, context)).toBe(combined);
   });
 
   it("applies modifier pipelines in authored order", () => {

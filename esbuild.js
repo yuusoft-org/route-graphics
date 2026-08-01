@@ -41,7 +41,24 @@ try {
     });
   };
 
+  const buildCliBundle = async () => {
+    const outdir = "./dist/cli";
+
+    await rm(outdir, { force: true, recursive: true });
+    await esbuild.build({
+      entryPoints: ["./src/cli/routeGraphicsCli.js"],
+      bundle: true,
+      minify: false,
+      sourcemap: false,
+      outfile: path.join(outdir, "routeGraphicsCli.js"),
+      format: "esm",
+      platform: "node",
+      packages: "external",
+    });
+  };
+
   await Promise.all([
+    buildCliBundle(),
     buildBundle({
       outdir: "./dist",
       minify: true,

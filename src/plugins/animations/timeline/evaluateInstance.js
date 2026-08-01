@@ -57,14 +57,10 @@ const sampleReferenceSegment = (segment, progress) => {
 const getSegmentContribution = (
   segment,
   localTime,
-  rootTime,
   sampleSegment,
   sourceSegment,
 ) => {
   const end = segment.start + segment.duration;
-  if (segment.trimRootAt !== undefined && rootTime >= segment.trimRootAt) {
-    return null;
-  }
   let value;
   if (localTime < segment.start) {
     value = new Set(["backwards", "both"]).has(segment.fill)
@@ -117,13 +113,29 @@ export const sampleBoundTrack = (
       domainCache,
     );
     if (!domainState.active) continue;
+    if (segment.trimDomain !== undefined) {
+      const trimState = mapDomain(
+        instance,
+        segment.trimDomain,
+        rootTime,
+        domainCache,
+      );
+      if (trimState.active && trimState.localTime >= segment.trimAt) continue;
+    } else if (
+      segment.trimRootAt !== undefined &&
+      rootTime >= segment.trimRootAt
+    ) {
+      continue;
+    }
+    const valueDomainState = segment.refreshDomain
+      ? mapDomain(instance, segment.refreshDomain, rootTime, domainCache)
+      : domainState;
     const resolvedSegment = segment.resolveValues
-      ? { ...segment, ...segment.resolveValues(domainState) }
+      ? { ...segment, ...segment.resolveValues(valueDomainState) }
       : segment;
     const contribution = getSegmentContribution(
       resolvedSegment,
       domainState.localTime,
-      rootTime,
       sampleSegment,
       segment,
     );
@@ -201,6 +213,7 @@ export const applyTimelineFrame = (frame) => {
   }
   const opened = [];
   const appliedIndexes = [];
+  let primaryError;
   try {
     for (const group of groups) {
       group.beforeApplyFrame?.();
@@ -212,6 +225,7 @@ export const applyTimelineFrame = (frame) => {
       appliedIndexes.push(index);
     }
   } catch (error) {
+    primaryError = error;
     for (let index = appliedIndexes.length - 1; index >= 0; index--) {
       const itemIndex = appliedIndexes[index];
       const item = frame.values[itemIndex];
@@ -222,10 +236,16 @@ export const applyTimelineFrame = (frame) => {
         // rollback failure separately, but must still close every batch hook.
       }
     }
-    throw error;
-  } finally {
-    for (let index = opened.length - 1; index >= 0; index--) {
+  }
+
+  let closeError;
+  for (let index = opened.length - 1; index >= 0; index--) {
+    try {
       opened[index].afterApplyFrame?.();
+    } catch (error) {
+      closeError ??= error;
     }
   }
+  if (primaryError) throw primaryError;
+  if (closeError) throw closeError;
 };
