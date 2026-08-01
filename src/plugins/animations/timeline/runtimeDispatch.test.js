@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createAnimationBus } from "../animationBus.js";
 import { dispatchUpdateAnimationsNow } from "../updateAnimationDispatch.js";
 import { createCompletionTracker } from "../../../util/completionTracker.js";
@@ -82,6 +82,168 @@ describe("portable GSAP update runtime integration", () => {
     expect(root.x).toBe(25);
     bus.tick(50);
     expect(root.x).toBe(30);
+  });
+
+  it("settles and does not completion-track a nested infinite GSAP group", () => {
+    const root = display("root");
+    const animation = normalizeAnimations([
+      {
+        id: "nested-infinite",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            {
+              kind: "sequence",
+              repeat: "infinite",
+              steps: [
+                {
+                  kind: "to",
+                  values: { x: 100 },
+                  duration: 100,
+                  easing: "linear",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+    const events = [];
+    const tracker = createCompletionTracker((name, payload) =>
+      events.push([name, payload]),
+    );
+    tracker.reset("nested-infinite-state");
+    const bus = createAnimationBus();
+    const onComplete = vi.fn(() => {
+      root.x = 100;
+    });
+
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: { x: 100 },
+      onComplete,
+    });
+    tracker.completeIfEmpty();
+    bus.flush();
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(events).toContainEqual([
+      "renderComplete",
+      { id: "nested-infinite-state", aborted: false },
+    ]);
+    expect(bus.getState().animations[0].duration).toBe(Infinity);
+  });
+
+  it("releases render completion when a timeline frame adapter fails", () => {
+    const root = display("root");
+    let liveX = 0;
+    let rejectWrites = false;
+    Object.defineProperty(root, "x", {
+      configurable: true,
+      get: () => liveX,
+      set: (value) => {
+        if (rejectWrites && value !== 0) {
+          throw new Error("adapter write failed");
+        }
+        liveX = value;
+      },
+    });
+    const animation = normalizeAnimations([
+      {
+        id: "failing-frame",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            {
+              kind: "to",
+              values: { x: 100 },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]);
+    const eventHandler = vi.fn();
+    const tracker = createCompletionTracker(eventHandler);
+    tracker.reset("failing-frame-state");
+    const bus = createAnimationBus();
+    const onComplete = vi.fn();
+
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: { x: 100 },
+      onComplete,
+    });
+    bus.flush();
+    tracker.completeIfEmpty();
+    expect(eventHandler).not.toHaveBeenCalled();
+
+    rejectWrites = true;
+    bus.tick(50);
+
+    expect(bus.getState().activeCount).toBe(0);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
+      id: "failing-frame-state",
+      aborted: false,
+    });
+  });
+
+  it("releases render completion at a finite update's reverse boundary", () => {
+    const root = display("root");
+    const animation = normalizeAnimations([
+      {
+        id: "reverse-tracked-update",
+        targetId: "root",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            {
+              kind: "to",
+              values: { x: 100 },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]);
+    const eventHandler = vi.fn();
+    const tracker = createCompletionTracker(eventHandler);
+    tracker.reset("reverse-tracked-state");
+    const bus = createAnimationBus();
+
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: { x: 100 },
+    });
+    bus.flush();
+    tracker.completeIfEmpty();
+    bus.tick(40);
+
+    expect(bus.reverse("reverse-tracked-update")).toBe(true);
+    bus.tick(40);
+
+    expect(bus.getState().activeCount).toBe(0);
+    expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
+      id: "reverse-tracked-state",
+      aborted: false,
+    });
   });
 
   it("rejects mixed legacy/GSAP write conflicts before either time-zero frame", () => {

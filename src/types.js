@@ -1055,6 +1055,38 @@ export class BaseRouteGraphics {
   hitTestElementBounds(point) {
     throw new Error("Method not implemented.");
   }
+
+  pauseAnimation(_animationId) {
+    throw new Error("Method not implemented.");
+  }
+
+  resumeAnimation(_animationId) {
+    throw new Error("Method not implemented.");
+  }
+
+  reverseAnimation(_animationId, _enabled = true) {
+    throw new Error("Method not implemented.");
+  }
+
+  setAnimationDirection(_animationId, _direction) {
+    throw new Error("Method not implemented.");
+  }
+
+  seekAnimation(_animationId, _timeMS, _options) {
+    throw new Error("Method not implemented.");
+  }
+
+  setAnimationProgress(_animationId, _progress, _options) {
+    throw new Error("Method not implemented.");
+  }
+
+  setAnimationSpeed(_animationId, _speed) {
+    throw new Error("Method not implemented.");
+  }
+
+  getAnimationState(_animationId) {
+    throw new Error("Method not implemented.");
+  }
 }
 
 /**

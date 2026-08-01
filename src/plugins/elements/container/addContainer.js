@@ -181,21 +181,37 @@ export const addContainer = ({
     eventHandler,
   });
 
-  dispatchLiveAnimations({
-    animations,
-    targetId: id,
-    animationBus,
-    completionTracker,
-    element: container,
-    targetState: {
-      ...getElementTransformTargetState(element, { alpha }),
-      ...getBlurTargetState(element, { force: shouldForceBlur }),
-      ...getShaderFilterTargetState(element, {
-        force: shouldForceShaderProgress,
-      }),
-    },
-    renderContext,
-  });
+  const dispatchContainerAnimations = () =>
+    dispatchLiveAnimations({
+      animations,
+      targetId: id,
+      animationBus,
+      completionTracker,
+      element: container,
+      targetState: {
+        ...getElementTransformTargetState(element, { alpha }),
+        ...getBlurTargetState(element, { force: shouldForceBlur }),
+        ...getShaderFilterTargetState(element, {
+          force: shouldForceShaderProgress,
+        }),
+      },
+      renderContext,
+    });
 
-  return childMountOperation;
+  if (childMountOperation && typeof childMountOperation.then === "function") {
+    const mountCompletionVersion = completionTracker?.getVersion?.();
+    completionTracker?.track?.(mountCompletionVersion);
+
+    return Promise.resolve(childMountOperation)
+      .then(() => {
+        if (signal?.aborted || container.destroyed) return;
+        dispatchContainerAnimations();
+      })
+      .finally(() => {
+        completionTracker?.complete?.(mountCompletionVersion);
+      });
+  }
+
+  dispatchContainerAnimations();
+  return undefined;
 };

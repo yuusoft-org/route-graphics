@@ -103,6 +103,10 @@ export const createLegacyTimelineContext = ({
   repeatDelay,
   yoyo,
 }) => {
+  const preservesRepeatedDuration =
+    loop ||
+    repeat === "infinite" ||
+    (Number.isSafeInteger(repeat) && repeat > 0);
   const groups = propertyGroups
     .map((group) => {
       let subjectState =
@@ -125,7 +129,9 @@ export const createLegacyTimelineContext = ({
           }),
       };
     })
-    .map((group) => removeNoopAutoProperties(group, id, loop))
+    .map((group) =>
+      removeNoopAutoProperties(group, id, preservesRepeatedDuration),
+    )
     .filter((group) => Object.keys(group.properties).length > 0);
   if (groups.length === 0) return null;
 
@@ -940,8 +946,9 @@ export const createAnimationBus = () => {
           toRemove.push(id);
           continue;
         }
-        context.paused = true;
         emit("reverseCompleted", { id });
+        fireCompleteEvent(context);
+        toRemove.push(id);
         continue;
       }
 
@@ -1024,6 +1031,11 @@ export const createAnimationBus = () => {
   const reverse = (id, enabled = true) => {
     const context = getActiveContext(id);
     if (!context) return false;
+    if (enabled && context.animationType === "transition") {
+      throw new Error(
+        `Transition animation "${id}" does not support player-controlled reverse playback.`,
+      );
+    }
     context.playDirection = enabled ? -1 : 1;
     context.paused = false;
     return true;

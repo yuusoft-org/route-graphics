@@ -252,6 +252,92 @@ describe("animationBus auto tween shorthand", () => {
     expect(onBusComplete).not.toHaveBeenCalled();
   });
 
+  it("preserves the occupied duration of a finitely repeated no-op auto tween", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "auto-noop-repeat",
+        repeat: 1,
+        repeatDelay: 50,
+        element,
+        properties: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 20 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    expect(animationBus.getState()).toMatchObject({
+      activeCount: 1,
+      animations: [
+        expect.objectContaining({
+          id: "auto-noop-repeat",
+          duration: 300,
+        }),
+      ],
+    });
+
+    animationBus.tick(649);
+    expect(animationBus.getState().activeCount).toBe(1);
+    expect(element.x).toBe(20);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    animationBus.tick(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an infinitely repeated no-op auto tween active", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "auto-noop-infinite-repeat",
+        repeat: "infinite",
+        repeatDelay: 50,
+        element,
+        properties: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 20 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(10_000);
+
+    expect(animationBus.getState().activeCount).toBe(1);
+    expect(animationBus.getState().animations[0].duration).toBe(300);
+    expect(element.x).toBe(20);
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
   it("throws when auto tween cannot resolve a targetState value", () => {
     const animationBus = createAnimationBus();
 
@@ -1011,6 +1097,65 @@ describe("animationBus auto tween shorthand", () => {
     expect(applyFrame).toHaveBeenCalledWith(100);
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it("completes and disposes an update that reaches the reverse boundary", () => {
+    const animationBus = createAnimationBus();
+    const applyFrame = vi.fn();
+    const onComplete = vi.fn();
+    const dispose = vi.fn();
+    const reverseCompleted = vi.fn();
+    animationBus.on("reverseCompleted", reverseCompleted);
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "reverse-update",
+        driver: "custom",
+        animationType: "update",
+        duration: 100,
+        applyFrame,
+        onComplete,
+        dispose,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(40);
+
+    expect(animationBus.reverse("reverse-update")).toBe(true);
+    animationBus.tick(40);
+
+    expect(applyFrame).toHaveBeenLastCalledWith(0);
+    expect(reverseCompleted).toHaveBeenCalledWith({ id: "reverse-update" });
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it("rejects player-controlled reverse for transitions without mutating playback", () => {
+    const animationBus = createAnimationBus();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "forward-only-transition",
+        driver: "custom",
+        animationType: "transition",
+        duration: 100,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(25);
+
+    expect(animationBus.reverse("forward-only-transition", false)).toBe(true);
+    expect(() => animationBus.reverse("forward-only-transition")).toThrow(
+      'Transition animation "forward-only-transition" does not support player-controlled reverse playback.',
+    );
+    expect(animationBus.getState().animations[0]).toMatchObject({
+      currentTime: 25,
+      direction: "forward",
+      paused: false,
+    });
   });
 
   it("keeps deferred custom animations active for one final playback frame", () => {

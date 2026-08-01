@@ -8,6 +8,9 @@ vi.mock("../../src/plugins/elements/renderElements.js", () => ({
 import { renderElements } from "../../src/plugins/elements/renderElements.js";
 import { addContainer } from "../../src/plugins/elements/container/addContainer.js";
 import { createRenderContext } from "../../src/plugins/elements/renderContext.js";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import { createCompletionTracker } from "../../src/util/completionTracker.js";
+import { normalizeAnimations } from "../../src/util/normalizeAnimations.js";
 
 describe("addContainer", () => {
   beforeEach(() => {
@@ -68,7 +71,7 @@ describe("addContainer", () => {
     );
   });
 
-  it("returns the fresh child mount operation", () => {
+  it("returns an operation that awaits the fresh child mount", async () => {
     const parent = new Container();
     const renderContext = createRenderContext();
     const childMountOperation = Promise.resolve();
@@ -108,7 +111,83 @@ describe("addContainer", () => {
       signal: new AbortController().signal,
     });
 
-    expect(result).toBe(childMountOperation);
+    expect(result).toBeInstanceOf(Promise);
+    await expect(result).resolves.toBeUndefined();
+  });
+
+  it("waits for asynchronous descendants before binding owner timeline aliases", async () => {
+    const parent = new Container();
+    const renderContext = createRenderContext();
+    const animationBus = createAnimationBus();
+    const completionTracker = createCompletionTracker();
+    completionTracker.reset("async-descendant-state");
+    let finishChildMount;
+
+    renderElements.mockImplementationOnce(
+      ({ parent: owner }) =>
+        new Promise((resolve) => {
+          finishChildMount = () => {
+            const child = new Container();
+            child.label = "async-child";
+            owner.addChild(child);
+            resolve();
+          };
+        }),
+    );
+
+    const animations = normalizeAnimations([
+      {
+        id: "animate-async-child",
+        targetId: "container-1",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          targets: {
+            child: { element: "async-child" },
+          },
+          steps: [
+            {
+              kind: "to",
+              targets: "child",
+              values: { x: 100 },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]);
+
+    const operation = addContainer({
+      app: { audioStage: { add: vi.fn() } },
+      parent,
+      element: {
+        id: "container-1",
+        type: "container",
+        x: 0,
+        y: 0,
+        alpha: 1,
+        children: [{ id: "async-child", type: "async-node" }],
+      },
+      animations,
+      eventHandler: vi.fn(),
+      animationBus,
+      elementPlugins: [],
+      renderContext,
+      zIndex: 0,
+      completionTracker,
+      signal: new AbortController().signal,
+    });
+
+    expect(animationBus.getState().activeCount).toBe(0);
+    finishChildMount();
+    await expect(operation).resolves.toBeUndefined();
+    expect(() => animationBus.flush()).not.toThrow();
+    expect(animationBus.getState().animations[0]).toMatchObject({
+      id: "animate-async-child",
+      duration: 100,
+    });
+    parent.destroy({ children: true });
   });
 
   it("dispatches update animations when the container is newly added", () => {

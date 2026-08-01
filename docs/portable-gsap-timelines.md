@@ -221,6 +221,19 @@ ordered by crossing time and source priority.
 Pause, resume, seek, progress, reverse, and runtime speed are player controls,
 not executable YAML steps. They do not mutate the immutable program.
 
+The renderer exposes them as `pauseAnimation(id)`, `resumeAnimation(id)`,
+`seekAnimation(id, elapsedMS, options)`,
+`setAnimationProgress(id, progress, options)`,
+`reverseAnimation(id, enabled)`, `setAnimationDirection(id, direction)`, and
+`setAnimationSpeed(id, speed)`. `getAnimationState(id)` returns the active
+player state, or `null` when that player is not active. Transition players
+reject runtime reverse control; authored transition yoyo remains supported.
+
+Authored `emit` steps are delivered to the renderer's configured
+`eventHandler` as `eventHandler("timelineEvent", payload)`. The payload includes
+the animation `id`, authored `event` name and JSON `payload`, resolved `time`,
+crossing `direction`, and domain `iteration` tuple.
+
 ## Orchestrated Transitions
 
 A transition can use top-level `gsap` to coordinate `prev`/`next` surfaces,

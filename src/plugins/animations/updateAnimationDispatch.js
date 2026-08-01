@@ -235,12 +235,11 @@ const settleLoopingUpdateState = ({
   element,
   targetState,
   onComplete,
+  isInfiniteAnimation = (animation) =>
+    animation.playback?.loop === true ||
+    animation.playback?.repeat === "infinite",
 }) => {
-  const loopingAnimation = animations.find(
-    (animation) =>
-      animation.playback?.loop === true ||
-      animation.playback?.repeat === "infinite",
-  );
+  const loopingAnimation = animations.find(isInfiniteAnimation);
   if (!loopingAnimation || targetState == null || !onComplete) {
     return { didSettle: false, element };
   }
@@ -380,6 +379,12 @@ export const dispatchUpdateAnimationsNow = ({
       !animationBus.hasContext(animation.id),
   );
   const preparedGsap = new Map(stagedGsap);
+  const compiledGsapPrograms = new Map(
+    [...preparedGsap].map(([animationId, prepared]) => [
+      animationId,
+      prepared.program,
+    ]),
+  );
   const dispatchIds = new Set(
     animationsToDispatch.map((animation) => animation.id),
   );
@@ -392,6 +397,12 @@ export const dispatchUpdateAnimationsNow = ({
 
   for (const animation of animationsToDispatch) {
     if (animation.gsap) {
+      if (!compiledGsapPrograms.has(animation.id)) {
+        compiledGsapPrograms.set(
+          animation.id,
+          compilePortableGsapAnimation(animation),
+        );
+      }
       continue;
     }
     validateRectStyleAnimationTarget(element, animation);
@@ -413,6 +424,10 @@ export const dispatchUpdateAnimationsNow = ({
     element,
     targetState,
     onComplete,
+    isInfiniteAnimation: (animation) =>
+      animation.playback?.loop === true ||
+      animation.playback?.repeat === "infinite" ||
+      compiledGsapPrograms.get(animation.id)?.duration === "infinite",
   });
   const dispatchElement = settlement.element;
   const dispatchAnimationBaseState =
@@ -431,7 +446,7 @@ export const dispatchUpdateAnimationsNow = ({
           );
           continue;
         }
-        const program = compilePortableGsapAnimation(animation);
+        const program = compiledGsapPrograms.get(animation.id);
         const bindingContext = createPixiTimelineBindingContext({
           program,
           ownerElement: dispatchElement,
@@ -496,9 +511,12 @@ export const dispatchUpdateAnimationsNow = ({
   }
 
   for (const animation of animationsToDispatch) {
+    const preparedTimeline = animation.gsap
+      ? preparedGsap.get(animation.id)?.instance
+      : preparedLegacy.get(animation.id)?.timeline?.instance;
     const isInfinite =
       animation.playback?.loop === true ||
-      animation.playback?.repeat === "infinite";
+      preparedTimeline?.duration === Infinity;
     const trackCompletion =
       animation.playback?.continuity !== "persistent" && !isInfinite;
     const stateVersion = trackCompletion
@@ -509,11 +527,17 @@ export const dispatchUpdateAnimationsNow = ({
       completionTracker.track(stateVersion);
     }
 
-    const complete = () => {
+    let completionReleased = false;
+    const releaseCompletion = () => {
+      if (completionReleased) return;
+      completionReleased = true;
       if (trackCompletion) {
         completionTracker.complete(stateVersion);
       }
+    };
 
+    const complete = () => {
+      releaseCompletion();
       if (!settlement.didSettle) {
         onComplete?.(animation);
       }
@@ -561,6 +585,7 @@ export const dispatchUpdateAnimationsNow = ({
             }
           },
           onComplete: complete,
+          onCancel: releaseCompletion,
         },
       });
       continue;
@@ -595,6 +620,7 @@ export const dispatchUpdateAnimationsNow = ({
         repeatDelay: animation.playback?.repeatDelay,
         yoyo: animation.playback?.yoyo,
         onComplete: complete,
+        onCancel: releaseCompletion,
       },
     });
   }
