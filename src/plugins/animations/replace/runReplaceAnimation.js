@@ -1111,30 +1111,46 @@ const getAnimatedUnionBounds = (subjects, controllers) => {
     return getUnionBounds(subjects);
   }
 
+  const originalTransforms = activeSubjects.map(({ wrapper }) => ({
+    wrapper,
+    x: wrapper.x,
+    y: wrapper.y,
+    alpha: wrapper.alpha,
+    rotation: wrapper.rotation,
+    scaleX: wrapper.scale.x,
+    scaleY: wrapper.scale.y,
+  }));
   const boundsContainer = new Container();
-  for (const subject of activeSubjects) {
-    boundsContainer.addChild(subject.wrapper);
-  }
-
   const rectangles = [];
-  for (const time of collectControllerSampleTimes(controllers)) {
-    for (const controller of controllers) {
-      controller.apply(time);
+  try {
+    for (const subject of activeSubjects) {
+      boundsContainer.addChild(subject.wrapper);
     }
 
-    rectangles.push(getLocalBoundsRectangle(boundsContainer));
-  }
+    for (const time of collectControllerSampleTimes(controllers)) {
+      for (const controller of controllers) {
+        controller.apply(time);
+      }
 
-  for (const controller of controllers) {
-    controller.apply(0);
-  }
-
-  for (const subject of activeSubjects) {
-    if (subject.wrapper.parent === boundsContainer) {
-      boundsContainer.removeChild(subject.wrapper);
+      rectangles.push(getLocalBoundsRectangle(boundsContainer));
     }
+  } finally {
+    for (const original of originalTransforms) {
+      const { wrapper } = original;
+      wrapper.x = original.x;
+      wrapper.y = original.y;
+      wrapper.alpha = original.alpha;
+      wrapper.rotation = original.rotation;
+      wrapper.scale.set(original.scaleX, original.scaleY);
+    }
+
+    for (const subject of activeSubjects) {
+      if (subject.wrapper.parent === boundsContainer) {
+        boundsContainer.removeChild(subject.wrapper);
+      }
+    }
+    boundsContainer.destroy();
   }
-  boundsContainer.destroy();
 
   return normalizeFrame(unionRectangles(rectangles));
 };
@@ -1364,10 +1380,15 @@ const createCompositorOverlay = ({
     prevSubject,
     nextSubject,
   });
-  const unionBounds = getAnimatedUnionBounds(
-    [prevSubject, nextSubject],
-    [boundsTimelineController],
-  );
+  let unionBounds;
+  try {
+    unionBounds = getAnimatedUnionBounds(
+      [prevSubject, nextSubject],
+      [boundsTimelineController],
+    );
+  } finally {
+    boundsTimelineController.destroy();
+  }
   const prevRoot = new Container();
   const nextRoot = new Container();
 
@@ -1613,10 +1634,15 @@ const createMaskedOverlay = ({
     prevSubject,
     nextSubject,
   });
-  const unionBounds = getAnimatedUnionBounds(
-    [prevSubject, nextSubject],
-    [boundsTimelineController],
-  );
+  let unionBounds;
+  try {
+    unionBounds = getAnimatedUnionBounds(
+      [prevSubject, nextSubject],
+      [boundsTimelineController],
+    );
+  } finally {
+    boundsTimelineController.destroy();
+  }
   const prevRoot = new Container();
   const nextRoot = new Container();
 

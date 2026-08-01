@@ -825,6 +825,7 @@ describe("runReplaceAnimation", () => {
     };
 
     const snapshotCalls = [];
+    const renderedSurfaceFrames = [];
     const app = {
       renderer: {
         width: 1280,
@@ -839,7 +840,16 @@ describe("runReplaceAnimation", () => {
           });
           return Texture.EMPTY;
         }),
-        render: vi.fn(),
+        render: vi.fn(({ container }) => {
+          const surface = container.children[0];
+          renderedSurfaceFrames.push({
+            x: surface?.x,
+            y: surface?.y,
+            scaleX: surface?.scale?.x,
+            scaleY: surface?.scale?.y,
+            alpha: surface?.alpha,
+          });
+        }),
       },
     };
     const amountParameter = {
@@ -892,6 +902,18 @@ describe("runReplaceAnimation", () => {
         id: "scene-compositor",
         targetId: "scene-root",
         type: "transition",
+        next: {
+          tween: {
+            translateY: {
+              initialValue: 0.45,
+              keyframes: [{ duration: 600, value: 0, easing: "linear" }],
+            },
+            scaleX: {
+              initialValue: 0.7,
+              keyframes: [{ duration: 600, value: 1, easing: "linear" }],
+            },
+          },
+        },
         compositor: animatedCompositor,
       },
       animations: new Map(),
@@ -938,6 +960,13 @@ describe("runReplaceAnimation", () => {
     );
     expect(prevDisplayObject.scale.x).toBe(0.75);
     expect(prevDisplayObject.scale.y).toBe(0.75);
+    expect(renderedSurfaceFrames[1]).toMatchObject({
+      x: 160,
+      scaleY: 0.75,
+      alpha: 1,
+    });
+    expect(renderedSurfaceFrames[1].y).toBeCloseTo(120.9375);
+    expect(renderedSurfaceFrames[1].scaleX).toBeCloseTo(0.54375);
 
     expect(app.renderer.render).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1007,6 +1036,15 @@ describe("runReplaceAnimation", () => {
     shaderClock = 9.25;
     dispatched.payload.applyFrame(150);
     expect(shaderUniforms.uniforms.uTime).toBeCloseTo(9.25);
+
+    dispatched.payload.applyFrame(600);
+    expect(renderedSurfaceFrames.at(-1)).toMatchObject({
+      x: 160,
+      scaleY: 0.75,
+      alpha: 1,
+    });
+    expect(renderedSurfaceFrames.at(-1).y).toBeCloseTo(90);
+    expect(renderedSurfaceFrames.at(-1).scaleX).toBeCloseTo(0.75);
   });
 
   it("reuses plain sprite textures for compositor snapshots instead of baking display scale into the texture", () => {
