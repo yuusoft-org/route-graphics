@@ -1,0 +1,68 @@
+---
+title: GSAP From Sequence
+description: A portable GSAP from action returns to the captured base before a later to action begins.
+specs:
+  - the from action should move from x 760 toward the captured x 160 base
+  - the from action should finish exactly at x 160 after 400ms
+  - the following to action should start after its 100ms wait
+  - the sequence should finish at x 960 after 900ms
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+---
+states:
+  - id: from-base
+    elements:
+      - id: from-target
+        type: rect
+        x: 160
+        "y": 260
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+  - id: from-sequence
+    elements:
+      - id: from-target
+        type: rect
+        x: 160
+        "y": 260
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+    animations:
+      - id: from-then-to
+        targetId: from-target
+        type: update
+        gsap:
+          profile: portable-v1
+          steps:
+            - kind: from
+              values: { x: 760 }
+              duration: 400
+              easing: linear
+            - kind: wait
+              duration: 100
+            - kind: to
+              values: { x: 960 }
+              duration: 400
+              easing: linear

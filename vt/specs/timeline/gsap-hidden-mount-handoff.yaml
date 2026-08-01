@@ -1,0 +1,75 @@
+---
+title: GSAP Hidden Mount Handoff
+description: A child portable GSAP from frame is staged before its parent transition snapshot and starts live playback only after handoff.
+specs:
+  - the half-visible parent snapshot should contain the child at its GSAP time-zero x position
+  - transition completion should hand off to the same time-zero child frame without a jump
+  - deferred child playback should advance only after the parent transition completes
+  - the child should settle at its authored next-state position
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+---
+states:
+  - id: hidden-mount-empty
+    elements: []
+  - id: hidden-mount-next
+    elements:
+      - id: mount-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        alpha: 1
+        children:
+          - id: mount-child
+            type: rect
+            x: 800
+            "y": 250
+            width: 220
+            height: 180
+            fill: "#FFFFFF"
+    animations:
+      - id: mount-root-enter
+        targetId: mount-root
+        type: transition
+        next:
+          tween:
+            alpha:
+              initialValue: 0
+              keyframes:
+                - duration: 500
+                  value: 1
+                  easing: linear
+      - id: mounted-child-from
+        targetId: mount-child
+        type: update
+        gsap:
+          profile: portable-v1
+          steps:
+            - kind: from
+              values: { x: 180 }
+              duration: 500
+              easing: linear

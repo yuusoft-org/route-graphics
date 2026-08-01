@@ -1,0 +1,58 @@
+---
+title: GSAP Infinite Live Settlement
+description: An infinite portable GSAP update binds relative motion from the live pre-reconciliation value and repeats without a flash.
+specs:
+  - the first quarter iteration should move from the live x 100 base to x 200
+  - the infinite timeline should wrap to its live base after 400ms
+  - the next iteration should repeat the same visible path instead of using the target-state x 900 base
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 100
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 100
+  - action: screenshot
+---
+states:
+  - id: infinite-live-base
+    elements:
+      - id: infinite-target
+        type: rect
+        x: 100
+        "y": 260
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+  - id: infinite-relative-loop
+    elements:
+      - id: infinite-target
+        type: rect
+        x: 900
+        "y": 260
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+    animations:
+      - id: infinite-live-motion
+        targetId: infinite-target
+        type: update
+        playback:
+          repeat: infinite
+        gsap:
+          profile: portable-v1
+          steps:
+            - kind: to
+              values: { x: { by: 400 } }
+              duration: 400
+              easing: linear

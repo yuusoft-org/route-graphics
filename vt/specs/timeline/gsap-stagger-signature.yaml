@@ -1,0 +1,130 @@
+---
+title: GSAP Stagger Signature
+description: A portable GSAP target group combines fromTo, stagger ordering, structured easing, relative motion, and modifiers.
+specs:
+  - center-origin stagger should begin with the middle target
+  - edge targets should join the entrance at their deterministic delays
+  - the entrance should settle all targets at their authored scale and alpha
+  - relative follow-through should stagger from the first target and snap vertical positions
+  - the complete signature animation should settle all three targets 80 pixels higher
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 100
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 150
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 150
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 150
+  - action: screenshot
+---
+states:
+  - id: stagger-base
+    elements:
+      - id: stagger-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: card-a
+            type: rect
+            x: 170
+            "y": 300
+            width: 180
+            height: 180
+            fill: "#FFFFFF"
+          - id: card-b
+            type: rect
+            x: 550
+            "y": 300
+            width: 180
+            height: 180
+            fill: "#FFFFFF"
+          - id: card-c
+            type: rect
+            x: 930
+            "y": 300
+            width: 180
+            height: 180
+            fill: "#FFFFFF"
+  - id: stagger-signature
+    elements:
+      - id: stagger-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: card-a
+            type: rect
+            x: 170
+            "y": 300
+            width: 180
+            height: 180
+            fill: "#FFFFFF"
+          - id: card-b
+            type: rect
+            x: 550
+            "y": 300
+            width: 180
+            height: 180
+            fill: "#FFFFFF"
+          - id: card-c
+            type: rect
+            x: 930
+            "y": 300
+            width: 180
+            height: 180
+            fill: "#FFFFFF"
+    animations:
+      - id: staggered-cards
+        targetId: stagger-root
+        type: update
+        gsap:
+          profile: portable-v1
+          targets:
+            cards: { elements: [card-a, card-b, card-c] }
+          steps:
+            - kind: fromTo
+              targets: cards
+              from: { y: 520, alpha: 0.2, scaleX: 0.5, scaleY: 0.5 }
+              to: { y: 300, alpha: 1, scaleX: 1, scaleY: 1 }
+              duration: 300
+              easing:
+                kind: back
+                direction: out
+                overshoot: 1.4
+              stagger: { each: 100, from: center }
+            - kind: to
+              targets: cards
+              values: { y: { by: -80 } }
+              duration: 200
+              easing: power2.out
+              stagger: { each: 50, from: start }
+              modifiers:
+                "y":
+                  - kind: snap
+                    increment: 10
