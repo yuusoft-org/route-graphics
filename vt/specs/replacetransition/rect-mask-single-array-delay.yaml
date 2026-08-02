@@ -1,53 +1,32 @@
 ---
-title: Render Complete Event - Replace Mask
-description: Asserts renderComplete waits for same-id replace mask completion.
+title: Rect Mask One-Entry Array Delay
+description: A one-entry mask array waits for its delay before revealing the replacement
 specs:
-  - renderComplete should not fire halfway through the replace mask animation
-  - renderComplete should fire once with aborted=false after replace completion
+  - the one-entry mask array should remain fully hidden before its 300ms delay
+  - the mask should be halfway through its reveal at 600ms
+  - the replacement should be fully revealed at 900ms
+  - these checkpoints should match the legacy single-object compatibility spec
 steps:
-  - action: customEvent
-    name: clearEvents
   - action: keypress
     key: "n"
   - action: customEvent
     name: "snapShotKeyFrame"
     detail:
-      deltaMS: 500
+      deltaMS: 299
   - action: screenshot
-  - action: assert
-    type: js
-    fn: vtAssert.payloadDeepEquals
-    args:
-      - renderComplete
-      - all
-    value: []
   - action: customEvent
     name: "snapShotKeyFrame"
     detail:
-      deltaMS: 500
+      deltaMS: 301
   - action: screenshot
-  - action: assert
-    type: js
-    fn: vtAssert.payloadDeepEquals
-    args:
-      - renderComplete
-      - all
-    value:
-      - id: replace-mask-complete
-        aborted: false
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 300
+  - action: screenshot
 ---
 states:
-  - id: baseline
-    elements:
-      - id: rect1
-        type: rect
-        x: 160
-        "y": 120
-        width: 960
-        height: 480
-        fill: "#F2F2F2"
-        alpha: 1
-  - id: replace-mask-complete
+  - id: array-mask-start
     elements:
       - id: rect1
         type: rect
@@ -57,8 +36,18 @@ states:
         height: 480
         fill: "#4D4D4D"
         alpha: 1
+  - id: array-mask-end
+    elements:
+      - id: rect1
+        type: rect
+        x: 160
+        "y": 120
+        width: 960
+        height: 480
+        fill: "#FFFFFF"
+        alpha: 1
     animations:
-      - id: rect-mask-complete
+      - id: array-mask-replace
         targetId: rect1
         type: transition
         mask:
@@ -66,9 +55,10 @@ states:
             texture: mask-diagonal
             channel: red
             softness: 0.06
+            delay: 300
             progress:
               initialValue: 0
               keyframes:
-                - duration: 1000
+                - duration: 600
                   value: 1
                   easing: linear

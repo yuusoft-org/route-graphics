@@ -88,16 +88,16 @@ states:
         targetId: rect1
         type: transition
         mask:
-          kind: single
-          texture: mask-rgba-channels
-          channel: red
-          softness: 0.02
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-rgba-channels
+            channel: red
+            softness: 0.02
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear
   - id: channel-green
     elements:
       - id: rect1
@@ -113,16 +113,16 @@ states:
         targetId: rect1
         type: transition
         mask:
-          kind: single
-          texture: mask-rgba-channels
-          channel: green
-          softness: 0.02
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-rgba-channels
+            channel: green
+            softness: 0.02
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear
   - id: channel-blue
     elements:
       - id: rect1
@@ -138,16 +138,16 @@ states:
         targetId: rect1
         type: transition
         mask:
-          kind: single
-          texture: mask-rgba-channels
-          channel: blue
-          softness: 0.02
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-rgba-channels
+            channel: blue
+            softness: 0.02
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear
   - id: channel-alpha
     elements:
       - id: rect1
@@ -163,16 +163,16 @@ states:
         targetId: rect1
         type: transition
         mask:
-          kind: single
-          texture: mask-rgba-channels
-          channel: alpha
-          softness: 0.02
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-rgba-channels
+            channel: alpha
+            softness: 0.02
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear
   - id: channel-red-invert
     elements:
       - id: rect1
@@ -188,14 +188,14 @@ states:
         targetId: rect1
         type: transition
         mask:
-          kind: single
-          texture: mask-rgba-channels
-          channel: red
-          invert: true
-          softness: 0.02
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-rgba-channels
+            channel: red
+            invert: true
+            softness: 0.02
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear

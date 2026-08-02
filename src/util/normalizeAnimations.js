@@ -775,6 +775,13 @@ const normalizeMask = (mask, path) => {
     kind: mask.kind,
   };
 
+  if (mask.delay !== undefined) {
+    assertNonNegativeSafeIntegerMilliseconds(mask.delay, `${path}.delay`);
+    if (mask.delay > 0) {
+      normalized.delay = mask.delay;
+    }
+  }
+
   if (mask.channel !== undefined) {
     if (!MASK_CHANNELS.has(mask.channel)) {
       throw new Error(
@@ -864,6 +871,18 @@ const normalizeMask = (mask, path) => {
   return normalized;
 };
 
+const normalizeMasks = (maskOrMasks, path) => {
+  const usesArrayShape = Array.isArray(maskOrMasks);
+  if (usesArrayShape && maskOrMasks.length === 0) {
+    throw new Error(`${path} must be a non-empty array.`);
+  }
+
+  const masks = usesArrayShape ? maskOrMasks : [maskOrMasks];
+  return masks.map((mask, index) =>
+    normalizeMask(mask, usesArrayShape ? `${path}[${index}]` : path),
+  );
+};
+
 const normalizeReplaceSide = (side, path) => {
   assertPlainObject(side, path);
 
@@ -900,7 +919,7 @@ const normalizeReplacePayload = (animation, path) => {
   }
 
   if (animation.mask !== undefined) {
-    normalized.mask = normalizeMask(animation.mask, `${path}.mask`);
+    normalized.mask = normalizeMasks(animation.mask, `${path}.mask`);
   }
 
   if (animation.compositor !== undefined) {
@@ -1104,16 +1123,31 @@ export const normalizeAnimations = (animations = []) => {
       );
 
       if (animation.mask !== undefined) {
-        if (animation.mask.progress !== undefined) {
-          throw new Error(
-            `${path}.mask.progress cannot be mixed with top-level gsap. Animate the transitionMask target instead.`,
-          );
-        }
-        normalizedAnimation.mask = normalizeMask(
+        const usesArrayShape = Array.isArray(animation.mask);
+        const authoredMasks = usesArrayShape
+          ? animation.mask
+          : [animation.mask];
+        normalizedAnimation.mask = normalizeMasks(
           animation.mask,
           `${path}.mask`,
-        );
-        delete normalizedAnimation.mask.progress;
+        ).map((mask, index) => {
+          const maskPath = usesArrayShape
+            ? `${path}.mask[${index}]`
+            : `${path}.mask`;
+          if (mask.delay > 0) {
+            throw new Error(
+              `${maskPath}.delay cannot be mixed with top-level gsap. Delay the transitionMask action instead.`,
+            );
+          }
+          if (authoredMasks[index].progress !== undefined) {
+            throw new Error(
+              `${maskPath}.progress cannot be mixed with top-level gsap. Animate the transitionMask target instead.`,
+            );
+          }
+          const resource = { ...mask };
+          delete resource.progress;
+          return resource;
+        });
       }
 
       if (animation.compositor !== undefined) {

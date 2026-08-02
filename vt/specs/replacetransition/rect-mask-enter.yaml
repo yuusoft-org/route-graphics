@@ -37,13 +37,13 @@ states:
         targetId: rect1
         type: transition
         mask:
-          kind: single
-          texture: mask-diagonal
-          channel: red
-          softness: 0.06
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-diagonal
+            channel: red
+            softness: 0.06
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear

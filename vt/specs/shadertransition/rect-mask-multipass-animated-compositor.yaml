@@ -53,14 +53,14 @@ states:
         targetId: masked-compositor-rect
         type: transition
         mask:
-          kind: single
-          texture: mask-diagonal
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 800
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-diagonal
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 800
+                  value: 1
+                  easing: linear
         compositor:
           type: shader
           parameters:

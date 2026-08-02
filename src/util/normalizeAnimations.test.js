@@ -77,13 +77,16 @@ describe("normalizeAnimations shader support", () => {
         id: "delayed-transition",
         targetId: "scene",
         type: "transition",
-        mask: {
-          kind: "single",
-          texture: "wipe",
-          progress: {
-            keyframes: [{ delay: 500, duration: 600, value: 1 }],
+        mask: [
+          {
+            kind: "single",
+            texture: "wipe",
+            delay: 400,
+            progress: {
+              keyframes: [{ delay: 500, duration: 600, value: 1 }],
+            },
           },
-        },
+        ],
         compositor: createCompositor({
           parameters: { edgeWidth: 0.04 },
           tween: {
@@ -117,7 +120,8 @@ describe("normalizeAnimations shader support", () => {
       duration: 400,
       value: [0.2, 0.4, 0.6],
     });
-    expect(transitionAnimation.mask.progress.keyframes[0].delay).toBe(500);
+    expect(transitionAnimation.mask[0].delay).toBe(400);
+    expect(transitionAnimation.mask[0].progress.keyframes[0].delay).toBe(500);
     expect(
       transitionAnimation.compositor.tween.uProgress.keyframes[0].delay,
     ).toBe(700);
@@ -181,20 +185,38 @@ describe("normalizeAnimations shader support", () => {
       "animations[0].tween.filters.grade.amount.keyframes[0].delay",
     ],
     [
+      "mask start",
+      {
+        id: "invalid-mask-start-delay",
+        targetId: "scene",
+        type: "transition",
+        mask: [
+          {
+            kind: "single",
+            texture: "wipe",
+            delay: -1,
+          },
+        ],
+      },
+      "animations[0].mask[0].delay",
+    ],
+    [
       "mask progress",
       {
         id: "invalid-mask-delay",
         targetId: "scene",
         type: "transition",
-        mask: {
-          kind: "single",
-          texture: "wipe",
-          progress: {
-            keyframes: [{ delay: -1, duration: 100, value: 1 }],
+        mask: [
+          {
+            kind: "single",
+            texture: "wipe",
+            progress: {
+              keyframes: [{ delay: -1, duration: 100, value: 1 }],
+            },
           },
-        },
+        ],
       },
-      "animations[0].mask.progress.keyframes[0].delay",
+      "animations[0].mask[0].progress.keyframes[0].delay",
     ],
     [
       "compositor progress",
@@ -215,6 +237,126 @@ describe("normalizeAnimations shader support", () => {
   ])("reports the exact invalid %s delay path", (_name, animation, path) => {
     expect(() => normalizeAnimations([animation])).toThrow(
       `${path} must be a finite number greater than or equal to 0 and an integer number of milliseconds.`,
+    );
+  });
+
+  it("treats an explicit zero mask delay like an omitted delay", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "immediate-mask",
+        targetId: "scene",
+        type: "transition",
+        mask: [{ kind: "single", texture: "wipe", delay: 0 }],
+      },
+    ]);
+
+    expect(animation.mask[0]).not.toHaveProperty("delay");
+  });
+
+  it("normalizes multiple masks with independent progress and delay", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "multi-mask",
+        targetId: "scene",
+        type: "transition",
+        mask: [
+          { kind: "single", texture: "left" },
+          { kind: "single", texture: "right", delay: 250 },
+        ],
+      },
+    ]);
+
+    expect(animation.mask).toHaveLength(2);
+    expect(animation.mask[0]).toMatchObject({
+      kind: "single",
+      texture: "left",
+    });
+    expect(animation.mask[1]).toMatchObject({
+      kind: "single",
+      texture: "right",
+      delay: 250,
+    });
+  });
+
+  it("normalizes the legacy single-object mask shape to one array entry", () => {
+    const sourceMask = { kind: "single", texture: "wipe", delay: 100 };
+    const [animation] = normalizeAnimations([
+      {
+        id: "legacy-mask-object",
+        targetId: "scene",
+        type: "transition",
+        mask: sourceMask,
+      },
+    ]);
+
+    expect(animation.mask).toEqual([
+      expect.objectContaining({
+        kind: "single",
+        texture: "wipe",
+        delay: 100,
+      }),
+    ]);
+    expect(animation.mask[0]).not.toBe(sourceMask);
+  });
+
+  it("rejects an empty transition mask array", () => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "invalid-mask-array",
+          targetId: "scene",
+          type: "transition",
+          mask: [],
+        },
+      ]),
+    ).toThrow("animations[0].mask must be a non-empty array.");
+  });
+
+  it("preserves legacy mask error paths for top-level gsap", () => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "legacy-gsap-mask-delay",
+          targetId: "scene",
+          type: "transition",
+          mask: { kind: "single", texture: "wipe", delay: 100 },
+          gsap: {
+            profile: "portable-v1",
+            targets: { reveal: { transitionMask: true } },
+            steps: [
+              { kind: "set", targets: "reveal", values: { progress: 1 } },
+            ],
+          },
+        },
+      ]),
+    ).toThrow(
+      "animations[0].mask.delay cannot be mixed with top-level gsap. Delay the transitionMask action instead.",
+    );
+  });
+
+  it("keeps mask resource timing out of orchestrated gsap transitions", () => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "orchestrated-mask-delay",
+          targetId: "scene",
+          type: "transition",
+          mask: [{ kind: "single", texture: "wipe", delay: 100 }],
+          gsap: {
+            profile: "portable-v1",
+            targets: { reveal: { transitionMask: true } },
+            steps: [
+              {
+                kind: "set",
+                targets: "reveal",
+                values: { progress: 1 },
+              },
+            ],
+          },
+        },
+      ]),
+    ).toThrow(
+      "animations[0].mask[0].delay cannot be mixed with top-level gsap. Delay the transitionMask action instead.",
     );
   });
 
@@ -482,14 +624,16 @@ describe("normalizeAnimations shader support", () => {
         targetId: "scene",
         type: "transition",
         compositor: createCompositor(),
-        mask: {
-          kind: "single",
-          texture: "mask-diagonal",
-        },
+        mask: [
+          {
+            kind: "single",
+            texture: "mask-diagonal",
+          },
+        ],
       },
     ]);
 
-    expect(animation.mask.texture).toBe("mask-diagonal");
+    expect(animation.mask[0].texture).toBe("mask-diagonal");
     expect(animation.compositor.type).toBe("shader");
   });
 

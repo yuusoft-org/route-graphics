@@ -238,11 +238,17 @@ crossing `direction`, and domain `iteration` tuple.
 
 A transition can use top-level `gsap` to coordinate `prev`/`next` surfaces,
 mask progress, and compositor progress/parameters. Target aliases use
-`transitionSurface: prev | next`, `transitionMask: true`, or
-`transitionCompositor: true`. The timeline must be finite, and configured mask
-or compositor progress must resolve to exactly 1 at the terminal millisecond.
+`transitionSurface: prev | next`, `transitionMask: true`,
+`transitionMask: <zero-based-index>`, or `transitionCompositor: true`.
+`true` targets every mask entry; an index targets one entry. The timeline must
+be finite, and every configured mask plus compositor progress must resolve to
+exactly 1 at the terminal millisecond.
 Static mask/compositor resources remain outside the timeline and are validated
 before overlay allocation.
+
+Because this mode makes the portable timeline the sole timing authority,
+mask-entry `delay` and `progress` fields are not accepted alongside top-level
+`gsap`. Use each indexed target action's `delay` or scheduled start position.
 
 ## Inspection, Performance, And Portability
 

@@ -53,12 +53,12 @@ states:
                   value: 160
                   easing: linear
         mask:
-          kind: single
-          texture: mask-full
-          channel: red
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: mask-full
+            channel: red
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
+                  easing: linear

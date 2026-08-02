@@ -3,6 +3,17 @@ import { compilePortableGsapAnimation } from "./compilePortableGsap.js";
 const toPortableFrameValue = (frame) =>
   frame.relative ? { by: frame.value } : frame.value;
 
+const addInitialTrackDelay = (config, delay = 0) => {
+  if (delay === 0) return config;
+
+  return {
+    ...config,
+    keyframes: config.keyframes.map((frame, index) =>
+      index === 0 ? { ...frame, delay: (frame.delay ?? 0) + delay } : frame,
+    ),
+  };
+};
+
 const addLegacyTrack = (steps, { target, property, config }) => {
   const children = [];
   if (config.initialValue !== undefined) {
@@ -53,11 +64,11 @@ export const compileLegacyTransitionAnimation = (
   )) {
     addLegacyTrack(parallel, { target: "next", property, config });
   }
-  if (animation.mask?.progress) {
+  for (const [index, mask] of (animation.mask ?? []).entries()) {
     addLegacyTrack(parallel, {
-      target: "mask",
+      target: `mask-${index}`,
       property: "progress",
-      config: animation.mask.progress,
+      config: addInitialTrackDelay(mask.progress, mask.delay),
     });
   }
   for (const [property, config] of Object.entries(
@@ -92,7 +103,12 @@ export const compileLegacyTransitionAnimation = (
         targets: {
           previous: { transitionSurface: "prev" },
           next: { transitionSurface: "next" },
-          ...(animation.mask ? { mask: { transitionMask: true } } : {}),
+          ...Object.fromEntries(
+            (animation.mask ?? []).map((_mask, index) => [
+              `mask-${index}`,
+              { transitionMask: index },
+            ]),
+          ),
           ...(animation.compositor
             ? { compositor: { transitionCompositor: true } }
             : {}),

@@ -1,0 +1,64 @@
+---
+title: Rect Mask Single Object Delay
+description: A legacy single-object mask waits for its delay before revealing the replacement
+specs:
+  - the legacy single-object mask should remain fully hidden before its 300ms delay
+  - the mask should be halfway through its reveal at 600ms
+  - the replacement should be fully revealed at 900ms
+  - these checkpoints should match the one-entry array compatibility spec
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 299
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 301
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 300
+  - action: screenshot
+---
+states:
+  - id: object-mask-start
+    elements:
+      - id: rect1
+        type: rect
+        x: 160
+        "y": 120
+        width: 960
+        height: 480
+        fill: "#4D4D4D"
+        alpha: 1
+  - id: object-mask-end
+    elements:
+      - id: rect1
+        type: rect
+        x: 160
+        "y": 120
+        width: 960
+        height: 480
+        fill: "#FFFFFF"
+        alpha: 1
+    animations:
+      - id: object-mask-replace
+        targetId: rect1
+        type: transition
+        mask:
+          kind: single
+          texture: mask-diagonal
+          channel: red
+          softness: 0.06
+          delay: 300
+          progress:
+            initialValue: 0
+            keyframes:
+              - duration: 600
+                value: 1
+                easing: linear

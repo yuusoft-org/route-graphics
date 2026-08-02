@@ -503,17 +503,18 @@ animations:
     targetId: "scene-root"
     type: "transition"
     mask:
-      kind: "single"
-      texture: "masks/spiral-07.png"
-      channel: "red"
-      softness: 0.08
-      invert: false
-      progress:
-        initialValue: 0
-        keyframes:
-          - duration: 900
-            value: 1
-            easing: "linear"
+      - kind: "single"
+        texture: "masks/spiral-07.png"
+        channel: "red"
+        softness: 0.08
+        invert: false
+        delay: 200
+        progress:
+          initialValue: 0
+          keyframes:
+            - duration: 900
+              value: 1
+              easing: "linear"
 ```
 
 ## Parent Transition Rule
@@ -526,24 +527,61 @@ When an ancestor `transition` is active for a state change:
 
 This keeps transition composition aligned with the current snapshot-based runtime.
 
-## Mask
+## Masks
 
-Mask is always a transition primitive.
+`mask` is always a transition primitive. It accepts either a single mask object
+for backward compatibility or a non-empty array. The single-object shape is
+normalized internally to a one-entry array, so the timeline and renderer use
+one implementation. New multi-mask authoring uses the array shape.
 
-A mask defines a reveal field that controls how previous and next visuals hand
-off over time.
+Each normalized entry defines an independently timed reveal field that controls
+how previous and next visuals hand off over time.
+
+When entries overlap, their reveal values are combined with a per-pixel
+`max`. This is union behavior: the strongest reveal wins, and overlapping soft
+edges do not compound. A delayed entry contributes `0` until it becomes active.
+
+```yaml
+mask:
+  - kind: single
+    texture: masks/from-left.png
+    progress:
+      keyframes: [{ duration: 800, value: 1 }]
+  - kind: single
+    texture: masks/from-right.png
+    delay: 250
+    progress:
+      keyframes: [{ duration: 550, value: 1 }]
+```
 
 Supported kinds:
 
 - `single`
 - `sequence`
 
-### Common Mask Fields
+### Common Mask Entry Fields
 
 - `channel`
+- optional `delay`
 - `progress`
 - optional `invert`
 - `softness` for `single` masks only
+
+### `delay`
+
+Defines how many milliseconds the mask remains completely inactive before its
+progress timeline begins. While inactive, the previous surface passes through
+unchanged, including for sequence masks whose first frame already contains
+revealed pixels.
+
+`delay` defaults to `0`, contributes to transition duration, follows playback
+speed and authored repeat/yoyo mapping, and is added before any delay on the
+first `progress` keyframe. A progress-keyframe delay still means “hold the
+current progress value”; mask-level `delay` means “do not apply this mask yet.”
+
+Top-level orchestrated `gsap` transitions cannot use an entry's `delay`, because
+the GSAP timeline is their sole timing authority. Put the delay or start
+position on the action targeting that indexed `transitionMask` instead.
 
 ### `channel`
 
@@ -575,22 +613,22 @@ amount.
 
 ```yaml
 mask:
-  kind: "sequence"
-  progress:
-    initialValue: 0
-    keyframes:
-      - duration: 1000
-        value: 1
-        easing: "linear"
-  sample: "linear"
-  frames:
-    - at: 0
-      texture: "masks/a.png"
-    - at: 0.5
-      texture: "masks/b.png"
-    - at: 1
-      texture: "masks/c.png"
-  channel: "alpha"
+  - kind: "sequence"
+    progress:
+      initialValue: 0
+      keyframes:
+        - duration: 1000
+          value: 1
+          easing: "linear"
+    sample: "linear"
+    frames:
+      - at: 0
+        texture: "masks/a.png"
+      - at: 0.5
+        texture: "masks/b.png"
+      - at: 1
+        texture: "masks/c.png"
+    channel: "alpha"
 ```
 
 Sequence rules:

@@ -435,9 +435,24 @@ const validateTarget = (target, path, animationType) => {
         `${path}.transitionSurface must be prev or next on a transition.`,
       );
     }
-  } else if (kind === "transitionMask" || kind === "transitionCompositor") {
-    if (animationType !== "transition" || target[kind] !== true) {
-      throw new Error(`${path}.${kind} must be true on a transition.`);
+  } else if (kind === "transitionMask") {
+    const selector = target.transitionMask;
+    if (
+      animationType !== "transition" ||
+      (selector !== true && (!Number.isSafeInteger(selector) || selector < 0))
+    ) {
+      throw new Error(
+        `${path}.transitionMask must be true or a non-negative mask index on a transition.`,
+      );
+    }
+  } else if (kind === "transitionCompositor") {
+    if (
+      animationType !== "transition" ||
+      target.transitionCompositor !== true
+    ) {
+      throw new Error(
+        `${path}.transitionCompositor must be true on a transition.`,
+      );
     }
   } else throw new Error(`${path}.${kind} is not a supported target kind.`);
 };

@@ -65,24 +65,24 @@ states:
         targetId: rect1
         type: transition
         mask:
-          kind: sequence
-          frames:
-            - at: 0
-              texture: mask-empty
-            - at: 0.5
-              texture: mask-center-band
-            - at: 1
-              texture: mask-full
-          channel: alpha
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 500
-                value: 1
-                easing: linear
-              - duration: 500
-                value: 0
-                easing: linear
-              - duration: 500
-                value: 1
-                easing: linear
+          - kind: sequence
+            frames:
+              - at: 0
+                texture: mask-empty
+              - at: 0.5
+                texture: mask-center-band
+              - at: 1
+                texture: mask-full
+            channel: alpha
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 500
+                  value: 1
+                  easing: linear
+                - duration: 500
+                  value: 0
+                  easing: linear
+                - duration: 500
+                  value: 1
+                  easing: linear
