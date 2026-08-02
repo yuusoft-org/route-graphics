@@ -269,6 +269,19 @@ sound lifetime are retained. Later `play` commands that retain source identity
 are transport-only restarts and do not repeat the graph-lifecycle enter
 transition.
 
+Enter tracks deferred by pending decode, `startDelayMs`, or audio-context resume
+remain pending per property. If an accepted render changes that property before
+its enter track starts, the change supersedes and cancels the pending enter for
+that property, whether the change uses an update track or applies immediately.
+The update resolves from the current renderer-owned value and ends at the
+latest declared value; the canceled enter track must not run when playback
+eventually starts. If playback begins while the superseding update is still
+active, that property's automation continues from its renderer-owned value at
+that Web Audio clock time and runs only the remaining schedule; if the update
+has completed, the property uses its final value. Enter tracks for unchanged
+properties remain pending. If the property changes after its enter track
+starts, the normal interruption rules apply instead.
+
 ### Update
 
 An update track starts when the declared property changes. Omitting
@@ -308,13 +321,22 @@ final iteration, and cleanup waits until both any exit-transition work and that
 loop-end tail have finished. Without a loop-end tail, cleanup occurs when the
 longest exit track completes, or immediately when there are no exit tracks.
 
-A `loopEnd` tail is waited on only while it can make finite progress toward its
-boundary. If its effective playback rate is already `0`, or exit automation
-leaves it at `0` before it reaches that boundary, the loop-end wait is
-abandoned. Teardown then follows only the finite exit-transition timeline and
-cleanup is immediate when no transition work remains. This preserves the
-existing zero-rate cleanup behavior and prevents an outgoing sound or channel
-from being retained indefinitely.
+Whether a `loopEnd` tail can finish is determined from its complete resolved
+playback-rate timeline, not only its instantaneous rate at interruption. The
+calculation includes the current rate, `initialValue`, keyframe delays, eased
+ramps, and clamped relative endpoints. It accumulates the source-media progress
+produced by that timeline toward the remaining loop boundary. After the last
+keyframe, its final rate continues as a constant for this calculation.
+
+If that timeline reaches the boundary at a finite Web Audio clock time, cleanup
+waits for the tail even when its initial rate is `0`; an exit ramp to a positive
+rate can therefore resume and finish it. If no finite boundary time exists—for
+example, there is no playback-rate exit track and the current rate is `0`, or
+the track ends at `0` before accumulating enough source-media progress—the
+loop-end wait is abandoned. Teardown then follows only the finite
+exit-transition timeline, with immediate cleanup when no transition work
+remains. This preserves existing zero-rate cleanup without cutting off a tail
+that scheduled automation can complete.
 
 ## Source Replacement And Overlap
 
@@ -532,11 +554,13 @@ The later implementation must include:
 - normalization into one internal target-to-transition map
 - shared enter/exit scheduling time for ready replacement instances
 - pending-decode enter scheduling that does not delay outgoing teardown
+- per-property cancellation of pending enter tracks superseded by updates
 - keyframe-delay support in audio parameter automation
 - current-value hold on interruption
 - cleanup after both the longest exit track and any completable `loopEnd` tail
-- finite cleanup fallback for zero-rate `loopEnd` tails
+- full-timeline boundary calculation and finite fallback for zero-rate tails
 - conflict validation against legacy `audioEffects`
 - unit tests for normalization and timing
-- audio-stage tests for enter, update, exit, interruption, and replacement
+- audio-stage tests for enter, deferred-enter updates, exit, interruption,
+  replacement, and zero-rate loop-end resumption
 - manual audio fixtures for immediate, delayed, and full-volume overlap
