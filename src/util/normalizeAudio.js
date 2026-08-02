@@ -31,6 +31,7 @@ const AUDIO_TRANSITION_PHASE_KEYS = new Set(["initialValue", "keyframes"]);
 const AUDIO_TRANSITION_KEYFRAME_KEYS = new Set([
   "value",
   "duration",
+  "delay",
   "easing",
   "relative",
 ]);
@@ -73,6 +74,14 @@ const assertNumber = (value, path, { min, max } = {}) => {
       `Input error: ${path} must be less than or equal to ${max}.`,
     );
   }
+};
+
+const assertFiniteNumber = (value, path, range) => {
+  assertNumber(value, path);
+  if (!Number.isFinite(value)) {
+    throw new Error(`Input error: ${path} must be a finite number.`);
+  }
+  assertNumber(value, path, range);
 };
 
 const assertOptionalBoolean = (value, path) => {
@@ -160,7 +169,14 @@ const normalizePlaybackCommand = (
   };
 };
 
-const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
+const validateSound = (
+  node,
+  path,
+  ids,
+  flattenedSounds,
+  inlineTransitions,
+  channelId = null,
+) => {
   assertNonEmptyString(node.id, `${path}.id`);
   assertUniqueId(ids, node.id, `${path}.id`);
   assertNonEmptyString(node.src, `${path}.src`);
@@ -196,6 +212,20 @@ const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
       ? undefined
       : normalizePlaybackCommand(node.playback, `${path}.playback`);
 
+  if (node.transition !== undefined) {
+    inlineTransitions.set(
+      node.id,
+      validateInlineAudioTransition(node.transition, `${path}.transition`, {
+        nodeType: "sound",
+        propertyValues: {
+          volume,
+          pan: node.pan ?? 0,
+          playbackRate: node.playbackRate ?? 1,
+        },
+      }),
+    );
+  }
+
   flattenedSounds.push({
     id: node.id,
     type: "sound",
@@ -219,6 +249,7 @@ const validateChannel = (
   ids,
   flattenedChannels,
   flattenedSounds,
+  inlineTransitions,
 ) => {
   assertNonEmptyString(node.id, `${path}.id`);
   assertUniqueId(ids, node.id, `${path}.id`);
@@ -246,6 +277,19 @@ const validateChannel = (
           operationList: "pause, resume",
           positionOperations: NO_AUDIO_PLAYBACK_POSITION_OPERATIONS,
         });
+
+  if (node.transition !== undefined) {
+    inlineTransitions.set(
+      node.id,
+      validateInlineAudioTransition(node.transition, `${path}.transition`, {
+        nodeType: "audio-channel",
+        propertyValues: {
+          volume,
+          pan: node.pan ?? 0,
+        },
+      }),
+    );
+  }
 
   flattenedChannels.push({
     id: node.id,
@@ -290,7 +334,14 @@ const validateChannel = (
       );
     }
 
-    validateSound(child, childPath, ids, flattenedSounds, node.id);
+    validateSound(
+      child,
+      childPath,
+      ids,
+      flattenedSounds,
+      inlineTransitions,
+      node.id,
+    );
   }
 };
 
@@ -301,6 +352,7 @@ const validateAudioNodes = (audio, ids) => {
 
   const flattenedChannels = [];
   const flattenedSounds = [];
+  const inlineTransitions = new Map();
   const builtinNodeIds = new Set();
 
   for (const [index, node] of audio.entries()) {
@@ -314,7 +366,14 @@ const validateAudioNodes = (audio, ids) => {
     }
 
     if (node.type === "audio-channel") {
-      validateChannel(node, path, ids, flattenedChannels, flattenedSounds);
+      validateChannel(
+        node,
+        path,
+        ids,
+        flattenedChannels,
+        flattenedSounds,
+        inlineTransitions,
+      );
       builtinNodeIds.add(node.id);
       for (const sound of flattenedSounds) {
         if (sound.channelId === node.id) {
@@ -322,7 +381,7 @@ const validateAudioNodes = (audio, ids) => {
         }
       }
     } else {
-      validateSound(node, path, ids, flattenedSounds);
+      validateSound(node, path, ids, flattenedSounds, inlineTransitions);
       builtinNodeIds.add(node.id);
     }
   }
@@ -330,6 +389,7 @@ const validateAudioNodes = (audio, ids) => {
   return {
     channels: flattenedChannels,
     sounds: flattenedSounds,
+    inlineTransitions,
     builtinNodeIds,
     builtinNodeTypes: new Map(
       [...flattenedChannels, ...flattenedSounds].map((node) => [
@@ -340,7 +400,12 @@ const validateAudioNodes = (audio, ids) => {
   };
 };
 
-const validateTransitionPhase = (phase, path, propertyName) => {
+const validateTransitionPhase = (
+  phase,
+  path,
+  propertyName,
+  { finalValue } = {},
+) => {
   assertRecord(phase, path);
 
   for (const key of Object.keys(phase)) {
@@ -352,7 +417,7 @@ const validateTransitionPhase = (phase, path, propertyName) => {
   }
 
   if (phase.initialValue !== undefined) {
-    assertNumber(
+    assertFiniteNumber(
       phase.initialValue,
       `${path}.initialValue`,
       AUDIO_TRANSITION_PROPERTY_RANGES[propertyName],
@@ -380,7 +445,7 @@ const validateTransitionPhase = (phase, path, propertyName) => {
     if (keyframe.value === undefined) {
       throw new Error(`Input error: ${keyframePath}.value is required.`);
     }
-    assertNumber(
+    assertFiniteNumber(
       keyframe.value,
       `${keyframePath}.value`,
       keyframe.relative
@@ -391,7 +456,13 @@ const validateTransitionPhase = (phase, path, propertyName) => {
     if (keyframe.duration === undefined) {
       throw new Error(`Input error: ${keyframePath}.duration is required.`);
     }
-    assertNumber(keyframe.duration, `${keyframePath}.duration`, { min: 0 });
+    assertFiniteNumber(keyframe.duration, `${keyframePath}.duration`, {
+      min: 0,
+    });
+
+    if (keyframe.delay !== undefined) {
+      assertFiniteNumber(keyframe.delay, `${keyframePath}.delay`, { min: 0 });
+    }
 
     if (keyframe.easing !== undefined && !AUDIO_EASINGS.has(keyframe.easing)) {
       throw new Error(
@@ -401,7 +472,67 @@ const validateTransitionPhase = (phase, path, propertyName) => {
 
     assertOptionalBoolean(keyframe.relative, `${keyframePath}.relative`);
   }
+
+  if (finalValue !== undefined) {
+    const finalKeyframe = phase.keyframes[phase.keyframes.length - 1];
+    if (finalKeyframe.relative === true) {
+      throw new Error(
+        `Input error: ${path}.keyframes must end with an absolute value.`,
+      );
+    }
+    if (finalKeyframe.value !== finalValue) {
+      throw new Error(
+        `Input error: ${path}.keyframes must end at the node's declared ${propertyName} value ${finalValue}.`,
+      );
+    }
+  }
 };
+
+function validateInlineAudioTransition(
+  transition,
+  path,
+  { nodeType, propertyValues },
+) {
+  assertNonEmptyRecord(transition, path);
+  const normalizedProperties = {};
+
+  for (const [phaseName, propertyTracks] of Object.entries(transition)) {
+    if (!AUDIO_TRANSITION_PHASES.has(phaseName)) {
+      throw new Error(
+        `Input error: unsupported inline audio transition phase "${phaseName}" at ${path}.`,
+      );
+    }
+
+    assertNonEmptyRecord(propertyTracks, `${path}.${phaseName}`);
+    for (const [propertyName, track] of Object.entries(propertyTracks)) {
+      if (!AUDIO_TRANSITION_PROPERTIES.has(propertyName)) {
+        throw new Error(
+          `Input error: unsupported inline audio transition property "${propertyName}" at ${path}.${phaseName}.`,
+        );
+      }
+      if (
+        !AUDIO_TRANSITION_PROPERTIES_BY_NODE_TYPE[nodeType].has(propertyName)
+      ) {
+        throw new Error(
+          `Input error: inline audio transition property "${propertyName}" is not supported for node type "${nodeType}" at ${path}.${phaseName}.`,
+        );
+      }
+
+      validateTransitionPhase(
+        track,
+        `${path}.${phaseName}.${propertyName}`,
+        propertyName,
+        phaseName === "enter" || phaseName === "update"
+          ? { finalValue: propertyValues[propertyName] }
+          : {},
+      );
+      normalizedProperties[propertyName] ??= {};
+      normalizedProperties[propertyName][phaseName] = track;
+    }
+  }
+
+  return normalizedProperties;
+}
 
 const validateAudioTransition = (effect, path, nodeTypes) => {
   assertNonEmptyString(effect.targetId, `${path}.targetId`);
@@ -458,6 +589,7 @@ const validateAudioEffects = (audioEffects, ids, nodeTypes) => {
   }
 
   const transitionTargetIds = new Set();
+  const transitions = new Map();
 
   for (const [index, effect] of audioEffects.entries()) {
     const path = `audioEffects[${index}]`;
@@ -479,8 +611,11 @@ const validateAudioEffects = (audioEffects, ids, nodeTypes) => {
         );
       }
       transitionTargetIds.add(effect.targetId);
+      transitions.set(effect.targetId, effect.properties);
     }
   }
+
+  return transitions;
 };
 
 export const flattenAudioNodes = (audio = []) => {
@@ -494,13 +629,27 @@ export const normalizeAudioRenderState = ({
 } = {}) => {
   const ids = new Set();
   const flattened = validateAudioNodes(audio, ids);
-  validateAudioEffects(audioEffects, ids, flattened.builtinNodeTypes);
+  const transitions = validateAudioEffects(
+    audioEffects,
+    ids,
+    flattened.builtinNodeTypes,
+  );
+
+  for (const [targetId, properties] of flattened.inlineTransitions) {
+    if (transitions.has(targetId)) {
+      throw new Error(
+        `Input error: audio node "${targetId}" cannot define both inline transition and legacy audio-transition input.`,
+      );
+    }
+    transitions.set(targetId, properties);
+  }
 
   return {
     audio,
     audioEffects,
     channels: flattened.channels,
     sounds: flattened.sounds,
+    transitions,
   };
 };
 

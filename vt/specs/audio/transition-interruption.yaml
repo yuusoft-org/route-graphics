@@ -18,13 +18,9 @@ states:
         src: bgm-1
         loop: true
         volume: 100
-    audioEffects:
-      - id: interrupted-enter
-        type: audio-transition
-        targetId: interrupted-bgm
-        properties:
-          volume:
-            enter:
+        transition:
+          enter:
+            volume:
               initialValue: 0
               keyframes:
                 - { value: 100, duration: 6000, easing: linear }
@@ -35,13 +31,9 @@ states:
         src: bgm-1
         loop: true
         volume: 10
-    audioEffects:
-      - id: interrupted-update
-        type: audio-transition
-        targetId: interrupted-bgm
-        properties:
-          volume:
-            update:
+        transition:
+          update:
+            volume:
               keyframes:
                 - { value: 10, duration: 2000, easing: linear }
   - id: transition-interruption-stopped

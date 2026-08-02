@@ -19,13 +19,9 @@ states:
         loop: true
         volume: 80
         pan: 1
-    audioEffects:
-      - id: sound-pan-enter
-        type: audio-transition
-        targetId: sound-pan-transition-bgm
-        properties:
-          pan:
-            enter:
+        transition:
+          enter:
+            pan:
               initialValue: -1
               keyframes:
                 - { value: 1, duration: 3000, easing: linear }
@@ -37,16 +33,13 @@ states:
         loop: true
         volume: 80
         pan: -1
-    audioEffects:
-      - id: sound-pan-update-exit
-        type: audio-transition
-        targetId: sound-pan-transition-bgm
-        properties:
-          pan:
-            update:
+        transition:
+          update:
+            pan:
               keyframes:
                 - { value: -1, duration: 3000, easing: linear }
-            exit:
+          exit:
+            pan:
               keyframes:
                 - { value: 1, duration: 2000, easing: linear }
   - id: sound-pan-transition-exit

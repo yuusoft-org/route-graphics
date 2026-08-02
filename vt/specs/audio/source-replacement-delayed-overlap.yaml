@@ -1,0 +1,44 @@
+---
+title: Audio Manual - Delayed Replacement Overlap
+description: Inline replacement fixture where both sides hold silence or full volume before a crossfade.
+skipScreenshot: true
+specs:
+  - state 1 is silent so pressing n or clicking Next starts audio from a user gesture
+  - state 2 should start looping bgm-1 at volume 80
+  - state 3 should hold bgm-1 at full volume and bgm-2 at silence for one second, then crossfade over two seconds
+  - state 4 should fade out and stop bgm-2
+---
+states:
+  - id: replacement-delayed-ready
+    audio: []
+  - id: replacement-delayed-first
+    audio:
+      - id: replacement-delayed-bgm
+        type: sound
+        src: bgm-1
+        loop: true
+        volume: 80
+        transition:
+          exit:
+            volume:
+              keyframes:
+                - { delay: 1000, value: 0, duration: 2000, easing: linear }
+  - id: replacement-delayed-second
+    audio:
+      - id: replacement-delayed-bgm
+        type: sound
+        src: bgm-2
+        loop: true
+        volume: 80
+        transition:
+          enter:
+            volume:
+              initialValue: 0
+              keyframes:
+                - { delay: 1000, value: 80, duration: 2000, easing: linear }
+          exit:
+            volume:
+              keyframes:
+                - { value: 0, duration: 1200, easing: linear }
+  - id: replacement-delayed-stopped
+    audio: []

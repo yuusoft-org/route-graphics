@@ -191,6 +191,15 @@ const buildAudioTimeline = ({
   ];
 
   for (const keyframe of transition.keyframes) {
+    const delayMs = Math.max(0, toFiniteParamValue(keyframe.delay, 0));
+    if (delayMs > 0) {
+      elapsedMs += delayMs;
+      timeline.push({
+        time: elapsedMs,
+        value: timeline[timeline.length - 1].value,
+        easing: "linear",
+      });
+    }
     elapsedMs += Math.max(0, toFiniteParamValue(keyframe.duration, 0));
     const nextAuthoredValue = keyframe.relative
       ? authoredValue + keyframe.value
@@ -296,6 +305,69 @@ const rampParam = ({
   return timeline[timeline.length - 1].time;
 };
 
+const applyDeferredTimeline = ({
+  param,
+  automation,
+  normalizeParamValue,
+  context = getAudioContext(),
+}) => {
+  if (!param || !automation) return 0;
+
+  const now = context.currentTime;
+  const elapsedMs = Math.max(0, (now - automation.startTime) * 1000);
+  const { timeline } = automation;
+  const currentValue = normalizeParamValue(
+    getTimelineValueAtTime(timeline, elapsedMs),
+  );
+
+  if (typeof param.cancelScheduledValues === "function") {
+    param.cancelScheduledValues(now);
+  }
+  setParamAtTime(param, currentValue, now);
+
+  for (let index = 1; index < timeline.length; index++) {
+    const start = timeline[index - 1];
+    const end = timeline[index];
+    if (end.time <= elapsedMs) continue;
+
+    const durationMs = end.time - start.time;
+    const endTime = automation.startTime + end.time / 1000;
+    if (
+      durationMs <= 0 ||
+      typeof param.linearRampToValueAtTime !== "function"
+    ) {
+      setParamAtTime(param, end.value, endTime);
+      continue;
+    }
+
+    if (end.easing === "linear") {
+      param.linearRampToValueAtTime(end.value, endTime);
+      continue;
+    }
+
+    const easing = getEasingFunction(end.easing);
+    const sampleCount = Math.min(
+      AUDIO_AUTOMATION_MAX_SAMPLES,
+      Math.max(1, Math.ceil(durationMs / AUDIO_AUTOMATION_SAMPLE_INTERVAL_MS)),
+    );
+    for (let sample = 1; sample <= sampleCount; sample++) {
+      const progress = sample / sampleCount;
+      const sampleElapsedMs = start.time + durationMs * progress;
+      if (sampleElapsedMs <= elapsedMs) continue;
+      const value = normalizeParamValue(
+        start.value + (end.value - start.value) * easing(progress),
+      );
+      param.linearRampToValueAtTime(
+        value,
+        automation.startTime + sampleElapsedMs / 1000,
+      );
+    }
+  }
+
+  audioParamAutomation.set(param, automation);
+  return Math.max(0, timeline[timeline.length - 1].time - elapsedMs);
+};
+
 const createGainNode = (value = 1) => {
   const context = getAudioContext();
   const node = context.createGain();
@@ -314,8 +386,9 @@ const createPannerNode = (pan = 0) => {
   return node;
 };
 
-const getVolumeValue = ({ volume, muted }) =>
-  muted ? 0 : normalizeVolume(volume, 100);
+const getVolumeValue = ({ volume }) => normalizeVolume(volume, 100);
+
+const getMuteValue = ({ muted }) => (muted ? 0 : 1);
 
 const hasSameSoundSourceIdentity = (previous, next) =>
   previous.src === next.src &&
@@ -339,6 +412,10 @@ const normalizeDirectVolume = (volume, fallback = 1) => {
 };
 
 const getTransitionPhase = (effects = [], targetId, property, phase) => {
+  if (effects instanceof Map) {
+    return effects.get(targetId)?.[property]?.[phase] ?? null;
+  }
+
   const transition = effects.find(
     (effect) =>
       effect.type === "audio-transition" && effect.targetId === targetId,
@@ -347,22 +424,13 @@ const getTransitionPhase = (effects = [], targetId, property, phase) => {
   return transition?.properties?.[property]?.[phase] ?? null;
 };
 
-const getTransitionDuration = (transition) =>
-  transition?.keyframes?.reduce(
-    (duration, keyframe) =>
-      duration + Math.max(0, toFiniteParamValue(keyframe.duration, 0)),
-    0,
-  ) ?? 0;
-
-const getLoopEndDelayMs = (sound, context = getAudioContext()) => {
+const getRemainingIterationMediaSeconds = (
+  sound,
+  context = getAudioContext(),
+) => {
   const source = sound.source;
-  if (!source?.loop) {
+  if (!source) {
     return null;
-  }
-
-  const playbackRate = getCurrentParamValue(source.playbackRate, context);
-  if (playbackRate <= 0) {
-    return Number.POSITIVE_INFINITY;
   }
 
   const configuredLoopEnd =
@@ -381,11 +449,11 @@ const getLoopEndDelayMs = (sound, context = getAudioContext()) => {
     : toFiniteParamValue(source.loopEnd, 0) > loopStart
       ? toFiniteParamValue(source.loopEnd, 0)
       : bufferDuration;
-  const loopDuration = loopEnd - loopStart;
-  if (!Number.isFinite(loopDuration) || loopDuration < 0) {
+  const iterationDuration = loopEnd - loopStart;
+  if (!Number.isFinite(iterationDuration) || iterationDuration < 0) {
     return null;
   }
-  if (loopDuration === 0) {
+  if (iterationDuration === 0) {
     return 0;
   }
 
@@ -393,17 +461,121 @@ const getLoopEndDelayMs = (sound, context = getAudioContext()) => {
     sound.sourceStartedAt,
     context.currentTime,
   );
-  const elapsedSeconds = Math.max(0, context.currentTime - startedAt);
+  const progressedMediaSeconds = integrateAudioParamValue(
+    source.playbackRate,
+    startedAt,
+    context.currentTime,
+  );
   const startOffset = toFiniteParamValue(sound.sourceStartOffset, loopStart);
-  const elapsedInLoop =
-    (Math.max(0, startOffset - loopStart) + elapsedSeconds * playbackRate) %
-    loopDuration;
-  const remainingInLoop =
-    elapsedSeconds > 0 && elapsedInLoop === 0
-      ? 0
-      : loopDuration - elapsedInLoop;
+  const absoluteOffset = startOffset + progressedMediaSeconds;
+  if (!source.loop) {
+    return Math.max(0, loopEnd - Math.min(absoluteOffset, loopEnd));
+  }
 
-  return (remainingInLoop / playbackRate) * 1000;
+  const elapsedInIteration =
+    (((absoluteOffset - loopStart) % iterationDuration) + iterationDuration) %
+    iterationDuration;
+  if (progressedMediaSeconds > 0 && elapsedInIteration === 0) {
+    return 0;
+  }
+  return iterationDuration - elapsedInIteration;
+};
+
+const integrateTimelineRange = (timeline, startMs, endMs, normalizeValue) => {
+  const durationMs = Math.max(0, endMs - startMs);
+  if (durationMs === 0) return 0;
+
+  const sampleCount = Math.min(
+    AUDIO_AUTOMATION_MAX_SAMPLES,
+    Math.max(1, Math.ceil(durationMs / AUDIO_AUTOMATION_SAMPLE_INTERVAL_MS)),
+  );
+  const sampleDurationMs = durationMs / sampleCount;
+  let progressSeconds = 0;
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const sampleTimeMs = startMs + (sample + 0.5) * sampleDurationMs;
+    const rate = normalizeValue(getTimelineValueAtTime(timeline, sampleTimeMs));
+    progressSeconds += Math.max(0, rate) * (sampleDurationMs / 1000);
+  }
+  return progressSeconds;
+};
+
+const getTimeToMediaProgressMs = (
+  param,
+  requiredProgressSeconds,
+  context = getAudioContext(),
+) => {
+  if (requiredProgressSeconds <= 0) return 0;
+
+  const automation = audioParamAutomation.get(param);
+  if (!automation) {
+    const rate = Math.max(0, getParamValue(param, 1));
+    return rate > 0
+      ? (requiredProgressSeconds / rate) * 1000
+      : Number.POSITIVE_INFINITY;
+  }
+
+  const elapsedMs = Math.max(
+    0,
+    (context.currentTime - automation.startTime) * 1000,
+  );
+  const timelineEndMs =
+    automation.timeline[automation.timeline.length - 1].time;
+  const scheduledEndMs = Math.max(elapsedMs, timelineEndMs);
+  const scheduledProgress = integrateTimelineRange(
+    automation.timeline,
+    elapsedMs,
+    scheduledEndMs,
+    automation.normalizeValue,
+  );
+
+  if (scheduledProgress >= requiredProgressSeconds) {
+    let lowMs = elapsedMs;
+    let highMs = scheduledEndMs;
+    for (let iteration = 0; iteration < 48; iteration++) {
+      const midpointMs = (lowMs + highMs) / 2;
+      const progress = integrateTimelineRange(
+        automation.timeline,
+        elapsedMs,
+        midpointMs,
+        automation.normalizeValue,
+      );
+      if (progress >= requiredProgressSeconds) {
+        highMs = midpointMs;
+      } else {
+        lowMs = midpointMs;
+      }
+    }
+    return Math.max(0, highMs - elapsedMs);
+  }
+
+  const finalRate = Math.max(
+    0,
+    automation.normalizeValue(
+      getTimelineValueAtTime(automation.timeline, timelineEndMs),
+    ),
+  );
+  if (finalRate <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return (
+    Math.max(0, timelineEndMs - elapsedMs) +
+    ((requiredProgressSeconds - scheduledProgress) / finalRate) * 1000
+  );
+};
+
+const hasContinuingPlaybackProgress = (param) => {
+  const automation = audioParamAutomation.get(param);
+  if (!automation) {
+    return getParamValue(param, 1) > 0;
+  }
+
+  const timelineEndMs =
+    automation.timeline[automation.timeline.length - 1].time;
+  const finalRate = automation.normalizeValue(
+    getTimelineValueAtTime(automation.timeline, timelineEndMs),
+  );
+  return finalRate > 0;
 };
 
 const applyAudioParam = ({
@@ -452,25 +624,141 @@ const applyPan = ({ pannerNode, targetValue, transition }) =>
       Math.max(-1, Math.min(1, toFiniteParamValue(value, 0))),
   });
 
+const normalizePlaybackRateValue = (value) =>
+  Math.max(0, toFiniteParamValue(value, 1));
+
 const applyPlaybackRate = ({ source, targetValue, transition }) =>
   applyAudioParam({
     param: source?.playbackRate,
     targetValue,
     transition,
-    normalizeTargetValue: (value) => Math.max(0, toFiniteParamValue(value, 1)),
+    normalizeTargetValue: normalizePlaybackRateValue,
   });
+
+const getPlaybackRateAutomationValue = (sound, context = getAudioContext()) => {
+  const automation = sound.playbackRateAutomation;
+  if (!automation) {
+    return normalizePlaybackRateValue(sound.playbackRate);
+  }
+
+  const elapsedMs = Math.max(
+    0,
+    (context.currentTime - automation.startTime) * 1000,
+  );
+  return normalizePlaybackRateValue(
+    getTimelineValueAtTime(automation.timeline, elapsedMs),
+  );
+};
+
+const startPlaybackRateAutomation = ({ sound, transition, currentValue }) => {
+  if (!transition) {
+    sound.playbackRateAutomation = null;
+    return 0;
+  }
+
+  const context = getAudioContext();
+  const timeline = buildAudioTimeline({
+    transition,
+    currentValue,
+    normalizeTransitionValue: normalizePlaybackRateValue,
+    denormalizeParamValue: (value) => value,
+  });
+  sound.playbackRateAutomation = {
+    startTime: context.currentTime,
+    timeline,
+    normalizeValue: normalizePlaybackRateValue,
+  };
+  return timeline[timeline.length - 1].time;
+};
+
+const applySoundPlaybackRateTransition = ({
+  sound,
+  transition,
+  currentValue,
+}) => {
+  if (sound.source) {
+    const duration = applyPlaybackRate({
+      source: sound.source,
+      targetValue: sound.playbackRate,
+      transition,
+    });
+    sound.playbackRateAutomation = transition
+      ? (audioParamAutomation.get(sound.source.playbackRate) ?? null)
+      : null;
+    return duration;
+  }
+
+  return startPlaybackRateAutomation({
+    sound,
+    transition,
+    currentValue:
+      currentValue ?? getPlaybackRateAutomationValue(sound, getAudioContext()),
+  });
+};
+
+const applyPendingSoundEnterTransitions = (sound, source) => {
+  const transitions = sound.pendingEnterTransitions;
+  if (transitions) {
+    if (transitions.volume) {
+      applyVolume({
+        gainNode: sound.gainNode,
+        targetValue: getVolumeValue(sound),
+        transition: transitions.volume,
+      });
+    }
+    if (transitions.pan) {
+      applyPan({
+        pannerNode: sound.pannerNode,
+        targetValue: sound.pan,
+        transition: transitions.pan,
+      });
+    }
+  }
+
+  if (transitions?.playbackRate) {
+    applyPlaybackRate({
+      source,
+      targetValue: sound.playbackRate ?? 1,
+      transition: transitions.playbackRate,
+    });
+    sound.playbackRateAutomation =
+      audioParamAutomation.get(source?.playbackRate) ?? null;
+  } else if (sound.playbackRateAutomation) {
+    applyDeferredTimeline({
+      param: source?.playbackRate,
+      automation: sound.playbackRateAutomation,
+      normalizeParamValue: normalizePlaybackRateValue,
+    });
+  } else {
+    applyPlaybackRate({
+      source,
+      targetValue: sound.playbackRate ?? 1,
+      transition: null,
+    });
+  }
+  return transitions;
+};
+
+const consumePendingSoundEnterTransitions = (sound, transitions) => {
+  if (sound.pendingEnterTransitions === transitions) {
+    sound.pendingEnterTransitions = null;
+  }
+};
 
 const createChannelInstance = (channel, outputNode) => {
   const gainNode = createGainNode(getVolumeValue(channel));
   const pannerNode = createPannerNode(channel.pan ?? 0);
+  const muteGainNode = createGainNode(getMuteValue(channel));
 
-  connect(gainNode, pannerNode ?? outputNode);
-  if (pannerNode) connect(pannerNode, outputNode);
+  connect(gainNode, pannerNode ?? muteGainNode);
+  if (pannerNode) connect(pannerNode, muteGainNode);
+  connect(muteGainNode, outputNode);
 
   return {
     id: channel.id,
     gainNode,
     pannerNode,
+    muteGainNode,
     volume: channel.volume ?? 100,
     muted: channel.muted ?? false,
     pan: channel.pan ?? 0,
@@ -492,9 +780,11 @@ const createChannelInstance = (channel, outputNode) => {
 const createSoundInstance = ({ sound, channelNode, internalId }) => {
   const gainNode = createGainNode(getVolumeValue(sound));
   const pannerNode = createPannerNode(sound.pan ?? 0);
+  const muteGainNode = createGainNode(getMuteValue(sound));
 
-  connect(gainNode, pannerNode ?? channelNode);
-  if (pannerNode) connect(pannerNode, channelNode);
+  connect(gainNode, pannerNode ?? muteGainNode);
+  if (pannerNode) connect(pannerNode, muteGainNode);
+  connect(muteGainNode, channelNode);
 
   return {
     internalId,
@@ -513,6 +803,7 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     channelNode,
     gainNode,
     pannerNode,
+    muteGainNode,
     source: null,
     sourceStartedAt: null,
     sourceStartOffset: sound.startAt ?? 0,
@@ -521,7 +812,8 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     onFinishingSourceStarted: null,
     finishing: false,
     finishingCallbacks: new Set(),
-    playbackRateTransition: null,
+    pendingEnterTransitions: null,
+    playbackRateAutomation: null,
     playbackPending: false,
     pendingTimeoutId: null,
     pendingDelayMs: 0,
@@ -579,13 +871,6 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   source.buffer = audioBuffer;
   source.loop = sound.loop ?? false;
 
-  applyPlaybackRate({
-    source,
-    targetValue: sound.playbackRate ?? 1,
-    transition: sound.playbackRateTransition,
-  });
-  sound.playbackRateTransition = null;
-
   connect(source, sound.gainNode);
 
   sound.sourceEnded = false;
@@ -616,6 +901,11 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   } else {
     source.start(startTime, offset);
   }
+  const pendingEnterTransitions = applyPendingSoundEnterTransitions(
+    sound,
+    source,
+  );
+  consumePendingSoundEnterTransitions(sound, pendingEnterTransitions);
   debugAudio("source started", {
     id: sound.id,
     src: sound.src,
@@ -732,6 +1022,8 @@ const stopSource = (sound, delayMs = 0) => {
 
 const cleanupSound = (sound) => {
   sound.onSourceEnded = null;
+  sound.pendingEnterTransitions = null;
+  sound.playbackRateAutomation = null;
 
   if (sound.control) {
     sound.control.decodeRequestId += 1;
@@ -757,6 +1049,7 @@ const cleanupSound = (sound) => {
   disconnect(sound.source);
   disconnect(sound.gainNode);
   disconnect(sound.pannerNode);
+  disconnect(sound.muteGainNode);
 };
 
 const cleanupChannel = (channel) => {
@@ -766,6 +1059,7 @@ const cleanupChannel = (channel) => {
   }
   disconnect(channel.gainNode);
   disconnect(channel.pannerNode);
+  disconnect(channel.muteGainNode);
 };
 
 const schedule = (callback, delayMs) => {
@@ -908,9 +1202,14 @@ export const createAudioStage = () => {
     const control = instance.control;
     if (!control) return 0;
 
+    const context = getAudioContext();
     control.cursorMs = getControlledPositionMs(instance);
     control.sourceCursorMs = control.cursorMs;
-    control.sourceStartedAt = getAudioContext().currentTime;
+    control.sourceStartedAt = context.currentTime;
+    instance.sourceStartOffset =
+      Math.max(0, toFiniteParamValue(instance.startAt, 0)) +
+      control.cursorMs / 1000;
+    instance.sourceStartedAt = context.currentTime;
     return control.cursorMs;
   };
 
@@ -1173,13 +1472,6 @@ export const createAudioStage = () => {
     const source = context.createBufferSource();
     source.buffer = control.decodedBuffer;
     configureControlledLoop(instance, source);
-
-    applyPlaybackRate({
-      source,
-      targetValue: instance.playbackRate ?? 1,
-      transition: instance.playbackRateTransition,
-    });
-    instance.playbackRateTransition = null;
     connect(source, instance.gainNode);
 
     const sourceToken = control.sourceToken + 1;
@@ -1251,6 +1543,11 @@ export const createAudioStage = () => {
       disconnect(source);
       throw error;
     }
+    const pendingEnterTransitions = applyPendingSoundEnterTransitions(
+      instance,
+      source,
+    );
+    consumePendingSoundEnterTransitions(instance, pendingEnterTransitions);
 
     return source;
   };
@@ -2059,6 +2356,7 @@ export const createAudioStage = () => {
       const currentVolumeValue = getVolumeValue(existing);
       const nextVolumeValue = getVolumeValue(channel);
       const volumeChanged = currentVolumeValue !== nextVolumeValue;
+      const mutedChanged = existing.muted !== channel.muted;
       const panChanged = existing.pan !== (channel.pan ?? 0);
       const loopInterrupted = existing.loop && !channel.loop;
 
@@ -2095,6 +2393,9 @@ export const createAudioStage = () => {
           targetValue: channel.pan,
           transition: panTransition,
         });
+      }
+      if (mutedChanged) {
+        setParamNow(existing.muteGainNode.gain, getMuteValue(channel));
       }
       return existing;
     }
@@ -2138,8 +2439,12 @@ export const createAudioStage = () => {
   const connectSoundToChannel = (instance, channelNode) => {
     disconnect(instance.gainNode);
     disconnect(instance.pannerNode);
-    connect(instance.gainNode, instance.pannerNode ?? channelNode);
-    if (instance.pannerNode) connect(instance.pannerNode, channelNode);
+    disconnect(instance.muteGainNode);
+    connect(instance.gainNode, instance.pannerNode ?? instance.muteGainNode);
+    if (instance.pannerNode) {
+      connect(instance.pannerNode, instance.muteGainNode);
+    }
+    connect(instance.muteGainNode, channelNode);
     instance.channelNode = channelNode;
   };
 
@@ -2190,29 +2495,16 @@ export const createAudioStage = () => {
     currentSoundKeyById.set(sound.id, internalId);
     bindChannelLoopCompletion(instance);
 
-    const volumeTransition = getTransitionPhase(
-      effects,
-      sound.id,
-      "volume",
-      phase,
-    );
-    const panTransition = getTransitionPhase(effects, sound.id, "pan", phase);
-    applyVolume({
-      gainNode: instance.gainNode,
-      targetValue: getVolumeValue(sound),
-      transition: volumeTransition,
-    });
-    applyPan({
-      pannerNode: instance.pannerNode,
-      targetValue: sound.pan,
-      transition: panTransition,
-    });
-    instance.playbackRateTransition = getTransitionPhase(
-      effects,
-      sound.id,
-      "playbackRate",
-      phase,
-    );
+    instance.pendingEnterTransitions = {
+      volume: getTransitionPhase(effects, sound.id, "volume", phase),
+      pan: getTransitionPhase(effects, sound.id, "pan", phase),
+      playbackRate: getTransitionPhase(
+        effects,
+        sound.id,
+        "playbackRate",
+        phase,
+      ),
+    };
     if (instance.control) {
       acceptControlledCommand(instance, sound.playback);
     } else if (parentChannel.control?.status === "paused") {
@@ -2224,6 +2516,7 @@ export const createAudioStage = () => {
   };
 
   const applySoundExitTransitions = (instance, effects) => {
+    instance.pendingEnterTransitions = null;
     const volumeTransition = getTransitionPhase(
       effects,
       instance.id,
@@ -2258,16 +2551,10 @@ export const createAudioStage = () => {
       : 0;
     let playbackRateDuration = 0;
     if (playbackRateTransition) {
-      if (instance.source) {
-        playbackRateDuration = applyPlaybackRate({
-          source: instance.source,
-          targetValue: instance.playbackRate,
-          transition: playbackRateTransition,
-        });
-      } else {
-        instance.playbackRateTransition = playbackRateTransition;
-        playbackRateDuration = getTransitionDuration(playbackRateTransition);
-      }
+      playbackRateDuration = applySoundPlaybackRateTransition({
+        sound: instance,
+        transition: playbackRateTransition,
+      });
     }
 
     return Math.max(volumeDuration, panDuration, playbackRateDuration);
@@ -2277,6 +2564,7 @@ export const createAudioStage = () => {
     if (!instance) return 0;
 
     instance.finishing = false;
+    instance.pendingEnterTransitions = null;
     instance.finishingCallbacks.clear();
     instance.onSourceEnded = null;
 
@@ -2308,9 +2596,8 @@ export const createAudioStage = () => {
       targetValue: instance.pan,
       transition: panTransition,
     });
-    const playbackRateDuration = applyPlaybackRate({
-      source: instance.source,
-      targetValue: instance.playbackRate,
+    const playbackRateDuration = applySoundPlaybackRateTransition({
+      sound: instance,
       transition: playbackRateTransition,
     });
     const ownDuration = Math.max(
@@ -2346,12 +2633,17 @@ export const createAudioStage = () => {
     }
 
     instance.finishing = true;
-    const loopEndDelayMs = getLoopEndDelayMs(instance);
+    const transitionStartTime = getAudioContext().currentTime;
+    const remainingMediaAtInterruption =
+      getRemainingIterationMediaSeconds(instance);
     const exitDuration = applySoundExitTransitions(instance, effects);
+    const exitDeadlineTime = transitionStartTime + exitDuration / 1000;
     instance.loop = false;
+    let transitionComplete = exitDuration <= 0;
+    let tailComplete = false;
 
     const cleanupFinishedSound = () => {
-      if (!instance.finishing) {
+      if (!instance.finishing || !transitionComplete || !tailComplete) {
         return;
       }
 
@@ -2366,9 +2658,14 @@ export const createAudioStage = () => {
       }
       finishingCallbacks.forEach((callback) => callback());
     };
-    const stopAndCleanupAfterExit = () => {
-      stopSource(instance, exitDuration);
-      instance.cleanupTimeoutId = schedule(cleanupFinishedSound, exitDuration);
+    const completeTailWithoutLoopEnd = () => {
+      const remainingExitMs = Math.max(
+        0,
+        (exitDeadlineTime - getAudioContext().currentTime) * 1000,
+      );
+      stopSource(instance, remainingExitMs);
+      tailComplete = true;
+      cleanupFinishedSound();
     };
     const finishActiveSource = () => {
       instance.onFinishingSourceStarted = null;
@@ -2376,37 +2673,61 @@ export const createAudioStage = () => {
         return;
       }
       if (!instance.source || instance.sourceEnded) {
+        tailComplete = true;
         cleanupFinishedSound();
         return;
       }
 
-      const playbackRate = getCurrentParamValue(
+      const remainingMediaSeconds =
+        remainingMediaAtInterruption ??
+        getRemainingIterationMediaSeconds(instance);
+      if (remainingMediaSeconds === null) {
+        if (!hasContinuingPlaybackProgress(instance.source.playbackRate)) {
+          completeTailWithoutLoopEnd();
+          return;
+        }
+        instance.source.loop = false;
+        return;
+      }
+
+      const loopEndDelayMs = getTimeToMediaProgressMs(
         instance.source.playbackRate,
+        remainingMediaSeconds,
         getAudioContext(),
       );
-      if (playbackRate <= 0 || loopEndDelayMs === Number.POSITIVE_INFINITY) {
-        stopAndCleanupAfterExit();
+      if (!Number.isFinite(loopEndDelayMs)) {
+        completeTailWithoutLoopEnd();
         return;
       }
 
       instance.source.loop = false;
-      if (loopEndDelayMs !== null) {
-        try {
-          instance.source.stop(
-            getAudioContext().currentTime + loopEndDelayMs / 1000,
-          );
-        } catch {
-          cleanupFinishedSound();
-        }
+      try {
+        const stopTime = getAudioContext().currentTime + loopEndDelayMs / 1000;
+        instance.source.stop(Number(stopTime.toFixed(9)));
+      } catch {
+        tailComplete = true;
+        cleanupFinishedSound();
       }
     };
 
+    if (exitDuration > 0) {
+      instance.cleanupTimeoutId = schedule(() => {
+        transitionComplete = true;
+        cleanupFinishedSound();
+      }, exitDuration);
+    }
+
     if (getAudioContext().state !== "running") {
+      transitionComplete = true;
+      tailComplete = true;
       cleanupFinishedSound();
       return;
     }
 
-    instance.onSourceEnded = cleanupFinishedSound;
+    instance.onSourceEnded = () => {
+      tailComplete = true;
+      cleanupFinishedSound();
+    };
     if (
       waitForPendingPlayback &&
       (instance.playbackPending || instance.pendingTimeoutId !== null)
@@ -2415,6 +2736,7 @@ export const createAudioStage = () => {
       return;
     }
     if (!instance.source || instance.sourceEnded) {
+      tailComplete = true;
       cleanupFinishedSound();
       return;
     }
@@ -2426,11 +2748,25 @@ export const createAudioStage = () => {
     const currentVolumeValue = getVolumeValue(instance);
     const nextVolumeValue = getVolumeValue(sound);
     const volumeChanged = currentVolumeValue !== nextVolumeValue;
+    const mutedChanged = instance.muted !== sound.muted;
     const panChanged = instance.pan !== sound.pan;
     const loopChanged = instance.loop !== sound.loop;
     const playbackRateChanged = instance.playbackRate !== sound.playbackRate;
     const startDelayChanged = instance.startDelayMs !== sound.startDelayMs;
     const sourceBeforeUpdate = instance.source;
+    const currentPlaybackRateValue = instance.source
+      ? getCurrentParamValue(instance.source.playbackRate, getAudioContext())
+      : getPlaybackRateAutomationValue(instance, getAudioContext());
+
+    if (volumeChanged && instance.pendingEnterTransitions) {
+      instance.pendingEnterTransitions.volume = null;
+    }
+    if (panChanged && instance.pendingEnterTransitions) {
+      instance.pendingEnterTransitions.pan = null;
+    }
+    if (playbackRateChanged && instance.pendingEnterTransitions) {
+      instance.pendingEnterTransitions.playbackRate = null;
+    }
 
     if (
       instance.control &&
@@ -2497,6 +2833,10 @@ export const createAudioStage = () => {
       });
     }
 
+    if (mutedChanged) {
+      setParamNow(instance.muteGainNode.gain, getMuteValue(sound));
+    }
+
     if (playbackRateChanged) {
       const playbackRateTransition = getTransitionPhase(
         effects,
@@ -2505,15 +2845,22 @@ export const createAudioStage = () => {
         "update",
       );
       if (instance.control && loopChanged && instance.source) {
-        instance.playbackRateTransition = playbackRateTransition;
+        startPlaybackRateAutomation({
+          sound: instance,
+          transition: playbackRateTransition,
+          currentValue: currentPlaybackRateValue,
+        });
       } else if (instance.source) {
-        applyPlaybackRate({
-          source: instance.source,
-          targetValue: sound.playbackRate,
+        applySoundPlaybackRateTransition({
+          sound: instance,
           transition: playbackRateTransition,
         });
       } else {
-        instance.playbackRateTransition = playbackRateTransition;
+        startPlaybackRateAutomation({
+          sound: instance,
+          transition: playbackRateTransition,
+          currentValue: currentPlaybackRateValue,
+        });
       }
     }
 
@@ -2627,6 +2974,8 @@ export const createAudioStage = () => {
     return {
       prev,
       next,
+      prevTransitions: prev.transitions,
+      nextTransitions: next.transitions,
       prevChannelById,
       nextChannelById,
       prevSoundById,
@@ -2643,6 +2992,8 @@ export const createAudioStage = () => {
   } = {}) => {
     const {
       next,
+      prevTransitions,
+      nextTransitions,
       prevChannelById,
       nextChannelById,
       prevSoundById,
@@ -2695,7 +3046,7 @@ export const createAudioStage = () => {
     for (const [id, prevChannel] of prevChannelById) {
       if (!nextChannelById.has(id)) {
         const channel = channels.get(id);
-        const duration = removeChannel(channel, prevAudioEffects);
+        const duration = removeChannel(channel, prevTransitions);
         channelCleanupDurations.set(id, duration);
         if (prevChannel.interruption === "loopEnd" && channel) {
           channel.loop = false;
@@ -2732,7 +3083,7 @@ export const createAudioStage = () => {
     for (const [id, nextChannel] of nextChannelById) {
       ensureChannel(
         nextChannel,
-        nextAudioEffects,
+        nextTransitions,
         prevChannelById.has(id) ? "update" : "enter",
       );
     }
@@ -2752,7 +3103,7 @@ export const createAudioStage = () => {
         if (!finishAtLoopEnd) {
           return removeSoundInstance(
             instance,
-            prevAudioEffects,
+            prevTransitions,
             inheritedDuration,
           );
         }
@@ -2762,11 +3113,11 @@ export const createAudioStage = () => {
           finishSoundForDeferredChannel(
             instance,
             deferredCleanup,
-            prevAudioEffects,
+            prevTransitions,
           );
         } else {
           finishSoundInstance(instance, undefined, {
-            effects: prevAudioEffects,
+            effects: prevTransitions,
             waitForPendingPlayback: true,
           });
         }
@@ -2801,7 +3152,7 @@ export const createAudioStage = () => {
         }
         addSoundInstance({
           sound: nextSound,
-          effects: nextAudioEffects,
+          effects: nextTransitions,
           phase: "enter",
           internalId: `render:${id}:${++soundGeneration}`,
         });
@@ -2812,7 +3163,7 @@ export const createAudioStage = () => {
       if (!prevSoundById.has(id)) {
         addSoundInstance({
           sound: nextSound,
-          effects: nextAudioEffects,
+          effects: nextTransitions,
           phase: "enter",
           internalId: `render:${id}:${++soundGeneration}`,
         });
@@ -2830,7 +3181,7 @@ export const createAudioStage = () => {
         updateSoundInstance({
           instance,
           sound: nextSound,
-          effects: nextAudioEffects,
+          effects: nextTransitions,
         });
       }
     }
