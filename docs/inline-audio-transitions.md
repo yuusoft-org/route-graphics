@@ -196,9 +196,11 @@ current audible value.
 | `easing`   | string  | no       | `linear` | Easing for the segment reaching this keyframe    |
 | `relative` | boolean | no       | `false`  | Resolve value relative to the preceding endpoint |
 
-`duration` and `delay` must be finite non-negative numbers. Values use the
-same property ranges as their target fields. Relative values are resolved and
-clamped before becoming the baseline for the following keyframe.
+`duration` and `delay` must be finite non-negative numbers, and `value` must be
+finite. Absolute values use the same ranges as their target fields. A relative
+value is a signed delta and is not itself restricted to the target field's
+range. Its resolved endpoint is clamped to that range before becoming the
+baseline for the following keyframe.
 
 For `enter` and `update`, the last keyframe must be absolute and equal the value
 declared on the next audio node. This keeps the final audible value consistent
@@ -306,6 +308,14 @@ final iteration, and cleanup waits until both any exit-transition work and that
 loop-end tail have finished. Without a loop-end tail, cleanup occurs when the
 longest exit track completes, or immediately when there are no exit tracks.
 
+A `loopEnd` tail is waited on only while it can make finite progress toward its
+boundary. If its effective playback rate is already `0`, or exit automation
+leaves it at `0` before it reaches that boundary, the loop-end wait is
+abandoned. Teardown then follows only the finite exit-transition timeline and
+cleanup is immediate when no transition work remains. This preserves the
+existing zero-rate cleanup behavior and prevents an outgoing sound or channel
+from being retained indefinitely.
+
 ## Source Replacement And Overlap
 
 Changing any source-identity field on a retained public sound ID replaces its
@@ -321,12 +331,22 @@ Replacement creates two internal instances:
 - the outgoing instance uses the previous node's `exit` tracks
 - the incoming instance uses the next node's `enter` tracks
 
-Both sets of tracks derive from one shared Web Audio clock value. With no
-incoming `startDelayMs`, outgoing exit and incoming enter tracks start from that
-same time. An incoming source delay offsets that source and its enter tracks
-from the shared base time. The outgoing instance is not destroyed until its
-exit tracks complete. Overlap is therefore a lifecycle consequence, not a
-separate field.
+Both sets of tracks use the Web Audio clock. The outgoing exit begins at the
+replacement's reconciliation time. If the incoming source is already decoded,
+validated, and ready to schedule, it uses that same base time: with no incoming
+`startDelayMs`, its source and enter tracks start with the outgoing exit; a
+source delay offsets both the incoming source and its enter tracks.
+
+If the incoming source is still decoding, outgoing teardown is not postponed.
+The incoming enter tracks remain unscheduled rather than advancing silently.
+They start with the source after decode and validation succeed and its complete
+`startDelayMs` countdown finishes. If the outgoing exit or `loopEnd` tail is
+still active then, the instances overlap for the remaining time; otherwise
+there is an audible gap. A decode, validation, or playback failure does not run
+the incoming enter tracks and does not restore the detached outgoing instance.
+The shared-start guarantee therefore applies only to ready incoming sources.
+Outgoing cleanup follows the exit and `loopEnd` rules above. Overlap is a
+lifecycle consequence, not a separate field.
 
 ### Immediate Crossfade
 
@@ -368,7 +388,8 @@ audio:
 ```
 
 The old source fades out while the new source fades in for the same two-second
-window.
+window. This example assumes `track-b` is ready when replacement reconciliation
+begins; otherwise the pending-decode timing above applies.
 
 ### Synchronized Delayed Crossfade
 
@@ -459,10 +480,11 @@ individual fades or replacements.
 
 ## Completion
 
-Audio transitions remain non-blocking for the existing visual
-`renderComplete`/`stateComplete` lifecycle. Exit cleanup and outgoing-instance
-ownership still continue internally until the applicable exit tracks and any
-already-authorized `loopEnd` tail have completed.
+Audio transitions remain non-blocking for the existing public `renderComplete`
+event. Exit cleanup and outgoing-instance ownership still continue internally
+until the applicable exit tracks and any completable, already-authorized
+`loopEnd` tail have completed. Non-progressing zero-rate tails use the finite
+fallback defined under Exit.
 
 A future audio-specific transition-complete event or explicitly blocking audio
 timeline is outside this proposal.
@@ -477,6 +499,7 @@ The future implementation should reject:
 - empty property tracks or empty keyframe arrays
 - unknown track or keyframe fields
 - missing keyframe `value` or `duration`
+- non-finite keyframe values
 - negative or non-finite delay/duration
 - unsupported easing names
 - absolute values outside the property range
@@ -507,10 +530,12 @@ The later implementation must include:
 
 - schema and JSDoc types for inline lifecycle tracks
 - normalization into one internal target-to-transition map
-- shared enter/exit scheduling time for replacement instances
+- shared enter/exit scheduling time for ready replacement instances
+- pending-decode enter scheduling that does not delay outgoing teardown
 - keyframe-delay support in audio parameter automation
 - current-value hold on interruption
-- cleanup after both the longest exit track and any `loopEnd` tail complete
+- cleanup after both the longest exit track and any completable `loopEnd` tail
+- finite cleanup fallback for zero-rate `loopEnd` tails
 - conflict validation against legacy `audioEffects`
 - unit tests for normalization and timing
 - audio-stage tests for enter, update, exit, interruption, and replacement
