@@ -1202,9 +1202,14 @@ export const createAudioStage = () => {
     const control = instance.control;
     if (!control) return 0;
 
+    const context = getAudioContext();
     control.cursorMs = getControlledPositionMs(instance);
     control.sourceCursorMs = control.cursorMs;
-    control.sourceStartedAt = getAudioContext().currentTime;
+    control.sourceStartedAt = context.currentTime;
+    instance.sourceStartOffset =
+      Math.max(0, toFiniteParamValue(instance.startAt, 0)) +
+      control.cursorMs / 1000;
+    instance.sourceStartedAt = context.currentTime;
     return control.cursorMs;
   };
 

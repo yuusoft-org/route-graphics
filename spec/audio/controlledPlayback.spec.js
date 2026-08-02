@@ -1085,6 +1085,53 @@ describe("command-controlled sound playback", () => {
     expect(eventsByName(eventHandler, "soundComplete")).toEqual([]);
   });
 
+  it("preserves non-looping rate history when finishing at loopEnd", async () => {
+    const { context, render, stage } = await setupControlledStage();
+    const channel = (children) => ({
+      id: "music",
+      type: "audio-channel",
+      interruption: "loopEnd",
+      children,
+    });
+    const initial = playbackSound({
+      commandId: 1,
+      operation: "play",
+      positionMs: 0,
+      playbackRate: 0.5,
+    });
+    const faster = playbackSound({
+      commandId: 1,
+      operation: "play",
+      positionMs: 0,
+      playbackRate: 2,
+    });
+
+    render([channel([initial])]);
+    await flushMicrotasks();
+    const source = context.sources[0];
+
+    context.currentTime = 12;
+    render([channel([faster])]);
+
+    const currentKey = stage._inspect().currentSoundKeyById.get("player");
+    const instance = stage._inspect().sounds.get(currentKey);
+    expect(instance.control.sourceCursorMs).toBeCloseTo(1000);
+    expect(instance.sourceStartOffset).toBeCloseTo(1);
+    expect(instance.sourceStartedAt).toBe(12);
+
+    context.currentTime = 13;
+    render([channel([])]);
+
+    expect(source.loop).toBe(false);
+    expect(source.stop).toHaveBeenCalledTimes(1);
+    expect(source.stop).toHaveBeenCalledWith(16.5);
+    expect(stage._inspect().sounds.get(currentKey)).toBe(instance);
+
+    context.currentTime = 16.5;
+    source.onended();
+    expect(stage._inspect().sounds.has(currentKey)).toBe(false);
+  });
+
   it("runs inline enter once for same-source transport plays and again for replacement", async () => {
     const { context, render, stage } = await setupControlledStage({
       assets: new Map([
