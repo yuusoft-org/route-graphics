@@ -736,7 +736,13 @@ const applyPendingSoundEnterTransitions = (sound, source) => {
       transition: null,
     });
   }
-  sound.pendingEnterTransitions = null;
+  return transitions;
+};
+
+const consumePendingSoundEnterTransitions = (sound, transitions) => {
+  if (sound.pendingEnterTransitions === transitions) {
+    sound.pendingEnterTransitions = null;
+  }
 };
 
 const createChannelInstance = (channel, outputNode) => {
@@ -865,7 +871,10 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   source.buffer = audioBuffer;
   source.loop = sound.loop ?? false;
 
-  applyPendingSoundEnterTransitions(sound, source);
+  const pendingEnterTransitions = applyPendingSoundEnterTransitions(
+    sound,
+    source,
+  );
 
   connect(source, sound.gainNode);
 
@@ -897,6 +906,7 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   } else {
     source.start(startTime, offset);
   }
+  consumePendingSoundEnterTransitions(sound, pendingEnterTransitions);
   debugAudio("source started", {
     id: sound.id,
     src: sound.src,
@@ -1459,7 +1469,10 @@ export const createAudioStage = () => {
     source.buffer = control.decodedBuffer;
     configureControlledLoop(instance, source);
 
-    applyPendingSoundEnterTransitions(instance, source);
+    const pendingEnterTransitions = applyPendingSoundEnterTransitions(
+      instance,
+      source,
+    );
     connect(source, instance.gainNode);
 
     const sourceToken = control.sourceToken + 1;
@@ -1531,6 +1544,7 @@ export const createAudioStage = () => {
       disconnect(source);
       throw error;
     }
+    consumePendingSoundEnterTransitions(instance, pendingEnterTransitions);
 
     return source;
   };

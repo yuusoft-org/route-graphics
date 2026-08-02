@@ -1201,6 +1201,90 @@ describe("command-controlled sound playback", () => {
     expect(restartedRate.linearRampToValueAtTime).toHaveBeenCalledWith(2, 11);
   });
 
+  it("preserves pending enter tracks when source start fails and retries them on a later play", async () => {
+    let startAttempts = 0;
+    const { context, eventHandler, render, stage } = await setupControlledStage(
+      {
+        contextOptions: {
+          startImpl: () => {
+            startAttempts += 1;
+            if (startAttempts === 1) {
+              throw new Error("browser start failure");
+            }
+          },
+        },
+      },
+    );
+    const transition = {
+      enter: {
+        volume: {
+          initialValue: 0,
+          keyframes: [{ value: 80, duration: 500 }],
+        },
+        pan: {
+          initialValue: -1,
+          keyframes: [{ value: 0.5, duration: 500 }],
+        },
+        playbackRate: {
+          initialValue: 0.5,
+          keyframes: [{ value: 2, duration: 500 }],
+        },
+      },
+    };
+    const sound = (commandId) =>
+      playbackSound({
+        commandId,
+        operation: "play",
+        positionMs: 0,
+        volume: 80,
+        pan: 0.5,
+        playbackRate: 2,
+        transition,
+      });
+
+    render([sound(1)]);
+    await flushMicrotasks();
+
+    const currentKey = stage._inspect().currentSoundKeyById.get("player");
+    const instance = stage._inspect().sounds.get(currentKey);
+    expect(eventsByName(eventHandler, "soundError").at(-1)).toEqual({
+      _event: {
+        id: "player",
+        commandId: 1,
+        errorCode: "playback-failed",
+      },
+    });
+    expect(instance.pendingEnterTransitions).not.toBeNull();
+
+    context.currentTime = 11;
+    render([sound(2)]);
+    await flushMicrotasks();
+
+    expect(startAttempts).toBe(2);
+    expect(context.sources).toHaveLength(2);
+    expect(instance.pendingEnterTransitions).toBeNull();
+    expect(instance.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0,
+      11,
+    );
+    expect(
+      instance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(0.8, 11.5);
+    expect(instance.pannerNode.pan.setValueAtTime).toHaveBeenLastCalledWith(
+      -1,
+      11,
+    );
+    expect(
+      instance.pannerNode.pan.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(0.5, 11.5);
+    expect(
+      context.sources[1].playbackRate.setValueAtTime,
+    ).toHaveBeenLastCalledWith(0.5, 11);
+    expect(
+      context.sources[1].playbackRate.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(2, 11.5);
+  });
+
   it("starts a replacement enter after pending decode without delaying outgoing exit", async () => {
     let resolveDecode;
     const decodePromise = new Promise((resolve) => {
