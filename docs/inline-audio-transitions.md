@@ -59,7 +59,7 @@ audio:
       update:
         volume:
           keyframes:
-            - value: 40
+            - value: 80
               duration: 500
               easing: easeOutQuad
       exit:
@@ -79,24 +79,24 @@ additional keyframes express advanced behavior through the same interface.
 The proposed public structure, expressed as TypeScript-like documentation, is:
 
 ```ts
-type AudioTransition = {
-  enter?: AudioTransitionPhase;
-  update?: AudioTransitionPhase;
-  exit?: AudioTransitionPhase;
+type InlineAudioTransition = {
+  enter?: InlineAudioTransitionPhase;
+  update?: InlineAudioTransitionPhase;
+  exit?: InlineAudioTransitionPhase;
 };
 
-type AudioTransitionPhase = {
-  volume?: AudioTransitionTrack;
-  pan?: AudioTransitionTrack;
-  playbackRate?: AudioTransitionTrack; // sound only
+type InlineAudioTransitionPhase = {
+  volume?: InlineAudioTransitionTrack;
+  pan?: InlineAudioTransitionTrack;
+  playbackRate?: InlineAudioTransitionTrack; // sound only
 };
 
-type AudioTransitionTrack = {
+type InlineAudioTransitionTrack = {
   initialValue?: number;
-  keyframes: AudioTransitionKeyframe[]; // non-empty
+  keyframes: InlineAudioTransitionKeyframe[]; // non-empty
 };
 
-type AudioTransitionKeyframe = {
+type InlineAudioTransitionKeyframe = {
   value: number;
   duration: number; // milliseconds
   delay?: number; // milliseconds; defaults to 0
@@ -106,7 +106,10 @@ type AudioTransitionKeyframe = {
 ```
 
 `SoundElement` and `AudioChannelElement` each gain
-`transition?: AudioTransition`, subject to their supported-property subsets.
+`transition?: InlineAudioTransition`, subject to their supported-property
+subsets. The `InlineAudio*` names intentionally remain distinct from the legacy
+`AudioTransition`, `AudioTransitionPhase`, and `AudioTransitionKeyframe` types
+used by `audioEffects` during the compatibility period.
 
 ## Interface Contract
 
@@ -257,8 +260,11 @@ resume. Channel enter automation starts when the channel enters the audio
 graph.
 
 For command-controlled playback, enter automation runs with the first accepted
-`play` that starts a source in that sound lifetime. Later play or restart
-commands are transport operations and do not repeat the graph-lifecycle enter
+`play` that starts a source in that sound lifetime. It also runs for the
+incoming instance of an accepted source replacement: the required higher
+`play` command changes source identity even though the public sound ID and
+sound lifetime are retained. Later `play` commands that retain source identity
+are transport-only restarts and do not repeat the graph-lifecycle enter
 transition.
 
 ### Update
@@ -281,8 +287,8 @@ transition:
 ### Exit
 
 Exit configuration comes from the previous node because the node is absent
-from the next state. The outgoing instance remains alive until its longest exit
-property track completes.
+from the next state. The outgoing instance remains alive until all applicable
+exit work completes.
 
 ```yaml
 transition:
@@ -293,8 +299,12 @@ transition:
           duration: 1000
 ```
 
-If several exit properties have different durations, cleanup waits for the
-maximum total track duration.
+If several exit properties have different durations, their transition work
+completes after the maximum total track duration. Under a containing channel's
+`interruption: loopEnd`, exit tracks run concurrently with the already-authorized
+final iteration, and cleanup waits until both any exit-transition work and that
+loop-end tail have finished. Without a loop-end tail, cleanup occurs when the
+longest exit track completes, or immediately when there are no exit tracks.
 
 ## Source Replacement And Overlap
 
@@ -451,7 +461,8 @@ individual fades or replacements.
 
 Audio transitions remain non-blocking for the existing visual
 `renderComplete`/`stateComplete` lifecycle. Exit cleanup and outgoing-instance
-ownership still continue internally for their complete finite duration.
+ownership still continue internally until the applicable exit tracks and any
+already-authorized `loopEnd` tail have completed.
 
 A future audio-specific transition-complete event or explicitly blocking audio
 timeline is outside this proposal.
@@ -499,7 +510,7 @@ The later implementation must include:
 - shared enter/exit scheduling time for replacement instances
 - keyframe-delay support in audio parameter automation
 - current-value hold on interruption
-- cleanup based on the longest exit track
+- cleanup after both the longest exit track and any `loopEnd` tail complete
 - conflict validation against legacy `audioEffects`
 - unit tests for normalization and timing
 - audio-stage tests for enter, update, exit, interruption, and replacement
