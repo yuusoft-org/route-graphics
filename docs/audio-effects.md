@@ -2,6 +2,11 @@
 
 Last updated: 2026-07-15
 
+> **Design proposal:** [`Inline Audio Transition Interface`](./inline-audio-transitions.md)
+> defines a proposed inline replacement for separately authored
+> `audio-transition` records. It is not implemented. The interface documented
+> below remains the current runtime contract.
+
 This document defines the channel-based audio interface for Route Graphics
 render state.
 
