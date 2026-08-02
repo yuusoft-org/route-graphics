@@ -1556,10 +1556,10 @@ animations:
     type: transition
 
     mask:
-      kind: single
-      texture: masks/spiral.png
-      channel: red
-      softness: 0.08
+      - kind: single
+        texture: masks/spiral.png
+        channel: red
+        softness: 0.08
 
     compositor:
       type: shader
@@ -1644,16 +1644,18 @@ synthetic transition alias. The implicit `self` target and ordinary
 transition program. Live descendant animation remains deferred rather than
 being mixed into snapshot orchestration.
 
-`transitionMask` requires a mask configuration. `transitionCompositor` requires
-a compositor configuration. Missing previous or next content remains a
-transparent surface as in the current transition model.
+`transitionMask: true` requires at least one mask entry and targets all of them;
+`transitionMask: <zero-based-index>` targets one existing entry.
+`transitionCompositor` requires a compositor configuration. Missing previous or
+next content remains a transparent surface as in the current transition model.
 
-In orchestrated mode, a configured mask must have an effective terminal
-`progress: 1` write and a configured compositor must have an effective terminal
-`progress: 1` write. The compiler does not silently generate an independent
-progress tween because that would create timing outside the authored timeline.
-Surface motion is optional. Finalization still removes the overlay and reveals
-the live next subtree through the existing transition lifecycle.
+In orchestrated mode, every configured mask entry must have an effective
+terminal `progress: 1` write and a configured compositor must have an effective
+terminal `progress: 1` write. The compiler does not silently generate an
+independent progress tween because that would create timing outside the
+authored timeline. Surface motion is optional. Finalization still removes the
+overlay and reveals the live next subtree through the existing transition
+lifecycle.
 
 Terminal validation evaluates the composed effective value at the exact finite
 root endpoint after repeats, yoyo direction, overwrite, and fill semantics; it

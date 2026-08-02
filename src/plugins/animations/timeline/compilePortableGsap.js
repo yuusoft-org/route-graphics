@@ -220,7 +220,12 @@ const normalizeTargetQueries = (animation) => {
       };
       kinds.set(alias, "transitionSurface");
     } else if (definition.transitionMask !== undefined) {
-      queries[alias] = { kind: "transitionMask" };
+      queries[alias] = {
+        kind: "transitionMask",
+        ...(definition.transitionMask === true
+          ? {}
+          : { index: definition.transitionMask }),
+      };
       kinds.set(alias, "transitionMask");
     } else {
       queries[alias] = { kind: "transitionCompositor" };
@@ -468,6 +473,9 @@ export const compilePortableGsapAnimation = (
         total += count;
       }
       return total;
+    }
+    if (query.kind === "transitionMask") {
+      return query.index === undefined ? (animation.mask?.length ?? 0) : 1;
     }
     if (query.kind.startsWith("transition")) return 1;
     return null;

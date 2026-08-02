@@ -68,13 +68,16 @@ const defaultResolveQuery = (query, alias, context) => {
           `transition:${query.surface}`,
         ),
       ].filter(Boolean);
-    case "transitionMask":
-      return [
-        normalizeTarget(
-          getRegistryValue(context.transitionTargets, "mask"),
-          "transition:mask",
-        ),
-      ].filter(Boolean);
+    case "transitionMask": {
+      const registered = getRegistryValue(context.transitionTargets, "mask");
+      const masks = Array.isArray(registered) ? registered : [registered];
+      const selected = query.index === undefined ? masks : [masks[query.index]];
+      return selected
+        .map((mask, index) =>
+          normalizeTarget(mask, `transition:mask:${query.index ?? index}`),
+        )
+        .filter(Boolean);
+    }
     case "transitionCompositor":
       return [
         normalizeTarget(

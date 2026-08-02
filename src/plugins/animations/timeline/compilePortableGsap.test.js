@@ -321,7 +321,10 @@ describe("portable GSAP frontend compiler", () => {
       id: "handoff",
       targetId: "root",
       type: "transition",
-      mask: { kind: "single", texture: "mask.png" },
+      mask: [
+        { kind: "single", texture: "mask-a.png" },
+        { kind: "single", texture: "mask-b.png" },
+      ],
       compositor: {
         type: "shader",
         source: {
@@ -337,6 +340,7 @@ describe("portable GSAP frontend compiler", () => {
         targets: {
           previous: { transitionSurface: "prev" },
           reveal: { transitionMask: true },
+          secondReveal: { transitionMask: 1 },
           effect: { transitionCompositor: true },
         },
         steps: [
@@ -369,6 +373,10 @@ describe("portable GSAP frontend compiler", () => {
       },
     });
     expect(program.duration).toBe(100);
+    expect(program.targetQueries).toMatchObject({
+      reveal: { kind: "transitionMask" },
+      secondReveal: { kind: "transitionMask", index: 1 },
+    });
     expect(program.clipTemplates.map(({ channel }) => channel)).toEqual([
       "appearance.alpha",
       "transition.mask.progress",

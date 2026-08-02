@@ -222,6 +222,14 @@ const validateTargetQuery = (query, path) => {
       }
       break;
     case "transitionMask":
+      assertKnownFields(query, new Set(["kind", "index"]), path);
+      if (
+        query.index !== undefined &&
+        (!Number.isSafeInteger(query.index) || query.index < 0)
+      ) {
+        throw new Error(`${path}.index must be a non-negative safe integer.`);
+      }
+      break;
     case "transitionCompositor":
       assertKnownFields(query, new Set(["kind"]), path);
       break;

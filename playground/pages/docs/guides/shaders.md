@@ -296,8 +296,8 @@ animations:
     targetId: scene
     type: transition
     mask:
-      kind: single
-      texture: paper-mask
+      - kind: single
+        texture: paper-mask
     compositor:
       type: shader
       parameters:

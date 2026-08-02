@@ -2410,15 +2410,17 @@ describe("runReplaceAnimation", () => {
             },
           },
         },
-        mask: {
-          kind: "single",
-          texture: maskTexture,
-          channel: "red",
-          progress: {
-            initialValue: 0,
-            keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+        mask: [
+          {
+            kind: "single",
+            texture: maskTexture,
+            channel: "red",
+            progress: {
+              initialValue: 0,
+              keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+            },
           },
-        },
+        ],
       },
       animations: new Map(),
       animationBus,
@@ -2495,17 +2497,19 @@ describe("runReplaceAnimation", () => {
         id: "scene-mask-replace",
         targetId: "scene-root",
         type: "transition",
-        mask: {
-          kind: "single",
-          texture: maskTexture,
-          channel: "red",
-          progress: {
-            initialValue: 0,
-            keyframes: [
-              { delay: 200, duration: 800, value: 1, easing: "linear" },
-            ],
+        playback: { speed: 2 },
+        mask: [
+          {
+            kind: "single",
+            texture: maskTexture,
+            channel: "red",
+            delay: 200,
+            progress: {
+              initialValue: 0,
+              keyframes: [{ duration: 800, value: 1, easing: "linear" }],
+            },
           },
-        },
+        ],
       },
       animations: new Map(),
       animationBus,
@@ -2524,8 +2528,8 @@ describe("runReplaceAnimation", () => {
     const dispatched = animationBus.dispatch.mock.calls[0][0];
 
     expect(app.renderer.extract.pixels).not.toHaveBeenCalled();
-    expect(dispatched.payload.duration).toBe(1000);
-    dispatched.payload.applyFrame(199);
+    expect(dispatched.payload.duration).toBe(500);
+    dispatched.payload.applyFrame(99);
 
     expect(app.renderer.extract.pixels).not.toHaveBeenCalled();
     const overlay = parent.children.find(
@@ -2536,12 +2540,157 @@ describe("runReplaceAnimation", () => {
     expect(
       maskFilter.resources.replaceMaskUniforms.uniforms.uMaskDirectReveal,
     ).toBe(0);
+    expect(maskFilter.resources.replaceMaskUniforms.uniforms.uMaskActive).toBe(
+      0,
+    );
     expect(maskFilter.resources.replaceMaskUniforms.uniforms.uProgress).toBe(0);
 
-    dispatched.payload.applyFrame(600);
+    dispatched.payload.applyFrame(100);
+    expect(maskFilter.resources.replaceMaskUniforms.uniforms.uMaskActive).toBe(
+      1,
+    );
+    expect(maskFilter.resources.replaceMaskUniforms.uniforms.uProgress).toBe(0);
+
+    dispatched.payload.applyFrame(300);
     expect(
       maskFilter.resources.replaceMaskUniforms.uniforms.uProgress,
     ).toBeCloseTo(0.5);
+
+    dispatched.payload.applyFrame(99);
+    expect(maskFilter.resources.replaceMaskUniforms.uniforms.uMaskActive).toBe(
+      0,
+    );
+  });
+
+  it("runs multiple masks independently and combines overlaps with max reveal", () => {
+    const prevDisplayObject = createDisplayObject("scene-root");
+    const nextDisplayObject = createDisplayObject("scene-root");
+    const parent = createParent(prevDisplayObject);
+    prevDisplayObject.parent = parent;
+    const firstTexture = document.createElement("canvas");
+    const secondTexture = document.createElement("canvas");
+    firstTexture.width = secondTexture.width = 1;
+    firstTexture.height = secondTexture.height = 1;
+    const filterFromSpy = vi.spyOn(Filter, "from");
+    const plugin = {
+      add: vi.fn(({ parent: targetParent, element }) => {
+        nextDisplayObject.label = element.id;
+        targetParent.addChild(nextDisplayObject);
+      }),
+      delete: vi.fn(({ parent: targetParent, element }) => {
+        const child = targetParent.children.find(
+          (item) => item.label === element.id,
+        );
+        if (child) targetParent.removeChild(child);
+      }),
+    };
+    const animationBus = { dispatch: vi.fn() };
+    const app = {
+      renderer: {
+        width: 1280,
+        height: 720,
+        generateTexture: vi.fn(() => Texture.EMPTY),
+        render: vi.fn(),
+      },
+    };
+
+    try {
+      runReplaceAnimation({
+        app,
+        parent,
+        prevElement: { id: "scene-root", type: "container" },
+        nextElement: { id: "scene-root", type: "container", children: [] },
+        animation: {
+          id: "scene-multiple-mask-replace",
+          targetId: "scene-root",
+          type: "transition",
+          mask: [
+            {
+              kind: "single",
+              texture: firstTexture,
+              progress: {
+                initialValue: 0,
+                keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+              },
+            },
+            {
+              kind: "single",
+              texture: secondTexture,
+              delay: 400,
+              progress: {
+                initialValue: 0,
+                keyframes: [{ duration: 600, value: 1, easing: "linear" }],
+              },
+            },
+          ],
+        },
+        animations: new Map(),
+        animationBus,
+        completionTracker: {
+          getVersion: () => 11,
+          track: vi.fn(),
+          complete: vi.fn(),
+        },
+        eventHandler: vi.fn(),
+        elementPlugins: [],
+        plugin,
+        zIndex: 0,
+        signal: new AbortController().signal,
+      });
+
+      const accumulatorIndexes = filterFromSpy.mock.calls.flatMap(
+        ([config], index) =>
+          config.gl?.name === "replace-mask-accumulate-filter" ? [index] : [],
+      );
+      const accumulators = accumulatorIndexes.map(
+        (index) => filterFromSpy.mock.results[index].value,
+      );
+      const dispatched = animationBus.dispatch.mock.calls[0][0];
+      const overlay = parent.children.find(
+        (child) => child !== nextDisplayObject,
+      );
+      const finalMaskFilter = overlay.children[0].filters[0];
+
+      expect(dispatched.payload.duration).toBe(1000);
+      expect(accumulators).toHaveLength(2);
+      expect(
+        filterFromSpy.mock.calls[accumulatorIndexes[0]][0].gl.fragment,
+      ).toContain("max(accumulated, reveal)");
+      expect(
+        filterFromSpy.mock.calls[accumulatorIndexes[0]][0].gpu.fragment.source,
+      ).toContain("max(accumulated, reveal)");
+      expect(
+        finalMaskFilter.resources.replaceMaskUniforms.uniforms
+          .uMaskDirectReveal,
+      ).toBe(1);
+
+      dispatched.payload.applyFrame(300);
+      expect(
+        accumulators[0].resources.replaceMaskUniforms.uniforms.uProgress,
+      ).toBeCloseTo(0.3);
+      expect(
+        accumulators[0].resources.replaceMaskUniforms.uniforms.uMaskActive,
+      ).toBe(1);
+      expect(
+        accumulators[1].resources.replaceMaskUniforms.uniforms.uProgress,
+      ).toBe(0);
+      expect(
+        accumulators[1].resources.replaceMaskUniforms.uniforms.uMaskActive,
+      ).toBe(0);
+
+      dispatched.payload.applyFrame(700);
+      expect(
+        accumulators[0].resources.replaceMaskUniforms.uniforms.uProgress,
+      ).toBeCloseTo(0.7);
+      expect(
+        accumulators[1].resources.replaceMaskUniforms.uniforms.uProgress,
+      ).toBeCloseTo(0.5);
+      expect(
+        accumulators[1].resources.replaceMaskUniforms.uniforms.uMaskActive,
+      ).toBe(1);
+    } finally {
+      filterFromSpy.mockRestore();
+    }
   });
 
   it("routes single alpha masks through the alpha preprocessing filter", () => {
@@ -2597,15 +2746,17 @@ describe("runReplaceAnimation", () => {
           id: "scene-mask-replace-alpha",
           targetId: "scene-root",
           type: "transition",
-          mask: {
-            kind: "single",
-            texture: maskTexture,
-            channel: "alpha",
-            progress: {
-              initialValue: 0,
-              keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+          mask: [
+            {
+              kind: "single",
+              texture: maskTexture,
+              channel: "alpha",
+              progress: {
+                initialValue: 0,
+                keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+              },
             },
-          },
+          ],
         },
         animations: new Map(),
         animationBus,
@@ -2707,15 +2858,17 @@ describe("runReplaceAnimation", () => {
         id: "scene-mask-replace",
         targetId: "scene-root",
         type: "transition",
-        mask: {
-          kind: "single",
-          texture: maskTexture,
-          channel: "red",
-          progress: {
-            initialValue: 0,
-            keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+        mask: [
+          {
+            kind: "single",
+            texture: maskTexture,
+            channel: "red",
+            progress: {
+              initialValue: 0,
+              keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+            },
           },
-        },
+        ],
       },
       animations: new Map(),
       animationBus,
@@ -2893,15 +3046,17 @@ describe("runReplaceAnimation", () => {
           id: "scene-mask-replace",
           targetId: "scene-root",
           type: "transition",
-          mask: {
-            kind: "single",
-            texture: maskTexture,
-            channel: "red",
-            progress: {
-              initialValue: 0,
-              keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+          mask: [
+            {
+              kind: "single",
+              texture: maskTexture,
+              channel: "red",
+              progress: {
+                initialValue: 0,
+                keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+              },
             },
-          },
+          ],
         },
         animations: new Map(),
         animationBus,
@@ -2995,20 +3150,23 @@ describe("runReplaceAnimation", () => {
         id: "scene-mask-sequence",
         targetId: "scene-root",
         type: "transition",
-        mask: {
-          kind: "sequence",
-          frames: [
-            { at: 0, texture: leftMask },
-            { at: 1, texture: rightMask },
-          ],
-          channel: "alpha",
-          sample: "linear",
-          invert: true,
-          progress: {
-            initialValue: 0,
-            keyframes: [{ duration: 1000, value: 1, easing: "linear" }],
+        mask: [
+          {
+            kind: "sequence",
+            delay: 200,
+            frames: [
+              { at: 0, texture: leftMask },
+              { at: 1, texture: rightMask },
+            ],
+            channel: "alpha",
+            sample: "linear",
+            invert: true,
+            progress: {
+              initialValue: 0,
+              keyframes: [{ duration: 800, value: 1, easing: "linear" }],
+            },
           },
-        },
+        ],
       },
       animations: new Map(),
       animationBus,
@@ -3027,7 +3185,8 @@ describe("runReplaceAnimation", () => {
     const dispatched = animationBus.dispatch.mock.calls[0][0];
 
     expect(app.renderer.extract.pixels).not.toHaveBeenCalled();
-    dispatched.payload.applyFrame(500);
+    expect(dispatched.payload.duration).toBe(1000);
+    dispatched.payload.applyFrame(199);
 
     expect(app.renderer.extract.pixels).not.toHaveBeenCalled();
     const overlay = parent.children.find(
@@ -3038,6 +3197,17 @@ describe("runReplaceAnimation", () => {
     expect(
       maskFilter.resources.replaceMaskUniforms.uniforms.uMaskDirectReveal,
     ).toBe(1);
+    expect(maskFilter.resources.replaceMaskUniforms.uniforms.uMaskActive).toBe(
+      0,
+    );
+
+    dispatched.payload.applyFrame(600);
+    expect(maskFilter.resources.replaceMaskUniforms.uniforms.uMaskActive).toBe(
+      1,
+    );
+    expect(
+      maskFilter.resources.replaceMaskUniforms.uniforms.uProgress,
+    ).toBeCloseTo(0.5);
   });
 
   it("does not flush deferred activation when a transition is cancelled", () => {

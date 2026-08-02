@@ -930,7 +930,7 @@ export const DEFAULT_TEXT_STYLE = {
  * @property {Object & {filters?: Object<string, ShaderTween>}} [tween] - Standard update properties plus filter parameter timelines grouped by filter id
  * @property {Object} [prev] - Previous transition surface motion
  * @property {Object} [next] - Next transition surface motion
- * @property {Object} [mask] - Transition mask configuration
+ * @property {(Object & {delay?: number}) | (Object & {delay?: number})[]} [mask] - One transition mask or an ordered mask array; normalized internally to an array
  * @property {ShaderCompositor} [compositor] - Inline transition compositor effect with co-located parameter timelines
  */
 

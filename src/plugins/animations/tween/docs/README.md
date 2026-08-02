@@ -169,16 +169,17 @@ states:
         targetId: "scene-root"
         type: "transition"
         mask:
-          kind: "single"
-          texture: "masks/spiral-07.png"
-          channel: "red"
-          softness: 0.08
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 900
-                value: 1
-                easing: linear
+          - kind: "single"
+            texture: "masks/spiral-07.png"
+            channel: "red"
+            softness: 0.08
+            delay: 200
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 900
+                  value: 1
+                  easing: linear
 ```
 
 Sequence mask transition:
@@ -198,22 +199,22 @@ states:
         targetId: "scene-root"
         type: "transition"
         mask:
-          kind: "sequence"
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 900
-                value: 1
-                easing: linear
-          sample: "linear"
-          frames:
-            - at: 0
-              texture: "masks/wipe-a.png"
-            - at: 0.5
-              texture: "masks/wipe-b.png"
-            - at: 1
-              texture: "masks/wipe-c.png"
-          channel: "alpha"
+          - kind: "sequence"
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 900
+                  value: 1
+                  easing: linear
+            sample: "linear"
+            frames:
+              - at: 0
+                texture: "masks/wipe-a.png"
+              - at: 0.5
+                texture: "masks/wipe-b.png"
+              - at: 1
+                texture: "masks/wipe-c.png"
+            channel: "alpha"
 ```
 
 For sequence masks, `progress` drives frame selection. The sampled frame value
@@ -223,10 +224,16 @@ frames must start at `0`, end at `1`, and be sorted by unique `at` values.
 Feathering belongs in the frame alpha; `softness` is not valid for sequence
 masks.
 
+`mask` accepts the existing single-object shape or a non-empty array. A single
+object is normalized internally to a one-entry array. Each entry has its own
+progress and optional delay. Entries combine as a per-pixel maximum reveal: the
+strongest mask wins where they overlap, while delayed masks contribute no reveal
+before they start.
+
 ## Current Transition Rules
 
 - `update` is update-only. Integrations should reject `type: update` for enter, exit, and replace paths.
-- `mask` is transition-only.
+- `mask` is transition-only and accepts one object or a non-empty array.
 - a custom shader-backed transition uses an inline `compositor` with
   `compositor.tween.progress` and optional parameter timelines.
 - `prev.tween` and `next.tween` can be combined with `mask`.
