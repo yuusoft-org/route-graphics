@@ -1,17 +1,14 @@
 # Inline Audio Transition Interface
 
-Status: proposed; design-only; not implemented
+Status: implemented
 
 Last updated: 2026-08-02
 
 ## Purpose
 
-This document proposes replacing separately authored `audio-transition`
-records with one inline transition interface on `sound` and `audio-channel`
-nodes.
-
-The proposal is intentionally documentation-only. The current runtime and
-schemas continue to use the `audioEffects` interface documented in
+This document defines the canonical inline transition interface on `sound` and
+`audio-channel` nodes. Separately authored `audio-transition` records remain
+accepted as a legacy compatibility interface documented in
 [`audio-effects.md`](./audio-effects.md).
 
 ## Goals
@@ -30,8 +27,8 @@ schemas continue to use the `audioEffects` interface documented in
 - no second shorthand interface for simple fades
 - no named `fade`, `crossfade`, `hold`, or `offset` operations
 - no transition of boolean switches or source-identity fields
-- no shared multi-target audio timeline in this proposal
-- no implementation or compatibility removal in this pull request
+- no shared multi-target audio timeline in this interface
+- no removal of the legacy compatibility interface in this change
 
 ## Canonical Shape
 
@@ -76,7 +73,7 @@ additional keyframes express advanced behavior through the same interface.
 
 ### Structural Definition
 
-The proposed public structure, expressed as TypeScript-like documentation, is:
+The public structure, expressed as TypeScript-like documentation, is:
 
 ```ts
 type InlineAudioTransition = {
@@ -508,12 +505,12 @@ until the applicable exit tracks and any completable, already-authorized
 `loopEnd` tail have completed. Non-progressing zero-rate tails use the finite
 fallback defined under Exit.
 
-A future audio-specific transition-complete event or explicitly blocking audio
-timeline is outside this proposal.
+An audio-specific transition-complete event or explicitly blocking audio
+timeline is outside this interface.
 
 ## Validation
 
-The future implementation should reject:
+The runtime rejects:
 
 - `transition` that is not a non-empty object
 - unsupported lifecycle phase names
@@ -531,36 +528,11 @@ The future implementation should reject:
 
 ## Compatibility And Migration
 
-When implemented:
-
-1. inline `transition` becomes the canonical public authoring interface
+1. inline `transition` is the canonical public authoring interface
 2. existing `audioEffects` / `audio-transition` input remains accepted for a
    compatibility period
 3. both forms normalize to the same internal property timelines
 4. defining both forms for one target in one state is a validation error
-5. current fixtures migrate to inline syntax while dedicated compatibility
-   tests retain the legacy form
+5. manual fixtures use inline syntax while dedicated compatibility tests retain
+   the legacy form
 6. removal of `audioEffects` requires a separate breaking release
-
-This proposal does not add inline fields to schemas or types yet. Those changes
-belong in the implementation pull request so published validation never claims
-support before the runtime provides it.
-
-## Implementation Requirements For A Later Pull Request
-
-The later implementation must include:
-
-- schema and JSDoc types for inline lifecycle tracks
-- normalization into one internal target-to-transition map
-- shared enter/exit scheduling time for ready replacement instances
-- pending-decode enter scheduling that does not delay outgoing teardown
-- per-property cancellation of pending enter tracks superseded by updates
-- keyframe-delay support in audio parameter automation
-- current-value hold on interruption
-- cleanup after both the longest exit track and any completable `loopEnd` tail
-- full-timeline boundary calculation and finite fallback for zero-rate tails
-- conflict validation against legacy `audioEffects`
-- unit tests for normalization and timing
-- audio-stage tests for enter, deferred-enter updates, exit, interruption,
-  replacement, and zero-rate loop-end resumption
-- manual audio fixtures for immediate, delayed, and full-volume overlap

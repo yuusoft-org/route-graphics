@@ -16,44 +16,37 @@ states:
       - id: music
         type: audio-channel
         pan: 1
+        transition:
+          enter:
+            pan:
+              initialValue: -1
+              keyframes:
+                - { value: 1, duration: 3000, easing: linear }
         children:
           - id: channel-pan-transition-bgm
             type: sound
             src: bgm-1
             loop: true
             volume: 80
-    audioEffects:
-      - id: channel-pan-enter
-        type: audio-transition
-        targetId: music
-        properties:
-          pan:
-            enter:
-              initialValue: -1
-              keyframes:
-                - { value: 1, duration: 3000, easing: linear }
   - id: channel-pan-transition-update
     audio:
       - id: music
         type: audio-channel
         pan: -1
+        transition:
+          update:
+            pan:
+              keyframes:
+                - { value: -1, duration: 3000, easing: linear }
+          exit:
+            pan:
+              keyframes:
+                - { value: 1, duration: 2000, easing: linear }
         children:
           - id: channel-pan-transition-bgm
             type: sound
             src: bgm-1
             loop: true
             volume: 80
-    audioEffects:
-      - id: channel-pan-update-exit
-        type: audio-transition
-        targetId: music
-        properties:
-          pan:
-            update:
-              keyframes:
-                - { value: -1, duration: 3000, easing: linear }
-            exit:
-              keyframes:
-                - { value: 1, duration: 2000, easing: linear }
   - id: channel-pan-transition-exit
     audio: []
