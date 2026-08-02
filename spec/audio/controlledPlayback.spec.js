@@ -1255,6 +1255,15 @@ describe("command-controlled sound playback", () => {
       },
     });
     expect(instance.pendingEnterTransitions).not.toBeNull();
+    expect(
+      instance.gainNode.gain.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
+    expect(
+      instance.pannerNode.pan.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
+    expect(
+      context.sources[0].playbackRate.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
 
     context.currentTime = 11;
     render([sound(2)]);
@@ -1283,6 +1292,95 @@ describe("command-controlled sound playback", () => {
     expect(
       context.sources[1].playbackRate.linearRampToValueAtTime,
     ).toHaveBeenLastCalledWith(2, 11.5);
+  });
+
+  it("does not let a failed enter attempt influence an intervening property update", async () => {
+    let startAttempts = 0;
+    const { context, render, stage } = await setupControlledStage({
+      contextOptions: {
+        startImpl: () => {
+          startAttempts += 1;
+          if (startAttempts === 1) {
+            throw new Error("browser start failure");
+          }
+        },
+      },
+    });
+    const initial = playbackSound({
+      commandId: 1,
+      operation: "play",
+      positionMs: 0,
+      volume: 80,
+      pan: 0.5,
+      playbackRate: 2,
+      transition: {
+        enter: {
+          volume: {
+            initialValue: 0,
+            keyframes: [{ value: 80, duration: 500 }],
+          },
+          pan: {
+            initialValue: -1,
+            keyframes: [{ value: 0.5, duration: 500 }],
+          },
+          playbackRate: {
+            initialValue: 0.5,
+            keyframes: [{ value: 2, duration: 500 }],
+          },
+        },
+      },
+    });
+    const updated = (commandId) =>
+      playbackSound({
+        commandId,
+        operation: "play",
+        positionMs: 0,
+        volume: 40,
+        pan: 0,
+        playbackRate: 1,
+        transition: {
+          update: {
+            volume: { keyframes: [{ value: 40, duration: 500 }] },
+            pan: { keyframes: [{ value: 0, duration: 500 }] },
+            playbackRate: { keyframes: [{ value: 1, duration: 500 }] },
+          },
+        },
+      });
+
+    render([initial]);
+    await flushMicrotasks();
+    const currentKey = stage._inspect().currentSoundKeyById.get("player");
+    const instance = stage._inspect().sounds.get(currentKey);
+
+    context.currentTime = 10.25;
+    render([updated(1)]);
+
+    expect(instance.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.8,
+      10.25,
+    );
+    expect(instance.pannerNode.pan.setValueAtTime).toHaveBeenLastCalledWith(
+      0.5,
+      10.25,
+    );
+    expect(instance.pendingEnterTransitions).toEqual({
+      volume: null,
+      pan: null,
+      playbackRate: null,
+    });
+
+    context.currentTime = 10.5;
+    render([updated(2)]);
+    await flushMicrotasks();
+
+    expect(startAttempts).toBe(2);
+    expect(instance.pendingEnterTransitions).toBeNull();
+    expect(
+      context.sources[1].playbackRate.setValueAtTime,
+    ).toHaveBeenLastCalledWith(1.5, 10.5);
+    expect(
+      context.sources[1].playbackRate.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(1, 10.75);
   });
 
   it("starts a replacement enter after pending decode without delaying outgoing exit", async () => {

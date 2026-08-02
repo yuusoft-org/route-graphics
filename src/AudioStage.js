@@ -871,11 +871,6 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   source.buffer = audioBuffer;
   source.loop = sound.loop ?? false;
 
-  const pendingEnterTransitions = applyPendingSoundEnterTransitions(
-    sound,
-    source,
-  );
-
   connect(source, sound.gainNode);
 
   sound.sourceEnded = false;
@@ -906,6 +901,10 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   } else {
     source.start(startTime, offset);
   }
+  const pendingEnterTransitions = applyPendingSoundEnterTransitions(
+    sound,
+    source,
+  );
   consumePendingSoundEnterTransitions(sound, pendingEnterTransitions);
   debugAudio("source started", {
     id: sound.id,
@@ -1468,11 +1467,6 @@ export const createAudioStage = () => {
     const source = context.createBufferSource();
     source.buffer = control.decodedBuffer;
     configureControlledLoop(instance, source);
-
-    const pendingEnterTransitions = applyPendingSoundEnterTransitions(
-      instance,
-      source,
-    );
     connect(source, instance.gainNode);
 
     const sourceToken = control.sourceToken + 1;
@@ -1544,6 +1538,10 @@ export const createAudioStage = () => {
       disconnect(source);
       throw error;
     }
+    const pendingEnterTransitions = applyPendingSoundEnterTransitions(
+      instance,
+      source,
+    );
     consumePendingSoundEnterTransitions(instance, pendingEnterTransitions);
 
     return source;
