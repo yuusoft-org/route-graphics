@@ -1099,74 +1099,178 @@ describe("animationBus auto tween shorthand", () => {
     expect(animationBus.getState().activeCount).toBe(0);
   });
 
-  it("completes and disposes an update that reaches the reverse boundary", () => {
+  it.each([1, 40, 99])(
+    "completes and disposes a custom update reversed from %d ms",
+    (reverseAt) => {
+      const animationBus = createAnimationBus();
+      const applyFrame = vi.fn();
+      const onComplete = vi.fn();
+      const onReverseComplete = vi.fn();
+      const dispose = vi.fn();
+      const reverseCompleted = vi.fn();
+      animationBus.on("reverseCompleted", reverseCompleted);
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: "reverse-update",
+          driver: "custom",
+          animationType: "update",
+          duration: 100,
+          applyFrame,
+          onComplete,
+          onReverseComplete,
+          dispose,
+        },
+      });
+      animationBus.flush();
+      animationBus.tick(reverseAt);
+
+      expect(animationBus.reverse("reverse-update")).toBe(true);
+      animationBus.tick(reverseAt);
+
+      expect(applyFrame).toHaveBeenLastCalledWith(0);
+      expect(reverseCompleted).toHaveBeenCalledWith({ id: "reverse-update" });
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onReverseComplete).toHaveBeenCalledTimes(1);
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+    },
+  );
+
+  it("keeps a property animation on its zero-time frame at reverse completion", () => {
     const animationBus = createAnimationBus();
-    const applyFrame = vi.fn();
-    const onComplete = vi.fn();
+    const element = { x: 0, scale: { x: 1, y: 1 } };
+    const onComplete = vi.fn(() => {
+      element.x = 100;
+    });
     const onReverseComplete = vi.fn();
-    const dispose = vi.fn();
-    const reverseCompleted = vi.fn();
-    animationBus.on("reverseCompleted", reverseCompleted);
 
     animationBus.dispatch({
       type: "START",
       payload: {
-        id: "reverse-update",
+        id: "reverse-property-update",
+        animationType: "update",
+        element,
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ value: 100, duration: 100, easing: "linear" }],
+          },
+        },
+        onComplete,
+        onReverseComplete,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(75);
+    expect(element.x).toBe(75);
+
+    expect(animationBus.reverse("reverse-property-update")).toBe(true);
+    animationBus.tick(75);
+
+    expect(element.x).toBe(0);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onReverseComplete).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it("still disposes reverse-completed animations when their callback throws", () => {
+    const animationBus = createAnimationBus();
+    const dispose = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "throwing-reverse-completion",
         driver: "custom",
         animationType: "update",
         duration: 100,
-        applyFrame,
-        onComplete,
-        onReverseComplete,
+        onReverseComplete: () => {
+          throw new Error("consumer callback failed");
+        },
         dispose,
       },
     });
     animationBus.flush();
-    animationBus.tick(40);
+    animationBus.tick(25);
+    animationBus.reverse("throwing-reverse-completion");
 
-    expect(animationBus.reverse("reverse-update")).toBe(true);
-    animationBus.tick(40);
-
-    expect(applyFrame).toHaveBeenLastCalledWith(0);
-    expect(reverseCompleted).toHaveBeenCalledWith({ id: "reverse-update" });
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(onReverseComplete).toHaveBeenCalledTimes(1);
+    expect(() => animationBus.tick(25)).not.toThrow();
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(animationBus.getState().activeCount).toBe(0);
   });
 
-  it("clears deferred terminal completion when seeking away from the end", () => {
+  it.each([
+    ["seek", (bus, id) => bus.seek(id, 40)],
+    ["progress", (bus, id) => bus.setProgress(id, 0.4)],
+  ])(
+    "clears deferred terminal completion when moving away with %s",
+    (_control, moveAway) => {
+      const animationBus = createAnimationBus();
+      const applyFrame = vi.fn();
+      const onComplete = vi.fn();
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: "seek-deferred-transition",
+          driver: "custom",
+          animationType: "transition",
+          duration: 100,
+          deferCompletionUntilNextFrame: true,
+          applyFrame,
+          onComplete,
+        },
+      });
+      animationBus.flush();
+      animationBus.tick(100);
+
+      expect(animationBus.getState().animations[0]).toMatchObject({
+        currentTime: 100,
+      });
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(moveAway(animationBus, "seek-deferred-transition")).toBe(true);
+      animationBus.tick(10);
+
+      expect(animationBus.getState().animations[0]).toMatchObject({
+        currentTime: 50,
+      });
+      expect(applyFrame).toHaveBeenLastCalledWith(50);
+      expect(onComplete).not.toHaveBeenCalled();
+
+      animationBus.tick(50);
+      expect(onComplete).not.toHaveBeenCalled();
+      animationBus.tick(0);
+      expect(onComplete).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+    },
+  );
+
+  it("preserves deferred completion when seeking to the terminal frame", () => {
     const animationBus = createAnimationBus();
-    const applyFrame = vi.fn();
     const onComplete = vi.fn();
 
     animationBus.dispatch({
       type: "START",
       payload: {
-        id: "seek-deferred-transition",
+        id: "seek-terminal-transition",
         driver: "custom",
         animationType: "transition",
         duration: 100,
         deferCompletionUntilNextFrame: true,
-        applyFrame,
         onComplete,
       },
     });
     animationBus.flush();
     animationBus.tick(100);
 
-    expect(animationBus.getState().animations[0]).toMatchObject({
-      currentTime: 100,
-    });
+    expect(animationBus.seek("seek-terminal-transition", 100)).toBe(true);
     expect(onComplete).not.toHaveBeenCalled();
-    expect(animationBus.seek("seek-deferred-transition", 40)).toBe(true);
-    animationBus.tick(10);
+    animationBus.tick(0);
 
-    expect(animationBus.getState().animations[0]).toMatchObject({
-      currentTime: 50,
-    });
-    expect(applyFrame).toHaveBeenLastCalledWith(50);
-    expect(onComplete).not.toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
   });
 
   it("rejects player-controlled reverse for transitions without mutating playback", () => {

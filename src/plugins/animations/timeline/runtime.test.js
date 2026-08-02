@@ -494,9 +494,141 @@ describe("TimelineProgram binder and pure evaluator", () => {
     },
   );
 
-  it("allows overwrite error clips that remain disjoint across repeat gaps", () => {
+  it.each([
+    {
+      name: "third occurrence after repeat delays",
+      repeatedStep: {
+        kind: "to",
+        values: { x: 100 },
+        duration: 50,
+        repeat: 2,
+        repeatDelay: 50,
+      },
+      conflictStart: 225,
+    },
+    {
+      name: "speed-scaled second occurrence",
+      repeatedStep: {
+        kind: "to",
+        values: { x: 100 },
+        duration: 100,
+        repeat: 1,
+        speed: 2,
+      },
+      conflictStart: 75,
+    },
+    {
+      name: "repeated containing sequence",
+      repeatedStep: {
+        kind: "sequence",
+        repeat: 1,
+        steps: [
+          { kind: "to", values: { x: 100 }, duration: 50 },
+          { kind: "wait", duration: 50 },
+        ],
+      },
+      conflictStart: 125,
+    },
+    {
+      name: "nested child and parent repeats",
+      repeatedStep: {
+        kind: "sequence",
+        repeat: 1,
+        steps: [
+          {
+            kind: "to",
+            values: { x: 100 },
+            duration: 25,
+            repeat: 1,
+            repeatDelay: 25,
+          },
+          { kind: "wait", duration: 25 },
+        ],
+      },
+      conflictStart: 160,
+    },
+  ])(
+    "rejects overwrite error conflicts in $name",
+    ({ name, repeatedStep, conflictStart }) => {
+      const program = compilePortableGsapAnimation({
+        id: `occurrence-overwrite-${name.replaceAll(" ", "-")}`,
+        targetId: "hero",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            repeatedStep,
+            {
+              kind: "to",
+              values: { x: 200 },
+              duration: 10,
+              start: { time: conflictStart },
+              overwrite: "error",
+            },
+          ],
+        },
+      });
+
+      expect(() =>
+        bindTimelineProgram(program, {
+          capabilities: new Set(program.requirements),
+          targetRegistry: {
+            hero: { handle: { x: 0 }, identity: "hero" },
+          },
+          channelRegistry: { "transform.x": makeAdapter("x") },
+        }),
+      ).toThrow(/steps\[1\].*steps\[0\].*transform\.x/);
+    },
+  );
+
+  it("fails closed when overwrite disjointness depends on an infinite domain", () => {
     const program = compilePortableGsapAnimation({
-      id: "repeat-gap-disjoint",
+      id: "infinite-overwrite-error",
+      targetId: "hero",
+      type: "update",
+      gsap: {
+        profile: "portable-v1",
+        steps: [
+          {
+            kind: "parallel",
+            steps: [
+              {
+                kind: "to",
+                values: { x: 100 },
+                duration: 50,
+                repeat: "infinite",
+                repeatDelay: 50,
+              },
+              {
+                kind: "to",
+                values: { x: 200 },
+                duration: 10,
+                start: { time: 75 },
+                overwrite: "error",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(() =>
+      bindTimelineProgram(program, {
+        capabilities: new Set(program.requirements),
+        targetRegistry: {
+          hero: { handle: { x: 0 }, identity: "hero" },
+        },
+        channelRegistry: { "transform.x": makeAdapter("x") },
+      }),
+    ).toThrow(/cannot prove disjointness.*infinite/i);
+  });
+
+  it.each([
+    ["exact occurrence boundary", 50],
+    ["middle of repeat gap", 75],
+  ])("allows overwrite error clips at a disjoint %s", (name, start) => {
+    const program = compilePortableGsapAnimation({
+      id: `repeat-gap-disjoint-${name.replaceAll(" ", "-")}`,
       targetId: "hero",
       type: "update",
       gsap: {
@@ -512,8 +644,8 @@ describe("TimelineProgram binder and pure evaluator", () => {
           {
             kind: "to",
             values: { x: 20 },
-            duration: 50,
-            start: { time: 50 },
+            duration: name === "exact occurrence boundary" ? 50 : 25,
+            start: { time: start },
             overwrite: "error",
           },
         ],
