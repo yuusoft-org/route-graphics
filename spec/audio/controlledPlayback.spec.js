@@ -1383,6 +1383,109 @@ describe("command-controlled sound playback", () => {
     ).toHaveBeenLastCalledWith(1, 10.75);
   });
 
+  it("supersedes only changed enter tracks after a failed source start", async () => {
+    let startAttempts = 0;
+    const { context, render, stage } = await setupControlledStage({
+      contextOptions: {
+        startImpl: () => {
+          startAttempts += 1;
+          if (startAttempts === 1) {
+            throw new Error("browser start failure");
+          }
+        },
+      },
+    });
+    const initial = playbackSound({
+      commandId: 1,
+      operation: "play",
+      positionMs: 0,
+      volume: 80,
+      pan: 0.5,
+      playbackRate: 2,
+      transition: {
+        enter: {
+          volume: {
+            initialValue: 0,
+            keyframes: [{ value: 80, duration: 500 }],
+          },
+          pan: {
+            initialValue: -1,
+            keyframes: [{ value: 0.5, duration: 500 }],
+          },
+          playbackRate: {
+            initialValue: 0.5,
+            keyframes: [{ value: 2, duration: 500 }],
+          },
+        },
+      },
+    });
+    const updated = (commandId) =>
+      playbackSound({
+        commandId,
+        operation: "play",
+        positionMs: 0,
+        volume: 40,
+        pan: 0.5,
+        playbackRate: 2,
+        transition: {
+          update: {
+            volume: { keyframes: [{ value: 40, duration: 500 }] },
+          },
+        },
+      });
+
+    render([initial]);
+    await flushMicrotasks();
+    const currentKey = stage._inspect().currentSoundKeyById.get("player");
+    const instance = stage._inspect().sounds.get(currentKey);
+
+    context.currentTime = 10.25;
+    render([updated(1)]);
+
+    expect(instance.pendingEnterTransitions).toEqual({
+      volume: null,
+      pan: initial.transition.enter.pan,
+      playbackRate: initial.transition.enter.playbackRate,
+    });
+    expect(instance.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.8,
+      10.25,
+    );
+    expect(
+      instance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(0.4, 10.75);
+    const volumeSetCount =
+      instance.gainNode.gain.setValueAtTime.mock.calls.length;
+    const volumeRampCount =
+      instance.gainNode.gain.linearRampToValueAtTime.mock.calls.length;
+
+    context.currentTime = 10.5;
+    render([updated(2)]);
+    await flushMicrotasks();
+
+    expect(startAttempts).toBe(2);
+    expect(instance.pendingEnterTransitions).toBeNull();
+    expect(instance.gainNode.gain.setValueAtTime).toHaveBeenCalledTimes(
+      volumeSetCount,
+    );
+    expect(
+      instance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenCalledTimes(volumeRampCount);
+    expect(instance.pannerNode.pan.setValueAtTime).toHaveBeenLastCalledWith(
+      -1,
+      10.5,
+    );
+    expect(
+      instance.pannerNode.pan.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(0.5, 11);
+    expect(
+      context.sources[1].playbackRate.setValueAtTime,
+    ).toHaveBeenLastCalledWith(0.5, 10.5);
+    expect(
+      context.sources[1].playbackRate.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(2, 11);
+  });
+
   it("starts a replacement enter after pending decode without delaying outgoing exit", async () => {
     let resolveDecode;
     const decodePromise = new Promise((resolve) => {

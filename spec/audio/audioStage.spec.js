@@ -35,6 +35,7 @@ const createAudioParam = (
 const createAudioContextMock = ({
   decodedBuffer = { duration: 1 },
   reflectScheduledAudioParamValue = true,
+  startImpl,
   supportCancelAndHold = true,
   supportStereoPanner = true,
 } = {}) => {
@@ -81,7 +82,7 @@ const createAudioContextMock = ({
         playbackRate: createAudioParam(1, audioParamOptions),
         connect: vi.fn(),
         disconnect: vi.fn(),
-        start: vi.fn(),
+        start: vi.fn(startImpl),
         stop: vi.fn(),
       };
       context.sources.push(node);
@@ -2492,6 +2493,165 @@ describe("AudioStage graph rendering", () => {
     expect(source.stop).toHaveBeenCalledWith(11.25);
   });
 
+  it("composes inline channel and sound enter tracks on independent gain nodes", async () => {
+    const { stage, context } = await setupAudioStage();
+
+    stage.renderGraph({
+      nextAudio: [
+        {
+          id: "music",
+          type: "audio-channel",
+          volume: 50,
+          transition: {
+            enter: {
+              volume: {
+                initialValue: 0,
+                keyframes: [{ value: 50, duration: 1000 }],
+              },
+            },
+          },
+          children: [
+            {
+              id: "bgm",
+              type: "sound",
+              src: "theme",
+              volume: 80,
+              transition: {
+                enter: {
+                  volume: {
+                    initialValue: 0,
+                    keyframes: [{ value: 80, duration: 500 }],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const channel = stage._inspect().channels.get("music");
+    const sound = findCurrentSound(stage, "bgm");
+    expect(channel.gainNode).not.toBe(sound.gainNode);
+    expect(channel.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0,
+      10,
+    );
+    expect(channel.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0.5,
+      11,
+    );
+    expect(sound.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10);
+    expect(sound.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0.8,
+      10.5,
+    );
+    expect(context.sources[0].start).toHaveBeenCalledWith(10, 0);
+  });
+
+  it("does not restart automation when only an inline transition declaration changes", async () => {
+    const { stage, context } = await setupAudioStage();
+    const firstAudio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "theme",
+        volume: 80,
+        transition: {
+          enter: {
+            volume: {
+              initialValue: 0,
+              keyframes: [{ value: 80, duration: 1000 }],
+            },
+          },
+        },
+      },
+    ];
+    const secondAudio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "theme",
+        volume: 80,
+        transition: {
+          update: {
+            volume: {
+              keyframes: [{ value: 80, duration: 250 }],
+            },
+          },
+        },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: firstAudio });
+    const sound = findCurrentSound(stage, "bgm");
+    const gain = sound.gainNode.gain;
+    const cancelCount = gain.cancelScheduledValues.mock.calls.length;
+    const holdCount = gain.cancelAndHoldAtTime.mock.calls.length;
+    const setCount = gain.setValueAtTime.mock.calls.length;
+    const rampCount = gain.linearRampToValueAtTime.mock.calls.length;
+
+    context.currentTime = 10.25;
+    stage.renderGraph({ prevAudio: firstAudio, nextAudio: secondAudio });
+
+    expect(context.sources).toHaveLength(1);
+    expect(gain.cancelScheduledValues).toHaveBeenCalledTimes(cancelCount);
+    expect(gain.cancelAndHoldAtTime).toHaveBeenCalledTimes(holdCount);
+    expect(gain.setValueAtTime).toHaveBeenCalledTimes(setCount);
+    expect(gain.linearRampToValueAtTime).toHaveBeenCalledTimes(rampCount);
+    expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.8, 11);
+  });
+
+  it("waits for the longest delayed inline exit track before cleanup", async () => {
+    const { stage, context } = await setupAudioStage();
+    const audio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "theme",
+        volume: 100,
+        pan: 0,
+        playbackRate: 1,
+        transition: {
+          exit: {
+            volume: {
+              keyframes: [{ delay: 200, value: 0, duration: 300 }],
+            },
+            pan: {
+              keyframes: [{ delay: 100, value: 1, duration: 800 }],
+            },
+            playbackRate: {
+              keyframes: [{ delay: 300, value: 0.5, duration: 400 }],
+            },
+          },
+        },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: audio });
+    const sound = findCurrentSound(stage, "bgm");
+    const source = context.sources[0];
+    stage.renderGraph({ prevAudio: audio, nextAudio: [] });
+
+    expect(sound.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0,
+      10.5,
+    );
+    expect(sound.pannerNode.pan.linearRampToValueAtTime).toHaveBeenCalledWith(
+      1,
+      10.9,
+    );
+    expect(source.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0.5,
+      10.7,
+    );
+    expect(source.stop).toHaveBeenCalledWith(10.9);
+    vi.advanceTimersByTime(899);
+    expect(findSound(stage, "bgm")).toBe(sound);
+    vi.advanceTimersByTime(1);
+    expect(findSound(stage, "bgm")).toBeUndefined();
+  });
+
   it("crossfades replacement instances with independent inline enter and exit delays", async () => {
     const { stage, context } = await setupAudioStage({
       assetMap: new Map([
@@ -2614,6 +2774,55 @@ describe("AudioStage graph rendering", () => {
       1,
       12,
     );
+  });
+
+  it("does not apply inline enter tracks when declarative source start fails", async () => {
+    const { stage, context } = await setupAudioStage({
+      contextOptions: {
+        startImpl: () => {
+          throw new Error("browser start failure");
+        },
+      },
+    });
+
+    expect(() =>
+      stage.renderGraph({
+        nextAudio: [
+          {
+            id: "bgm",
+            type: "sound",
+            src: "theme",
+            volume: 80,
+            pan: 0.5,
+            playbackRate: 2,
+            transition: {
+              enter: {
+                volume: {
+                  initialValue: 0,
+                  keyframes: [{ value: 80, duration: 500 }],
+                },
+                pan: {
+                  initialValue: -1,
+                  keyframes: [{ value: 0.5, duration: 500 }],
+                },
+                playbackRate: {
+                  initialValue: 0.5,
+                  keyframes: [{ value: 2, duration: 500 }],
+                },
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrow("browser start failure");
+
+    const sound = findCurrentSound(stage, "bgm");
+    expect(sound.pendingEnterTransitions).not.toBeNull();
+    expect(sound.gainNode.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+    expect(sound.pannerNode.pan.linearRampToValueAtTime).not.toHaveBeenCalled();
+    expect(
+      context.sources[0].playbackRate.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
   });
 
   it("supersedes only changed pending enter properties before delayed playback", async () => {
