@@ -1,0 +1,77 @@
+---
+title: GSAP Infinite Descendant Settlement
+description: An infinite owner timeline targeting a descendant binds relative motion from the descendant's live pre-reconciliation value.
+specs:
+  - the descendant should begin its first iteration from the live x 100 base
+  - the infinite timeline should wrap to the descendant's live base after 400ms
+  - the next iteration should repeat without flashing to the authored target-state x 900 base
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 100
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 100
+  - action: screenshot
+---
+states:
+  - id: infinite-descendant-base
+    elements:
+      - id: infinite-descendant-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: infinite-descendant-target
+            type: rect
+            x: 100
+            "y": 260
+            width: 160
+            height: 160
+            fill: "#70E1A1"
+  - id: infinite-descendant-loop
+    elements:
+      - id: infinite-descendant-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: infinite-descendant-target
+            type: rect
+            x: 900
+            "y": 260
+            width: 160
+            height: 160
+            fill: "#70E1A1"
+    animations:
+      - id: infinite-descendant-motion
+        targetId: infinite-descendant-root
+        type: update
+        playback:
+          repeat: infinite
+        gsap:
+          profile: portable-v1
+          targets:
+            child: { element: infinite-descendant-target }
+          steps:
+            - kind: to
+              targets: child
+              values: { x: { by: 400 } }
+              duration: 400
+              easing: linear

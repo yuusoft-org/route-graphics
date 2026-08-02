@@ -1387,6 +1387,51 @@ const createRouteGraphics = () => {
       }
     },
 
+    pauseAnimation: (animationId) => animationBus.pause(animationId),
+
+    resumeAnimation: (animationId) => animationBus.resume(animationId),
+
+    reverseAnimation: (animationId, enabled = true) =>
+      animationBus.reverse(animationId, enabled),
+
+    setAnimationDirection: (animationId, direction) => {
+      if (direction !== "forward" && direction !== "reverse") {
+        throw new Error(
+          'Animation direction must be either "forward" or "reverse".',
+        );
+      }
+      return animationBus.reverse(animationId, direction === "reverse");
+    },
+
+    seekAnimation: (animationId, timeMS, options) => {
+      const didSeek = animationBus.seek(animationId, timeMS, options);
+      if (didSeek && typeof app.render === "function") {
+        app.render();
+      }
+      return didSeek;
+    },
+
+    setAnimationProgress: (animationId, progress, options) => {
+      const didSeek = animationBus.setProgress(animationId, progress, options);
+      if (didSeek && typeof app.render === "function") {
+        app.render();
+      }
+      return didSeek;
+    },
+
+    setAnimationSpeed: (animationId, speed) =>
+      animationBus.setSpeed(animationId, speed),
+
+    getAnimationState: (animationId) => {
+      const animationState = animationBus.getState();
+      if (animationId === undefined) return animationState;
+      return (
+        animationState.animations.find(
+          (animation) => animation.id === animationId,
+        ) ?? null
+      );
+    },
+
     /**
      *
      * @param {RouteGraphicsInitOptions} options
@@ -1545,6 +1590,9 @@ const createRouteGraphics = () => {
         animationBus.on("started", renderManualFrame),
         animationBus.on("completed", renderManualFrame),
         animationBus.on("cancelled", renderManualFrame),
+        animationBus.on("timelineEvent", (timelineEvent) => {
+          eventHandler?.("timelineEvent", timelineEvent);
+        }),
       ];
       if (!debug) {
         frameTickerListener = (time) => {

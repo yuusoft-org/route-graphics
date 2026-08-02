@@ -1,0 +1,85 @@
+---
+title: GSAP Descendant Cancellation Settlement
+description: Canceling an owner animation settles descendant aliases from the authored next subtree even when the following logical state is unchanged.
+specs:
+  - the descendant should begin at its committed x 500 position
+  - the finite from animation should place the descendant at x 300 halfway through
+  - navigating to an unchanged descendant state should cancel and settle it at x 500
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: keypress
+    key: "n"
+  - action: screenshot
+---
+states:
+  - id: descendant-cancel-base
+    elements:
+      - id: cancel-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: cancel-child
+            type: rect
+            x: 500
+            "y": 280
+            width: 160
+            height: 160
+            fill: "#FFFFFF"
+  - id: descendant-cancel-active
+    elements:
+      - id: cancel-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: cancel-child
+            type: rect
+            x: 500
+            "y": 280
+            width: 160
+            height: 160
+            fill: "#FFFFFF"
+    animations:
+      - id: descendant-cancel-motion
+        targetId: cancel-root
+        type: update
+        gsap:
+          profile: portable-v1
+          targets:
+            child: { element: cancel-child }
+          steps:
+            - kind: from
+              targets: child
+              values: { x: 100 }
+              duration: 400
+              easing: linear
+  - id: descendant-cancel-settled
+    elements:
+      - id: cancel-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: cancel-child
+            type: rect
+            x: 500
+            "y": 280
+            width: 160
+            height: 160
+            fill: "#FFFFFF"

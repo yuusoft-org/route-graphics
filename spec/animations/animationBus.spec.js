@@ -252,6 +252,92 @@ describe("animationBus auto tween shorthand", () => {
     expect(onBusComplete).not.toHaveBeenCalled();
   });
 
+  it("preserves the occupied duration of a finitely repeated no-op auto tween", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "auto-noop-repeat",
+        repeat: 1,
+        repeatDelay: 50,
+        element,
+        properties: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 20 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    expect(animationBus.getState()).toMatchObject({
+      activeCount: 1,
+      animations: [
+        expect.objectContaining({
+          id: "auto-noop-repeat",
+          duration: 300,
+        }),
+      ],
+    });
+
+    animationBus.tick(649);
+    expect(animationBus.getState().activeCount).toBe(1);
+    expect(element.x).toBe(20);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    animationBus.tick(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an infinitely repeated no-op auto tween active", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const element = {
+      x: 20,
+      scale: { x: 1, y: 1 },
+    };
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "auto-noop-infinite-repeat",
+        repeat: "infinite",
+        repeatDelay: 50,
+        element,
+        properties: {
+          x: {
+            auto: {
+              duration: 300,
+              easing: "linear",
+            },
+          },
+        },
+        targetState: { x: 20 },
+        onComplete,
+      },
+    });
+
+    animationBus.flush();
+    animationBus.tick(10_000);
+
+    expect(animationBus.getState().activeCount).toBe(1);
+    expect(animationBus.getState().animations[0].duration).toBe(300);
+    expect(element.x).toBe(20);
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
   it("throws when auto tween cannot resolve a targetState value", () => {
     const animationBus = createAnimationBus();
 
@@ -1013,6 +1099,206 @@ describe("animationBus auto tween shorthand", () => {
     expect(animationBus.getState().activeCount).toBe(0);
   });
 
+  it.each([1, 40, 99])(
+    "completes and disposes a custom update reversed from %d ms",
+    (reverseAt) => {
+      const animationBus = createAnimationBus();
+      const applyFrame = vi.fn();
+      const onComplete = vi.fn();
+      const onReverseComplete = vi.fn();
+      const dispose = vi.fn();
+      const reverseCompleted = vi.fn();
+      animationBus.on("reverseCompleted", reverseCompleted);
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: "reverse-update",
+          driver: "custom",
+          animationType: "update",
+          duration: 100,
+          applyFrame,
+          onComplete,
+          onReverseComplete,
+          dispose,
+        },
+      });
+      animationBus.flush();
+      animationBus.tick(reverseAt);
+
+      expect(animationBus.reverse("reverse-update")).toBe(true);
+      animationBus.tick(reverseAt);
+
+      expect(applyFrame).toHaveBeenLastCalledWith(0);
+      expect(reverseCompleted).toHaveBeenCalledWith({ id: "reverse-update" });
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onReverseComplete).toHaveBeenCalledTimes(1);
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+    },
+  );
+
+  it("keeps a property animation on its zero-time frame at reverse completion", () => {
+    const animationBus = createAnimationBus();
+    const element = { x: 0, scale: { x: 1, y: 1 } };
+    const onComplete = vi.fn(() => {
+      element.x = 100;
+    });
+    const onReverseComplete = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "reverse-property-update",
+        animationType: "update",
+        element,
+        properties: {
+          x: {
+            initialValue: 0,
+            keyframes: [{ value: 100, duration: 100, easing: "linear" }],
+          },
+        },
+        onComplete,
+        onReverseComplete,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(75);
+    expect(element.x).toBe(75);
+
+    expect(animationBus.reverse("reverse-property-update")).toBe(true);
+    animationBus.tick(75);
+
+    expect(element.x).toBe(0);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onReverseComplete).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it("still disposes reverse-completed animations when their callback throws", () => {
+    const animationBus = createAnimationBus();
+    const dispose = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "throwing-reverse-completion",
+        driver: "custom",
+        animationType: "update",
+        duration: 100,
+        onReverseComplete: () => {
+          throw new Error("consumer callback failed");
+        },
+        dispose,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(25);
+    animationBus.reverse("throwing-reverse-completion");
+
+    expect(() => animationBus.tick(25)).not.toThrow();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it.each([
+    ["seek", (bus, id) => bus.seek(id, 40)],
+    ["progress", (bus, id) => bus.setProgress(id, 0.4)],
+  ])(
+    "clears deferred terminal completion when moving away with %s",
+    (_control, moveAway) => {
+      const animationBus = createAnimationBus();
+      const applyFrame = vi.fn();
+      const onComplete = vi.fn();
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: "seek-deferred-transition",
+          driver: "custom",
+          animationType: "transition",
+          duration: 100,
+          deferCompletionUntilNextFrame: true,
+          applyFrame,
+          onComplete,
+        },
+      });
+      animationBus.flush();
+      animationBus.tick(100);
+
+      expect(animationBus.getState().animations[0]).toMatchObject({
+        currentTime: 100,
+      });
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(moveAway(animationBus, "seek-deferred-transition")).toBe(true);
+      animationBus.tick(10);
+
+      expect(animationBus.getState().animations[0]).toMatchObject({
+        currentTime: 50,
+      });
+      expect(applyFrame).toHaveBeenLastCalledWith(50);
+      expect(onComplete).not.toHaveBeenCalled();
+
+      animationBus.tick(50);
+      expect(onComplete).not.toHaveBeenCalled();
+      animationBus.tick(0);
+      expect(onComplete).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+    },
+  );
+
+  it("preserves deferred completion when seeking to the terminal frame", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "seek-terminal-transition",
+        driver: "custom",
+        animationType: "transition",
+        duration: 100,
+        deferCompletionUntilNextFrame: true,
+        onComplete,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(100);
+
+    expect(animationBus.seek("seek-terminal-transition", 100)).toBe(true);
+    expect(onComplete).not.toHaveBeenCalled();
+    animationBus.tick(0);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it("rejects player-controlled reverse for transitions without mutating playback", () => {
+    const animationBus = createAnimationBus();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "forward-only-transition",
+        driver: "custom",
+        animationType: "transition",
+        duration: 100,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(25);
+
+    expect(animationBus.reverse("forward-only-transition", false)).toBe(true);
+    expect(() => animationBus.reverse("forward-only-transition")).toThrow(
+      'Transition animation "forward-only-transition" does not support player-controlled reverse playback.',
+    );
+    expect(animationBus.getState().animations[0]).toMatchObject({
+      currentTime: 25,
+      direction: "forward",
+      paused: false,
+    });
+  });
+
   it("keeps deferred custom animations active for one final playback frame", () => {
     const animationBus = createAnimationBus();
     const applyFrame = vi.fn();
@@ -1084,6 +1370,181 @@ describe("animationBus auto tween shorthand", () => {
     expect(applyFrame).toHaveBeenCalledTimes(1);
     expect(applyFrame).toHaveBeenCalledWith(100);
     expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it.each(["tick", "setTime"])(
+    "disposes a completed backend exactly once through %s",
+    (completionMethod) => {
+      const animationBus = createAnimationBus();
+      const dispose = vi.fn();
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: `dispose-complete-${completionMethod}`,
+          driver: "custom",
+          duration: 100,
+          dispose,
+        },
+      });
+      animationBus.flush();
+
+      animationBus[completionMethod](100);
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+
+      animationBus.cancelAll();
+      animationBus.destroy();
+      expect(dispose).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([
+    "cancel",
+    "cancelAll",
+    "destroy",
+    "invalid-target-tick",
+    "invalid-target-setTime",
+  ])("disposes a backend exactly once after %s cancellation", (method) => {
+    const animationBus = createAnimationBus();
+    const dispose = vi.fn();
+    const onCancel = vi.fn();
+    const applyTargetState = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: `dispose-${method}`,
+        driver: "custom",
+        duration: 100,
+        dispose,
+        onCancel,
+        applyTargetState,
+        isValid: () => !method.startsWith("invalid-target"),
+      },
+    });
+    animationBus.flush();
+
+    if (method === "cancel") {
+      animationBus.dispatch({ type: "CANCEL", id: `dispose-${method}` });
+      animationBus.flush();
+    } else if (method.startsWith("invalid-target")) {
+      animationBus[method.endsWith("setTime") ? "setTime" : "tick"](1);
+    } else {
+      animationBus[method]();
+    }
+
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(applyTargetState).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+
+    animationBus.destroy();
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["tick", "setTime"])(
+    "cleans up a failed backend exactly once through %s",
+    (failureMethod) => {
+      const animationBus = createAnimationBus();
+      const failure = new Error(`${failureMethod} render failed`);
+      const dispose = vi.fn();
+      const onCancel = vi.fn();
+      const applyTargetState = vi.fn();
+      const failed = vi.fn();
+      animationBus.on("failed", failed);
+
+      animationBus.dispatch({
+        type: "START",
+        payload: {
+          id: `dispose-failure-${failureMethod}`,
+          driver: "custom",
+          duration: 100,
+          dispose,
+          onCancel,
+          applyTargetState,
+          applyFrame: (time) => {
+            if (time > 0) throw failure;
+          },
+        },
+      });
+      animationBus.flush();
+
+      animationBus[failureMethod](50);
+      expect(failed).toHaveBeenCalledWith({
+        id: `dispose-failure-${failureMethod}`,
+        error: failure,
+      });
+      expect(dispose).toHaveBeenCalledTimes(1);
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(applyTargetState).toHaveBeenCalledTimes(1);
+      expect(animationBus.getState().activeCount).toBe(0);
+
+      animationBus.destroy();
+      expect(dispose).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("disposes every newly activated backend once when queue activation rolls back", () => {
+    const animationBus = createAnimationBus();
+    const firstDispose = vi.fn();
+    const secondDispose = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "rollback-first",
+        driver: "custom",
+        duration: 100,
+        dispose: firstDispose,
+      },
+    });
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "rollback-second",
+        driver: "custom",
+        duration: 100,
+        dispose: secondDispose,
+        applyFrame: () => {
+          throw new Error("activation failed");
+        },
+      },
+    });
+
+    expect(() => animationBus.flush()).toThrow("activation failed");
+    expect(firstDispose).toHaveBeenCalledTimes(1);
+    expect(secondDispose).toHaveBeenCalledTimes(1);
+    expect(animationBus.getState().activeCount).toBe(0);
+
+    animationBus.destroy();
+    expect(firstDispose).toHaveBeenCalledTimes(1);
+    expect(secondDispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retain a completed context when backend disposal throws", () => {
+    const animationBus = createAnimationBus();
+    const onComplete = vi.fn();
+    const dispose = vi.fn(() => {
+      throw new Error("cleanup failed");
+    });
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "throwing-disposal",
+        driver: "custom",
+        duration: 10,
+        dispose,
+        onComplete,
+      },
+    });
+    animationBus.flush();
+
+    expect(() => animationBus.tick(10)).not.toThrow();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(dispose).toHaveBeenCalledTimes(1);
     expect(animationBus.getState().activeCount).toBe(0);
   });
 

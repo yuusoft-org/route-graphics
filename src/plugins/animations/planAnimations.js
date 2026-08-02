@@ -9,6 +9,10 @@ import {
 } from "./animationPropertyUtils.js";
 import { isDeepEqual } from "../../util/isDeepEqual.js";
 import { collectAllElementIds } from "../../util/collectElementIds.js";
+import {
+  canonicalizeProgram,
+  compilePortableGsapAnimation,
+} from "./timeline/index.js";
 
 export const groupAnimationsByTarget = (animations = []) => {
   if (animations instanceof Map) {
@@ -107,6 +111,9 @@ const hasSubtreeAnimationConflict = ({
 
 export const getAnimationContinuitySignature = (animation = {}) => {
   if (animation.type === "update") {
+    if (animation.gsap) {
+      return canonicalizeProgram(compilePortableGsapAnimation(animation));
+    }
     return JSON.stringify({
       type: animation.type,
       tween: animation.tween,
@@ -121,6 +128,7 @@ export const getAnimationContinuitySignature = (animation = {}) => {
     next: animation.next ?? null,
     mask: animation.mask ?? null,
     compositor: animation.compositor ?? null,
+    gsap: animation.gsap ?? null,
     playback: animation.playback ?? null,
   });
 };
@@ -242,6 +250,7 @@ export const dispatchUpdateAnimations = ({
   completionTracker,
   element,
   targetState,
+  targetStates,
   onComplete,
   renderContext,
 }) => {
@@ -274,11 +283,13 @@ export const dispatchUpdateAnimations = ({
       ? createAnimationSubjectState(element)
       : undefined;
 
-    applyInitialUpdateAnimationState(
+    const preparedGsap = applyInitialUpdateAnimationState(
       element,
       animationsToStart,
       undefined,
       animationBaseState,
+      targetState,
+      targetStates,
     );
 
     queueDeferredUpdateAnimationStart(renderContext, {
@@ -287,7 +298,9 @@ export const dispatchUpdateAnimations = ({
       completionTracker,
       element,
       targetState,
+      targetStates,
       animationBaseState,
+      preparedGsap,
     });
 
     return true;
@@ -299,6 +312,7 @@ export const dispatchUpdateAnimations = ({
     completionTracker,
     element,
     targetState,
+    targetStates,
     onComplete,
     animationBaseState: animationsUseTranslate(animationsToStart)
       ? createAnimationSubjectState(element)

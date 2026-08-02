@@ -46,6 +46,12 @@ vt:
         - title: "Rect Events"
           files: "rectevent"
           description: "Rect event interaction tests"
+    - title: "Animation Timeline Group"
+      type: "groupLabel"
+      items:
+        - title: "Animation Timelines"
+          files: "timeline"
+          description: "Shared tween and portable GSAP timeline rendering tests"
     - title: "Replace Transition Group"
       type: "groupLabel"
       items:

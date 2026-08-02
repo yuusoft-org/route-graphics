@@ -1,0 +1,51 @@
+---
+title: GSAP Persistent Transition Speed
+description: A persistent portable GSAP transition applies its playback speed exactly once during pending activation.
+specs:
+  - a 1000ms transition at speed 2 should be halfway visible after 250ms
+  - the transition should complete after 500ms rather than 250ms
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+---
+states:
+  - id: speed-base
+    elements: []
+  - id: speed-transition
+    elements:
+      - id: speed-target
+        type: rect
+        x: 280
+        "y": 160
+        width: 720
+        height: 400
+        fill: "#FFFFFF"
+        alpha: 1
+    animations:
+      - id: speed-transition-enter
+        targetId: speed-target
+        type: transition
+        playback:
+          continuity: persistent
+          speed: 2
+        gsap:
+          profile: portable-v1
+          targets:
+            incoming: { transitionSurface: next }
+          steps:
+            - kind: fromTo
+              targets: incoming
+              from: { alpha: 0 }
+              to: { alpha: 1 }
+              duration: 1000
+              easing: linear

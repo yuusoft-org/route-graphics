@@ -57,12 +57,29 @@ const replaceTextDisplayObject = ({
 };
 
 const updatePlainTextDisplayObject = (displayObject, textComputedNode) => {
-  displayObject.text = textComputedNode.content;
   applyTextStyle(displayObject, textComputedNode.textStyle);
+  const timelineTextUnits =
+    displayObject[Symbol.for("routeGraphics.timelineTextUnits")];
+  if (
+    timelineTextUnits?.matches(textComputedNode.content, displayObject.style)
+  ) {
+    timelineTextUnits.originalText = String(textComputedNode.content ?? "");
+  } else {
+    timelineTextUnits?.destroy();
+    displayObject.text = textComputedNode.content;
+  }
   syncTextAnchorRatios(displayObject, textComputedNode);
   positionTextInLayoutBox(displayObject, textComputedNode);
   displayObject.alpha = textComputedNode.alpha;
+  if (
+    timelineTextUnits?.matches(textComputedNode.content, displayObject.style)
+  ) {
+    timelineTextUnits.sync();
+  }
 };
+
+const syncTimelineTextUnits = (displayObject) =>
+  displayObject[Symbol.for("routeGraphics.timelineTextUnits")]?.sync?.();
 
 const updateTextDisplayObject = ({
   displayObject,
@@ -85,6 +102,7 @@ const updateTextDisplayObject = ({
     applyStyle: (overrideStyle) =>
       applyTextDisplayStyle(displayObject, textComputedNode, overrideStyle),
   });
+  syncTimelineTextUnits(displayObject);
 };
 
 /**
@@ -136,6 +154,7 @@ export const updateText = ({
   const updateElement = () => {
     if (isDeepEqual(prevTextComputedNode, nextTextComputedNode)) {
       setElementRenderState(textElement, nextTextComputedNode);
+      syncTimelineTextUnits(textElement);
       commitRenderState?.(textElement);
       return;
     }
@@ -175,6 +194,7 @@ export const updateText = ({
       targetId: prevTextComputedNode.id,
     });
     setElementRenderState(textElement, nextTextComputedNode);
+    syncTimelineTextUnits(textElement);
     commitRenderState?.(textElement);
   };
 

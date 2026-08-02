@@ -2150,6 +2150,188 @@ describe("RouteGraphics public API", () => {
     expect(app.findElementByLabel("preview-rect")?.x).toBeCloseTo(37.5);
   });
 
+  it("forwards authored timeline events through the public event handler", async () => {
+    const eventHandler = vi.fn();
+    const { app, pixiMock } = await setupRouteGraphics({
+      initOptions: { eventHandler },
+      pluginsFactory: async () => {
+        const [{ rectPlugin }, { tweenPlugin }] = await Promise.all([
+          import("../src/plugins/elements/rect/index.js"),
+          import("../src/plugins/animations/tween/index.js"),
+        ]);
+        return {
+          elements: [rectPlugin],
+          animations: [tweenPlugin],
+          audio: [],
+        };
+      },
+    });
+    const frameTick = getAutoAnimationTick(pixiMock);
+
+    app.render({
+      id: "timeline-event-baseline",
+      elements: [
+        {
+          id: "event-rect",
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 20,
+          height: 20,
+          fill: "#FFFFFF",
+        },
+      ],
+    });
+    eventHandler.mockClear();
+
+    app.render({
+      id: "timeline-event-active",
+      elements: [
+        {
+          id: "event-rect",
+          type: "rect",
+          x: 100,
+          y: 0,
+          width: 20,
+          height: 20,
+          fill: "#FFFFFF",
+        },
+      ],
+      animations: [
+        {
+          id: "eventful-update",
+          targetId: "event-rect",
+          type: "update",
+          gsap: {
+            profile: "portable-v1",
+            steps: [
+              {
+                kind: "to",
+                values: { x: 100 },
+                duration: 100,
+                easing: "linear",
+              },
+              {
+                kind: "emit",
+                event: "halfway",
+                payload: { source: "public-api" },
+                start: { time: 50 },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    frameTick({ deltaMS: 60 });
+
+    expect(eventHandler).toHaveBeenCalledWith("timelineEvent", {
+      id: "eventful-update",
+      event: "halfway",
+      payload: { source: "public-api" },
+      time: 50,
+      direction: "forward",
+      iteration: [0],
+    });
+  });
+
+  it("exposes per-animation player controls on the public renderer", async () => {
+    const eventHandler = vi.fn();
+    const { app, pixiMock } = await setupRouteGraphics({
+      initOptions: { eventHandler },
+      pluginsFactory: async () => {
+        const [{ rectPlugin }, { tweenPlugin }] = await Promise.all([
+          import("../src/plugins/elements/rect/index.js"),
+          import("../src/plugins/animations/tween/index.js"),
+        ]);
+        return {
+          elements: [rectPlugin],
+          animations: [tweenPlugin],
+          audio: [],
+        };
+      },
+    });
+    const frameTick = getAutoAnimationTick(pixiMock);
+
+    app.render({
+      id: "controlled-baseline",
+      elements: [
+        {
+          id: "controlled-rect",
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 20,
+          height: 20,
+          fill: "#FFFFFF",
+        },
+      ],
+    });
+    eventHandler.mockClear();
+    app.render({
+      id: "controlled-active",
+      elements: [
+        {
+          id: "controlled-rect",
+          type: "rect",
+          x: 100,
+          y: 0,
+          width: 20,
+          height: 20,
+          fill: "#FFFFFF",
+        },
+      ],
+      animations: [
+        {
+          id: "controlled-update",
+          targetId: "controlled-rect",
+          type: "update",
+          gsap: {
+            profile: "portable-v1",
+            steps: [
+              {
+                kind: "to",
+                values: { x: 100 },
+                duration: 100,
+                easing: "linear",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(app.pauseAnimation("controlled-update")).toBe(true);
+    frameTick({ deltaMS: 20 });
+    expect(app.findElementByLabel("controlled-rect")?.x).toBe(0);
+
+    expect(app.setAnimationSpeed("controlled-update", 2)).toBe(true);
+    expect(app.resumeAnimation("controlled-update")).toBe(true);
+    frameTick({ deltaMS: 25 });
+    expect(app.findElementByLabel("controlled-rect")?.x).toBeCloseTo(50);
+
+    expect(app.seekAnimation("controlled-update", 75)).toBe(true);
+    expect(app.findElementByLabel("controlled-rect")?.x).toBeCloseTo(75);
+    expect(app.setAnimationProgress("controlled-update", 0.25)).toBe(true);
+    expect(app.findElementByLabel("controlled-rect")?.x).toBeCloseTo(25);
+    expect(app.getAnimationState("controlled-update")).toMatchObject({
+      id: "controlled-update",
+      currentTime: 25,
+      duration: 100,
+      direction: "forward",
+      controlSpeed: 2,
+    });
+
+    expect(app.reverseAnimation("controlled-update")).toBe(true);
+    frameTick({ deltaMS: 13 });
+
+    expect(app.getAnimationState("controlled-update")).toBeNull();
+    expect(app.findElementByLabel("controlled-rect")?.x).toBe(0);
+    expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
+      id: "controlled-active",
+      aborted: false,
+    });
+  });
+
   it("animates rect styles through the public tween interface", async () => {
     const { app } = await setupRouteGraphics({
       pluginsFactory: async () => {
@@ -2564,6 +2746,87 @@ describe("RouteGraphics public API", () => {
     frameTick({ deltaMS: 125 });
     expect(app.findElementByLabel("ambient")?.x).toBeCloseTo(25);
     expect(eventHandler.mock.calls).toHaveLength(eventCountAfterRender);
+  });
+
+  it("emits renderComplete for infinity introduced by a nested GSAP group", async () => {
+    const eventHandler = vi.fn();
+    const { app, pixiMock } = await setupRouteGraphics({
+      initOptions: { eventHandler },
+      pluginsFactory: async () => {
+        const [{ rectPlugin }, { tweenPlugin }] = await Promise.all([
+          import("../src/plugins/elements/rect/index.js"),
+          import("../src/plugins/animations/tween/index.js"),
+        ]);
+        return {
+          elements: [rectPlugin],
+          animations: [tweenPlugin],
+          audio: [],
+        };
+      },
+    });
+    const frameTick = getAutoAnimationTick(pixiMock);
+
+    app.render({
+      id: "nested-infinite-baseline",
+      elements: [
+        {
+          id: "nested-infinite-rect",
+          type: "rect",
+          x: 0,
+          y: 0,
+          width: 20,
+          height: 20,
+          fill: "#FFFFFF",
+        },
+      ],
+    });
+    eventHandler.mockClear();
+
+    app.render({
+      id: "nested-infinite-active",
+      elements: [
+        {
+          id: "nested-infinite-rect",
+          type: "rect",
+          x: 100,
+          y: 0,
+          width: 20,
+          height: 20,
+          fill: "#FFFFFF",
+        },
+      ],
+      animations: [
+        {
+          id: "nested-infinite-update",
+          targetId: "nested-infinite-rect",
+          type: "update",
+          gsap: {
+            profile: "portable-v1",
+            steps: [
+              {
+                kind: "sequence",
+                repeat: "infinite",
+                steps: [
+                  {
+                    kind: "to",
+                    values: { x: 100 },
+                    duration: 100,
+                    easing: "linear",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
+      id: "nested-infinite-active",
+      aborted: false,
+    });
+    frameTick({ deltaMS: 50 });
+    expect(app.findElementByLabel("nested-infinite-rect")?.x).toBeCloseTo(50);
   });
 
   it("continues a persistent loop across unrelated renders and cancels it when omitted", async () => {

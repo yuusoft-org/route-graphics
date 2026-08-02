@@ -144,6 +144,9 @@ Design notes:
 - [Audio Effects](./docs/audio-effects.md)
 - [Command-Controlled Sound Playback](./docs/audio-playback-commands.md)
 - [Animation Model](./docs/animation-model.md)
+- [Portable GSAP-Style Timelines](./docs/portable-gsap-timelines.md)
+- [Shared Timeline Design and Roadmap](./docs/shared-timeline-plan-design-and-roadmap.md)
+- [Shared Timeline Implementation Review](./docs/shared-timeline-implementation-review.md)
 - [Shader Interface](./docs/shader-interface.md)
 
 ## Render CLI

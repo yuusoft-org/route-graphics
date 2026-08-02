@@ -22,6 +22,12 @@ const easeInQuad = (x) => x * x;
 const easeOutQuad = (x) => 1 - (1 - x) * (1 - x);
 const easeInOutQuad = (x) =>
   x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const easeInExpo = (x) =>
+  Math.pow(2, 10 * (x - 1)) * x + Math.pow(x, 6) * (1 - x);
+const easeInBack = (x) => {
+  const overshoot = 1.70158;
+  return (overshoot + 1) * x * x * x - overshoot * x * x;
+};
 
 const easings = Object.freeze({
   linear,
@@ -48,15 +54,10 @@ const easings = Object.freeze({
   easeOutSine: (x) => Math.sin((x * Math.PI) / 2),
   easeInOutSine: (x) => -(Math.cos(Math.PI * x) - 1) / 2,
 
-  easeInExpo: (x) => (x === 0 ? 0 : Math.pow(2, 10 * x - 10)),
-  easeOutExpo: (x) => (x === 1 ? 1 : 1 - Math.pow(2, -10 * x)),
-  easeInOutExpo: (x) => {
-    if (x === 0) return 0;
-    if (x === 1) return 1;
-    return x < 0.5
-      ? Math.pow(2, 20 * x - 10) / 2
-      : (2 - Math.pow(2, -20 * x + 10)) / 2;
-  },
+  easeInExpo,
+  easeOutExpo: (x) => 1 - easeInExpo(1 - x),
+  easeInOutExpo: (x) =>
+    x < 0.5 ? easeInExpo(x * 2) / 2 : 1 - easeInExpo((1 - x) * 2) / 2,
 
   easeInCirc: (x) => 1 - Math.sqrt(1 - Math.pow(x, 2)),
   easeOutCirc: (x) => Math.sqrt(1 - Math.pow(x - 1, 2)),
@@ -65,23 +66,10 @@ const easings = Object.freeze({
       ? (1 - Math.sqrt(1 - Math.pow(2 * x, 2))) / 2
       : (Math.sqrt(1 - Math.pow(-2 * x + 2, 2)) + 1) / 2,
 
-  easeInBack: (x) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return c3 * x * x * x - c1 * x * x;
-  },
-  easeOutBack: (x) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
-  },
-  easeInOutBack: (x) => {
-    const c1 = 1.70158;
-    const c2 = c1 * 1.525;
-    return x < 0.5
-      ? (Math.pow(2 * x, 2) * ((c2 + 1) * 2 * x - c2)) / 2
-      : (Math.pow(2 * x - 2, 2) * ((c2 + 1) * (x * 2 - 2) + c2) + 2) / 2;
-  },
+  easeInBack,
+  easeOutBack: (x) => 1 - easeInBack(1 - x),
+  easeInOutBack: (x) =>
+    x < 0.5 ? easeInBack(x * 2) / 2 : 1 - easeInBack((1 - x) * 2) / 2,
 
   easeInBounce: (x) => 1 - bounceOut(1 - x),
   easeOutBounce: bounceOut,

@@ -1,0 +1,74 @@
+---
+title: GSAP Masked Sampled Overshoot
+description: A masked portable GSAP surface remains visible at a sharp sampled-easing knot outside both endpoint bounds.
+specs:
+  - the incoming rect should be fully visible at the 100ms overshoot knot near x 660
+  - the sampled curve should return inside the endpoint interval by 300ms
+  - the masked transition should settle on the live incoming rect at x 360
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 100
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 700
+  - action: screenshot
+---
+states:
+  - id: sampled-bounds-base
+    elements:
+      - id: sampled-target
+        type: rect
+        x: 160
+        "y": 250
+        width: 180
+        height: 180
+        fill: "#4D4D4D"
+  - id: sampled-bounds-next
+    elements:
+      - id: sampled-target
+        type: rect
+        x: 360
+        "y": 250
+        width: 180
+        height: 180
+        fill: "#FFFFFF"
+    animations:
+      - id: sampled-mask-transition
+        targetId: sampled-target
+        type: transition
+        mask:
+          kind: single
+          texture: mask-full
+          channel: red
+        gsap:
+          profile: portable-v1
+          targets:
+            incoming: { transitionSurface: next }
+            reveal: { transitionMask: true }
+          steps:
+            - kind: set
+              targets: reveal
+              values: { progress: 1 }
+            - kind: fromTo
+              targets: incoming
+              from: { x: 160 }
+              to: { x: 360 }
+              duration: 1000
+              easing:
+                kind: sampled
+                samples:
+                  - [0, 0]
+                  - [0.1, 2.5]
+                  - [0.3, 0.6]
+                  - [1, 1]

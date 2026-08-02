@@ -1,0 +1,132 @@
+---
+title: GSAP Repeated Timeline Domains
+description: Repeated keyframes replay every segment while chained repeatRefresh values propagate through a nested speed domain.
+specs:
+  - both targets should advance through their first iteration at 50ms
+  - chained relative clips should finish their first iteration at x 300 without double counting
+  - repeatRefresh should continue from x 300 instead of jumping back at the iteration boundary
+  - both chained clips should contribute during the refreshed iteration
+  - repeated keyframes should restart and replay their first frame after 200ms
+  - nested repeatRefresh should accumulate both relative endpoints from x 300 to x 500
+  - both repeated schedules should retain their authored terminal values
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 50
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 50
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 25
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 25
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 50
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+---
+states:
+  - id: repeat-base
+    elements:
+      - id: repeat-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: replay-target
+            type: rect
+            x: 100
+            "y": 170
+            width: 140
+            height: 140
+            fill: "#FFFFFF"
+          - id: refresh-target
+            type: rect
+            x: 100
+            "y": 410
+            width: 140
+            height: 140
+            fill: "#A6A6A6"
+  - id: repeated-domains
+    elements:
+      - id: repeat-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: replay-target
+            type: rect
+            x: 100
+            "y": 170
+            width: 140
+            height: 140
+            fill: "#FFFFFF"
+          - id: refresh-target
+            type: rect
+            x: 100
+            "y": 410
+            width: 140
+            height: 140
+            fill: "#A6A6A6"
+    animations:
+      - id: repeated-domain-motion
+        targetId: repeat-root
+        type: update
+        gsap:
+          profile: portable-v1
+          targets:
+            replay: { element: replay-target }
+            refresh: { element: refresh-target }
+          steps:
+            - kind: parallel
+              steps:
+                - kind: keyframes
+                  targets: replay
+                  repeat: 1
+                  frames:
+                    - values: { x: 300 }
+                      duration: 100
+                      easing: linear
+                    - values: { x: 500 }
+                      duration: 100
+                      easing: linear
+                - kind: sequence
+                  repeat: 1
+                  repeatRefresh: true
+                  steps:
+                    - kind: to
+                      targets: refresh
+                      values: { x: { by: 100 } }
+                      duration: 100
+                      speed: 2
+                      easing: linear
+                    - kind: to
+                      targets: refresh
+                      values: { x: { by: 100 } }
+                      duration: 100
+                      speed: 2
+                      easing: linear

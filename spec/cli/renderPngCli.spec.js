@@ -252,6 +252,50 @@ describe("route-graphics render CLI", () => {
     });
   }, 30_000);
 
+  it("loads the CLI from the published package contents", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "rtgl-pack-test-"));
+    await execFileAsync(
+      "npm",
+      ["pack", "--ignore-scripts", "--pack-destination", tempDir],
+      {
+        cwd: projectRoot,
+        env: {
+          ...process.env,
+          npm_config_cache: path.join(tempDir, "npm-cache"),
+        },
+      },
+    );
+    const filename = (await fs.readdir(tempDir)).find((name) =>
+      name.endsWith(".tgz"),
+    );
+    expect(filename).toBeDefined();
+    const packageRoot = path.join(tempDir, "package");
+
+    await execFileAsync(
+      "tar",
+      ["-xzf", path.join(tempDir, filename), "-C", tempDir],
+      { env: process.env },
+    );
+    await fs.symlink(
+      path.join(projectRoot, "node_modules"),
+      path.join(packageRoot, "node_modules"),
+      "dir",
+    );
+
+    await execFileAsync(
+      process.execPath,
+      [path.join(packageRoot, "bin", "route-graphics.js"), "--help"],
+      {
+        cwd: packageRoot,
+        env: process.env,
+      },
+    );
+
+    await expect(
+      fs.stat(path.join(packageRoot, "dist", "cli", "routeGraphicsCli.js")),
+    ).resolves.toBeDefined();
+  }, 30_000);
+
   it("renders PNG output using the package CLI entrypoint", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "rtgl-cli-test-"));
     const outputPath = path.join(tempDir, "hello.png");

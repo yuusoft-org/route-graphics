@@ -1,0 +1,60 @@
+---
+title: Tween Relative Keyframe Chain
+description: Consecutive relative legacy keyframes accumulate once while running through the shared GSAP timeline backend.
+specs:
+  - the first relative keyframe should add 200 pixels to the captured x 100 base
+  - the second relative keyframe should continue from x 300 without re-evaluating the first delta
+  - the complete chain should settle at x 600 rather than overshooting
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 150
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 150
+  - action: screenshot
+---
+states:
+  - id: relative-base
+    elements:
+      - id: relative-target
+        type: rect
+        x: 100
+        "y": 260
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+  - id: relative-chain
+    elements:
+      - id: relative-target
+        type: rect
+        x: 600
+        "y": 260
+        width: 160
+        height: 160
+        fill: "#FFFFFF"
+    animations:
+      - id: accumulated-relative-motion
+        targetId: relative-target
+        type: update
+        tween:
+          x:
+            keyframes:
+              - value: 200
+                relative: true
+                duration: 200
+                easing: linear
+              - value: 300
+                relative: true
+                duration: 300
+                easing: linear

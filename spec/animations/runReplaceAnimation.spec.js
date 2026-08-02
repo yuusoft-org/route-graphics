@@ -825,6 +825,7 @@ describe("runReplaceAnimation", () => {
     };
 
     const snapshotCalls = [];
+    const renderedSurfaceFrames = [];
     const app = {
       renderer: {
         width: 1280,
@@ -839,7 +840,16 @@ describe("runReplaceAnimation", () => {
           });
           return Texture.EMPTY;
         }),
-        render: vi.fn(),
+        render: vi.fn(({ container }) => {
+          const surface = container.children[0];
+          renderedSurfaceFrames.push({
+            x: surface?.x,
+            y: surface?.y,
+            scaleX: surface?.scale?.x,
+            scaleY: surface?.scale?.y,
+            alpha: surface?.alpha,
+          });
+        }),
       },
     };
     const amountParameter = {
@@ -892,6 +902,18 @@ describe("runReplaceAnimation", () => {
         id: "scene-compositor",
         targetId: "scene-root",
         type: "transition",
+        next: {
+          tween: {
+            translateY: {
+              initialValue: 0.45,
+              keyframes: [{ duration: 600, value: 0, easing: "linear" }],
+            },
+            scaleX: {
+              initialValue: 0.7,
+              keyframes: [{ duration: 600, value: 1, easing: "linear" }],
+            },
+          },
+        },
         compositor: animatedCompositor,
       },
       animations: new Map(),
@@ -938,6 +960,13 @@ describe("runReplaceAnimation", () => {
     );
     expect(prevDisplayObject.scale.x).toBe(0.75);
     expect(prevDisplayObject.scale.y).toBe(0.75);
+    expect(renderedSurfaceFrames[1]).toMatchObject({
+      x: 160,
+      scaleY: 0.75,
+      alpha: 1,
+    });
+    expect(renderedSurfaceFrames[1].y).toBeCloseTo(120.9375);
+    expect(renderedSurfaceFrames[1].scaleX).toBeCloseTo(0.54375);
 
     expect(app.renderer.render).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1007,6 +1036,15 @@ describe("runReplaceAnimation", () => {
     shaderClock = 9.25;
     dispatched.payload.applyFrame(150);
     expect(shaderUniforms.uniforms.uTime).toBeCloseTo(9.25);
+
+    dispatched.payload.applyFrame(600);
+    expect(renderedSurfaceFrames.at(-1)).toMatchObject({
+      x: 160,
+      scaleY: 0.75,
+      alpha: 1,
+    });
+    expect(renderedSurfaceFrames.at(-1).y).toBeCloseTo(90);
+    expect(renderedSurfaceFrames.at(-1).scaleX).toBeCloseTo(0.75);
   });
 
   it("reuses plain sprite textures for compositor snapshots instead of baking display scale into the texture", () => {
@@ -1198,7 +1236,7 @@ describe("runReplaceAnimation", () => {
         id: "scene-enter",
         targetId: "scene-root",
         type: "transition",
-        playback: { continuity: "persistent" },
+        playback: { continuity: "persistent", speed: 2 },
         next: {
           tween: {
             alpha: {
@@ -1219,6 +1257,13 @@ describe("runReplaceAnimation", () => {
     });
 
     expect(animationBus.registerPending).toHaveBeenCalledTimes(1);
+    expect(animationBus.registerPending).toHaveBeenCalledWith(
+      expect.objectContaining({ playbackSpeed: 2 }),
+    );
+    expect(animationBus.activatePending).toHaveBeenCalledWith(
+      "scene-enter",
+      expect.objectContaining({ duration: 150, playbackSpeed: 1 }),
+    );
     expect(tracker.getVersion).not.toHaveBeenCalled();
     expect(tracker.track).not.toHaveBeenCalled();
 
@@ -2289,7 +2334,7 @@ describe("runReplaceAnimation", () => {
     expect(overlay.children[0].y).toBeCloseTo(35);
   });
 
-  it("expands masked transition bounds for absolute position tweens", () => {
+  it("includes sampled-easing extrema in masked transition bounds", () => {
     const prevDisplayObject = createDisplayObject("scene-root");
     const nextDisplayObject = createDisplayObject("scene-root");
     const parent = createParent(prevDisplayObject);
@@ -2347,7 +2392,21 @@ describe("runReplaceAnimation", () => {
           tween: {
             x: {
               initialValue: 200,
-              keyframes: [{ duration: 1000, value: 400, easing: "linear" }],
+              keyframes: [
+                {
+                  duration: 1000,
+                  value: 400,
+                  easing: {
+                    kind: "sampled",
+                    samples: [
+                      [0, 0],
+                      [0.1, 2],
+                      [0.25, 0.5],
+                      [1, 1],
+                    ],
+                  },
+                },
+              ],
             },
           },
         },
@@ -2381,7 +2440,7 @@ describe("runReplaceAnimation", () => {
     const sprite = overlay.children[0];
 
     expect(sprite.x).toBe(0);
-    expect(sprite.filterArea.width).toBe(401);
+    expect(sprite.filterArea.width).toBe(601);
     expect(sprite.filterArea.height).toBe(1);
   });
 

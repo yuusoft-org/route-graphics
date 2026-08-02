@@ -55,6 +55,7 @@ const executeDeferredMountOperation = (operation) => {
       return;
     case "start-update-animations":
       if (!operation.element || operation.element.destroyed) {
+        rollbackPreparedUpdateAnimations(operation);
         return;
       }
 
@@ -64,9 +65,18 @@ const executeDeferredMountOperation = (operation) => {
         completionTracker: operation.completionTracker,
         element: operation.element,
         targetState: operation.targetState,
+        targetStates: operation.targetStates,
         animationBaseState: operation.animationBaseState,
+        preparedGsap: operation.preparedGsap,
       });
       return;
+  }
+};
+
+const rollbackPreparedUpdateAnimations = (operation) => {
+  if (operation?.type !== "start-update-animations") return;
+  for (const prepared of operation.preparedGsap?.values?.() ?? []) {
+    prepared.bindingContext?.rollback?.();
   }
 };
 
@@ -88,7 +98,10 @@ export const clearDeferredMountOperations = (renderContext) => {
     return;
   }
 
-  renderContext.deferredMountOperations.length = 0;
+  const operations = renderContext.deferredMountOperations.splice(0);
+  for (const operation of operations) {
+    rollbackPreparedUpdateAnimations(operation);
+  }
 };
 
 export const queueDeferredAnimatedSpritePlay = (
@@ -152,6 +165,7 @@ export const queueDeferredUpdateAnimationStart = (
     element,
     targetState,
     animationBaseState,
+    preparedGsap,
   },
 ) =>
   queueDeferredMountOperation(renderContext, {
@@ -162,6 +176,7 @@ export const queueDeferredUpdateAnimationStart = (
     element,
     targetState,
     animationBaseState,
+    preparedGsap,
   });
 
 export const flushDeferredMountOperations = (

@@ -1,0 +1,256 @@
+---
+title: GSAP Text Units Lifecycle
+description: Explicit line targets preserve layout and sibling order, remain synchronized during later whole-text animation, and follow source destruction without requiring Unicode segmentation data from the VT browser.
+specs:
+  - staggered lines should animate independently without changing the fixed-width source layout
+  - the replacement text-unit container should remain between its background and foreground siblings
+  - the complete text animation should restore every line to the source baseline
+  - a later whole-text GSAP animation should visibly move and fade the retained unit container
+  - the whole-text animation should settle at its authored position and alpha
+  - later fill, stroke, and shadow updates should propagate to the retained visible units
+  - removing the source text should also remove every generated text-unit child
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 100
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 250
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 350
+  - action: screenshot
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 200
+  - action: screenshot
+  - action: keypress
+    key: "n"
+  - action: screenshot
+  - action: keypress
+    key: "n"
+  - action: screenshot
+---
+states:
+  - id: text-units-base
+    elements:
+      - id: text-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: text-background
+            type: rect
+            x: 180
+            "y": 160
+            width: 760
+            height: 260
+            fill: "#4D4D4D"
+          - id: unit-title
+            type: text
+            content: |-
+              TOP
+              BOTTOM
+            x: 260
+            "y": 180
+            textStyle:
+              fontSize: 64
+              lineHeight: 1.25
+              fill: "#FFFFFF"
+              fontFamily: Courier New
+          - id: text-foreground
+            type: rect
+            x: 430
+            "y": 250
+            width: 150
+            height: 120
+            fill: "#737373"
+  - id: text-units-animated
+    elements:
+      - id: text-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: text-background
+            type: rect
+            x: 180
+            "y": 160
+            width: 760
+            height: 260
+            fill: "#4D4D4D"
+          - id: unit-title
+            type: text
+            content: |-
+              TOP
+              BOTTOM
+            x: 260
+            "y": 180
+            textStyle:
+              fontSize: 64
+              lineHeight: 1.25
+              fill: "#FFFFFF"
+              fontFamily: Courier New
+          - id: text-foreground
+            type: rect
+            x: 430
+            "y": 250
+            width: 150
+            height: 120
+            fill: "#737373"
+    animations:
+      - id: line-entrance
+        targetId: text-root
+        type: update
+        gsap:
+          profile: portable-v1
+          targets:
+            letters:
+              textUnits:
+                elementId: unit-title
+                unit: line
+                order: logical
+          steps:
+            - kind: from
+              targets: letters
+              values: { y: { by: 100 }, alpha: 0 }
+              duration: 400
+              easing: power2.out
+              stagger: { each: 120, from: start }
+  - id: text-units-moved
+    elements:
+      - id: text-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: text-background
+            type: rect
+            x: 180
+            "y": 160
+            width: 760
+            height: 260
+            fill: "#4D4D4D"
+          - id: unit-title
+            type: text
+            content: |-
+              TOP
+              BOTTOM
+            x: 700
+            "y": 390
+            alpha: 0.45
+            textStyle:
+              fontSize: 64
+              lineHeight: 1.25
+              fill: "#FFFFFF"
+              fontFamily: Courier New
+          - id: text-foreground
+            type: rect
+            x: 430
+            "y": 250
+            width: 150
+            height: 120
+            fill: "#737373"
+    animations:
+      - id: retained-text-motion
+        targetId: unit-title
+        type: update
+        gsap:
+          profile: portable-v1
+          steps:
+            - kind: to
+              values: { x: 700, y: 390, alpha: 0.45 }
+              duration: 400
+              easing: linear
+  - id: text-units-restyled
+    elements:
+      - id: text-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: text-background
+            type: rect
+            x: 180
+            "y": 160
+            width: 760
+            height: 260
+            fill: "#4D4D4D"
+          - id: unit-title
+            type: text
+            content: |-
+              TOP
+              BOTTOM
+            x: 700
+            "y": 390
+            alpha: 0.45
+            textStyle:
+              fontSize: 64
+              lineHeight: 1.25
+              fill: "#70E1A1"
+              strokeColor: "#173F5F"
+              strokeWidth: 5
+              shadow:
+                color: "#000000"
+                offsetX: 7
+                offsetY: 7
+                blur: 3
+              fontFamily: Courier New
+          - id: text-foreground
+            type: rect
+            x: 430
+            "y": 250
+            width: 150
+            height: 120
+            fill: "#737373"
+  - id: text-units-removed
+    elements:
+      - id: text-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: text-background
+            type: rect
+            x: 180
+            "y": 160
+            width: 760
+            height: 260
+            fill: "#4D4D4D"
+          - id: text-foreground
+            type: rect
+            x: 430
+            "y": 250
+            width: 150
+            height: 120
+            fill: "#737373"

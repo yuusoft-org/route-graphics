@@ -1,12 +1,16 @@
 import { SUPPORTED_EASING_NAMES } from "./animationTimeline.js";
 import { normalizeShaderCompositor } from "../plugins/elements/util/shaderConfig.js";
 import { Color } from "pixi.js";
+import { normalizePortableGsap } from "../plugins/animations/timeline/normalizePortableGsap.js";
 
 const ANIMATION_TYPES = new Set(["update", "transition"]);
 const CONTINUITY_MODES = new Set(["render", "persistent"]);
 const DEFAULT_PLAYBACK_CONTINUITY = "render";
 const DEFAULT_PLAYBACK_SPEED = 1;
 const DEFAULT_PLAYBACK_LOOP = false;
+const DEFAULT_PLAYBACK_REPEAT = 0;
+const DEFAULT_PLAYBACK_REPEAT_DELAY = 0;
+const DEFAULT_PLAYBACK_YOYO = false;
 const UPDATE_TWEEN_PROPERTIES = new Set([
   "alpha",
   "x",
@@ -98,16 +102,45 @@ const assertPositiveFiniteNumber = (value, path) => {
   }
 };
 
-const assertNonNegativeFiniteNumber = (value, path) => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+const assertNonNegativeSafeIntegerMilliseconds = (value, path) => {
+  if (value === undefined) {
+    throw new Error(`${path} must be a number.`);
+  }
+
+  const isDirectLegacyTweenPath =
+    /^animations\[\d+\]\.tween\.(?!filters\.)/.test(path);
+  if (
+    isDirectLegacyTweenPath &&
+    path.endsWith(".delay") &&
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value < 0
+  ) {
     throw new Error(
       `${path} must be a finite number greater than or equal to 0.`,
+    );
+  }
+
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    !Number.isSafeInteger(value)
+  ) {
+    throw new Error(
+      `${path} must be a finite number greater than or equal to 0 and an integer number of milliseconds.`,
     );
   }
 };
 
 const normalizePlayback = (playback, path) => {
   assertPlainObject(playback, path);
+
+  assertKnownFields(
+    playback,
+    new Set(["continuity", "speed", "loop", "repeat", "repeatDelay", "yoyo"]),
+    path,
+  );
 
   const continuity = playback.continuity ?? DEFAULT_PLAYBACK_CONTINUITY;
   if (!CONTINUITY_MODES.has(continuity)) {
@@ -125,6 +158,10 @@ const normalizePlayback = (playback, path) => {
     }
   }
 
+  if (playback.loop !== undefined && playback.repeat !== undefined) {
+    throw new Error(`${path} cannot define both loop and repeat.`);
+  }
+
   const loop = playback.loop ?? DEFAULT_PLAYBACK_LOOP;
   if (typeof loop !== "boolean") {
     throw new Error(`${path}.loop must be a boolean.`);
@@ -133,15 +170,46 @@ const normalizePlayback = (playback, path) => {
     normalized.loop = true;
   }
 
+  const repeat = playback.repeat ?? DEFAULT_PLAYBACK_REPEAT;
+  if (repeat !== "infinite" && (!Number.isSafeInteger(repeat) || repeat < 0)) {
+    throw new Error(
+      `${path}.repeat must be a non-negative safe integer or "infinite".`,
+    );
+  }
+  if (repeat !== DEFAULT_PLAYBACK_REPEAT) {
+    normalized.repeat = repeat;
+  }
+
+  const repeatDelay = playback.repeatDelay ?? DEFAULT_PLAYBACK_REPEAT_DELAY;
+  assertNonNegativeSafeIntegerMilliseconds(repeatDelay, `${path}.repeatDelay`);
+
+  const yoyo = playback.yoyo ?? DEFAULT_PLAYBACK_YOYO;
+  if (typeof yoyo !== "boolean") {
+    throw new Error(`${path}.yoyo must be a boolean.`);
+  }
+
+  const isRepeating = loop || repeat === "infinite" || repeat > 0;
+  if (!isRepeating && repeatDelay > 0) {
+    throw new Error(`${path}.repeatDelay requires repeat or loop.`);
+  }
+  if (!isRepeating && yoyo) {
+    throw new Error(`${path}.yoyo requires repeat or loop.`);
+  }
+  if (repeatDelay > 0) normalized.repeatDelay = repeatDelay;
+  if (yoyo) normalized.yoyo = true;
+
   return normalized;
 };
 
 const normalizeAutoTween = (autoConfig, path) => {
   assertPlainObject(autoConfig, path);
-  assertNumber(autoConfig.duration, `${path}.duration`);
+  assertNonNegativeSafeIntegerMilliseconds(
+    autoConfig.duration,
+    `${path}.duration`,
+  );
 
   if (autoConfig.delay !== undefined) {
-    assertNonNegativeFiniteNumber(autoConfig.delay, `${path}.delay`);
+    assertNonNegativeSafeIntegerMilliseconds(autoConfig.delay, `${path}.delay`);
   }
 
   if (
@@ -193,10 +261,16 @@ const normalizeKeyframes = (
     const keyframePath = `${path}.keyframes[${index}]`;
     assertPlainObject(keyframe, keyframePath);
     assertValue(keyframe.value, `${keyframePath}.value`);
-    assertNumber(keyframe.duration, `${keyframePath}.duration`);
+    assertNonNegativeSafeIntegerMilliseconds(
+      keyframe.duration,
+      `${keyframePath}.duration`,
+    );
 
     if (keyframe.delay !== undefined) {
-      assertNonNegativeFiniteNumber(keyframe.delay, `${keyframePath}.delay`);
+      assertNonNegativeSafeIntegerMilliseconds(
+        keyframe.delay,
+        `${keyframePath}.delay`,
+      );
     }
 
     if (keyframe.easing !== undefined && typeof keyframe.easing !== "string") {
@@ -904,15 +978,27 @@ export const normalizeAnimations = (animations = []) => {
       );
     }
 
-    if (normalizedAnimation.playback?.loop === true) {
+    const loopsForever = normalizedAnimation.playback?.loop === true;
+    const repeatsForever = normalizedAnimation.playback?.repeat === "infinite";
+    if (loopsForever || repeatsForever) {
       if (animation.type !== "update") {
+        if (loopsForever) {
+          throw new Error(
+            `${path}.playback.loop is only supported for type "update".`,
+          );
+        }
         throw new Error(
-          `${path}.playback.loop is only supported for type "update".`,
+          `${path}.playback infinite repetition is only supported for type "update".`,
         );
       }
       if (normalizedAnimation.complete !== undefined) {
+        if (loopsForever) {
+          throw new Error(
+            `${path}.complete is not allowed when playback.loop is true because a loop never completes.`,
+          );
+        }
         throw new Error(
-          `${path}.complete is not allowed when playback.loop is true because a loop never completes.`,
+          `${path}.complete is not allowed when playback repeats infinitely because it never completes.`,
         );
       }
     }
@@ -939,6 +1025,10 @@ export const normalizeAnimations = (animations = []) => {
     );
 
     if (animation.type === "update") {
+      if (animation.tween !== undefined && animation.gsap !== undefined) {
+        throw new Error(`${path} cannot define both tween and gsap.`);
+      }
+
       if (animation.tween !== undefined) {
         Object.assign(
           normalizedAnimation,
@@ -946,11 +1036,22 @@ export const normalizeAnimations = (animations = []) => {
         );
       }
 
+      if (animation.gsap !== undefined) {
+        normalizedAnimation.gsap = normalizePortableGsap(
+          animation.gsap,
+          `${path}.gsap`,
+          "update",
+        );
+      }
+
       if (
         normalizedAnimation.tween === undefined &&
-        normalizedAnimation.filterTweens === undefined
+        normalizedAnimation.filterTweens === undefined &&
+        normalizedAnimation.gsap === undefined
       ) {
-        throw new Error(`${path} must define tween for an update animation.`);
+        throw new Error(
+          `${path} must define exactly one of tween or gsap for an update animation.`,
+        );
       }
 
       if (animation.replace !== undefined) {
@@ -990,6 +1091,46 @@ export const normalizeAnimations = (animations = []) => {
       throw new Error(`${path}.tween is not valid for transition animations.`);
     }
 
+    if (animation.gsap !== undefined) {
+      if (animation.prev !== undefined || animation.next !== undefined) {
+        throw new Error(
+          `${path} orchestrated gsap transitions cannot define prev.tween or next.tween.`,
+        );
+      }
+      normalizedAnimation.gsap = normalizePortableGsap(
+        animation.gsap,
+        `${path}.gsap`,
+        "transition",
+      );
+
+      if (animation.mask !== undefined) {
+        if (animation.mask.progress !== undefined) {
+          throw new Error(
+            `${path}.mask.progress cannot be mixed with top-level gsap. Animate the transitionMask target instead.`,
+          );
+        }
+        normalizedAnimation.mask = normalizeMask(
+          animation.mask,
+          `${path}.mask`,
+        );
+        delete normalizedAnimation.mask.progress;
+      }
+
+      if (animation.compositor !== undefined) {
+        if (animation.compositor.tween !== undefined) {
+          throw new Error(
+            `${path}.compositor.tween cannot be mixed with top-level gsap. Animate the transitionCompositor target instead.`,
+          );
+        }
+        normalizedAnimation.compositor = normalizeShaderCompositor(
+          animation.compositor,
+          `${path}.compositor`,
+        );
+      }
+
+      return normalizedAnimation;
+    }
+
     if (animation.replace !== undefined) {
       throw new Error(
         `${path}.replace is no longer supported. Define \`prev\`, \`next\`, or \`mask\` directly on the animation.`,
@@ -1012,6 +1153,31 @@ export const normalizeAnimations = (animations = []) => {
 
     return normalizedAnimation;
   });
+
+  const animationIds = new Map();
+  const transitionTargets = new Map();
+
+  for (const [index, animation] of normalized.entries()) {
+    const priorIdIndex = animationIds.get(animation.id);
+    if (priorIdIndex !== undefined) {
+      throw new Error(
+        `animations[${index}].id duplicates animations[${priorIdIndex}].id "${animation.id}". Animation ids must be unique within one state.`,
+      );
+    }
+    animationIds.set(animation.id, index);
+
+    if (animation.type !== "transition") {
+      continue;
+    }
+
+    const priorTransitionIndex = transitionTargets.get(animation.targetId);
+    if (priorTransitionIndex !== undefined) {
+      throw new Error(
+        `animations[${index}] defines a second transition for target "${animation.targetId}"; animations[${priorTransitionIndex}] already owns that transition target.`,
+      );
+    }
+    transitionTargets.set(animation.targetId, index);
+  }
 
   const targetKinds = new Map();
 

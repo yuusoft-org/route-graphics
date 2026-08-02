@@ -5,6 +5,10 @@ import { parseText } from "../../src/plugins/elements/text/parseText.js";
 import { updateText } from "../../src/plugins/elements/text/updateText.js";
 import { hitTestElementBounds } from "../../src/util/hitTestElementBounds.js";
 import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import { dispatchUpdateAnimationsNow } from "../../src/plugins/animations/updateAnimationDispatch.js";
+import { normalizeAnimations } from "../../src/util/normalizeAnimations.js";
+import { createCompletionTracker } from "../../src/util/completionTracker.js";
+import { getElementRenderState } from "../../src/plugins/elements/elementRenderState.js";
 
 const createSharedParams = () => ({
   app: {
@@ -25,6 +29,111 @@ const createSharedParams = () => ({
 });
 
 describe("text rich content", () => {
+  it("resyncs an existing split-text container after source layout updates", () => {
+    const parent = new Container();
+    const shared = createSharedParams();
+    const prevElement = parseText({
+      state: {
+        id: "split-text-update",
+        type: "text",
+        x: 20,
+        y: 30,
+        alpha: 1,
+        content: "A",
+        textStyle: {
+          fontSize: 24,
+          fontFamily: "Arial",
+          fill: "#FF0000",
+        },
+      },
+    });
+    const nextElement = parseText({
+      state: {
+        id: "split-text-update",
+        type: "text",
+        x: 140,
+        y: 90,
+        alpha: 0.4,
+        content: "A",
+        textStyle: {
+          fontSize: 24,
+          fontFamily: "Arial",
+          fill: "#00FF00",
+          strokeColor: "#0000FF",
+          strokeWidth: 2,
+          shadow: { color: "#111111", offsetX: 2, offsetY: 3, blur: 1 },
+        },
+      },
+    });
+    addText({ ...shared, parent, element: prevElement, zIndex: 0 });
+    const source = parent.getChildByLabel(prevElement.id);
+    const animation = normalizeAnimations([
+      {
+        id: "split-text-finite",
+        targetId: prevElement.id,
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          targets: {
+            character: {
+              textUnits: {
+                elementId: prevElement.id,
+                unit: "grapheme",
+                order: "logical",
+              },
+            },
+          },
+          steps: [
+            {
+              kind: "to",
+              targets: "character",
+              values: { alpha: 0.5 },
+              duration: 10,
+            },
+          ],
+        },
+      },
+    ]);
+    const bus = createAnimationBus();
+    const tracker = createCompletionTracker();
+    tracker.reset("split-text-update-state");
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: source,
+      targetState: {},
+    });
+    bus.flush();
+    bus.tick(10);
+    const units = parent.children.find((child) =>
+      child.label?.startsWith("__timeline-text-units:"),
+    );
+
+    updateText({
+      ...shared,
+      parent,
+      prevElement,
+      nextElement,
+      zIndex: 0,
+    });
+
+    expect(source).toMatchObject({ x: 140, y: 90, alpha: 0.4 });
+    expect(units).toMatchObject({ x: source.x, y: source.y, alpha: 0.4 });
+    expect(units.children[0].style).toBe(source.style);
+    expect(units.children[0].style.fill).toBe("#00FF00");
+    expect(units.children[0].style.stroke).toMatchObject({
+      color: "#0000FF",
+      width: 2,
+    });
+    expect(units.children[0].style.dropShadow).toMatchObject({
+      color: "#111111",
+      blur: 1,
+    });
+    expect(getElementRenderState(units)).toBe(nextElement);
+    parent.destroy({ children: true });
+  });
+
   it("applies degree rotation around an explicit rich-text origin", () => {
     const parent = new Container();
     const element = parseText({
