@@ -390,56 +390,71 @@ animations:
 
 ## Transition Masks
 
-`mask` is valid only on `type: transition`. It can be combined with `prev` and
-`next` surface motion.
+`mask` is valid only on `type: transition`. It accepts either the existing
+single-object shape or a non-empty array; a single object is normalized to a
+one-entry array. Its entries can be combined with `prev` and `next` surface
+motion. Overlapping entries use the per-pixel maximum reveal, so the strongest
+mask wins without compounding soft edges. A delayed entry contributes zero
+reveal until its start time.
 
 Common fields:
 
-| Field      | Type    | Default   | Notes                                     |
-| ---------- | ------- | --------- | ----------------------------------------- |
-| `kind`     | string  | -         | Required: `single` or `sequence`.         |
-| `channel`  | string  | `red`     | `red`, `green`, `blue`, or `alpha`.       |
-| `invert`   | boolean | `false`   | Reverses the sampled reveal field.        |
-| `progress` | object  | immediate | Manual keyframe timeline from `0` to `1`. |
+| Field      | Type    | Default   | Notes                                        |
+| ---------- | ------- | --------- | -------------------------------------------- |
+| `kind`     | string  | -         | Required: `single` or `sequence`.            |
+| `channel`  | string  | `red`     | `red`, `green`, `blue`, or `alpha`.          |
+| `invert`   | boolean | `false`   | Reverses the sampled reveal field.           |
+| `delay`    | integer | `0`       | Milliseconds before the mask becomes active. |
+| `progress` | object  | immediate | Manual keyframe timeline from `0` to `1`.    |
 
 ### Single Mask
 
 ```yaml
 mask:
-  kind: single
-  texture: spiral-mask
-  channel: red
-  softness: 0.08
-  progress:
-    initialValue: 0
-    keyframes:
-      - duration: 900
-        value: 1
-        easing: linear
+  - kind: single
+    texture: spiral-mask
+    channel: red
+    softness: 0.08
+    delay: 200
+    progress:
+      initialValue: 0
+      keyframes:
+        - duration: 900
+          value: 1
+          easing: linear
 ```
 
 `texture` is required. `softness` controls the feathered reveal threshold.
+
+`delay` keeps the mask completely inactive and holds the previous surface
+unchanged. After that time, the progress timeline begins. It is additive with a
+delay on the first progress keyframe: mask delay controls activation, while
+keyframe delay holds the initial progress after activation.
+
+For a top-level portable `gsap` transition, put timing on the action targeting
+the indexed `transitionMask`; mask-entry `delay` is not accepted in that
+authoring mode.
 
 ### Sequence Mask
 
 ```yaml
 mask:
-  kind: sequence
-  channel: alpha
-  sample: linear
-  progress:
-    initialValue: 0
-    keyframes:
-      - duration: 1000
-        value: 1
-        easing: linear
-  frames:
-    - at: 0
-      texture: masks/frame-0
-    - at: 0.5
-      texture: masks/frame-1
-    - at: 1
-      texture: masks/frame-2
+  - kind: sequence
+    channel: alpha
+    sample: linear
+    progress:
+      initialValue: 0
+      keyframes:
+        - duration: 1000
+          value: 1
+          easing: linear
+    frames:
+      - at: 0
+        texture: masks/frame-0
+      - at: 0.5
+        texture: masks/frame-1
+      - at: 1
+        texture: masks/frame-2
 ```
 
 Sequence rules:

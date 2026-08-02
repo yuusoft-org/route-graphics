@@ -213,14 +213,16 @@ describe("renderElements transition handling", () => {
           id: "rect-transition",
           targetId: "rect1",
           type: "transition",
-          mask: {
-            kind: "single",
-            texture: "mask-diagonal",
-            progress: {
-              initialValue: 0,
-              keyframes: [{ duration: 500, value: 1, easing: "linear" }],
+          mask: [
+            {
+              kind: "single",
+              texture: "mask-diagonal",
+              progress: {
+                initialValue: 0,
+                keyframes: [{ duration: 500, value: 1, easing: "linear" }],
+              },
             },
-          },
+          ],
         },
       ],
       animationBus,

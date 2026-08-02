@@ -149,14 +149,52 @@ out:
       targetId: scene-root
       type: transition
       mask:
-        kind: single
-        texture: masks/wipe.png
-        progress:
-          initialValue: 0
-          keyframes:
-            - duration: 0
-              value: 1
-              easing: linear
+        - kind: single
+          texture: masks/wipe.png
+          progress:
+            initialValue: 0
+            keyframes:
+              - duration: 0
+                value: 1
+                easing: linear
+  audio: []
+  audioEffects: []
+---
+case: Normalize transition animation with mask delay
+in:
+  - id: state-2-delayed-mask
+    animations:
+      - id: anim-delayed-mask
+        targetId: scene-root
+        type: transition
+        mask:
+          - kind: single
+            texture: masks/wipe.png
+            delay: 250
+            progress:
+              initialValue: 0
+              keyframes:
+                - delay: 50
+                  duration: 700
+                  value: 1
+out:
+  id: state-2-delayed-mask
+  elements: []
+  animations:
+    - id: anim-delayed-mask
+      targetId: scene-root
+      type: transition
+      mask:
+        - kind: single
+          delay: 250
+          texture: masks/wipe.png
+          progress:
+            initialValue: 0
+            keyframes:
+              - delay: 50
+                duration: 700
+                value: 1
+                easing: linear
   audio: []
   audioEffects: []
 ---
@@ -168,20 +206,20 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          frames:
-            - at: 0
-              texture: masks/a.png
-            - at: 0.5
-              texture: masks/b.png
-            - at: 1
-              texture: masks/c.png
-          channel: alpha
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 1000
-                value: 1
+          - kind: sequence
+            frames:
+              - at: 0
+                texture: masks/a.png
+              - at: 0.5
+                texture: masks/b.png
+              - at: 1
+                texture: masks/c.png
+            channel: alpha
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 1000
+                  value: 1
 out:
   id: state-2-sequence-mask
   elements: []
@@ -190,22 +228,22 @@ out:
       targetId: scene-root
       type: transition
       mask:
-        kind: sequence
-        channel: alpha
-        progress:
-          initialValue: 0
-          keyframes:
-            - duration: 1000
-              value: 1
-              easing: linear
-        frames:
-          - at: 0
-            texture: masks/a.png
-          - at: 0.5
-            texture: masks/b.png
-          - at: 1
-            texture: masks/c.png
-        sample: hold
+        - kind: sequence
+          channel: alpha
+          progress:
+            initialValue: 0
+            keyframes:
+              - duration: 1000
+                value: 1
+                easing: linear
+          frames:
+            - at: 0
+              texture: masks/a.png
+            - at: 0.5
+              texture: masks/b.png
+            - at: 1
+              texture: masks/c.png
+          sample: hold
   audio: []
   audioEffects: []
 ---
@@ -891,8 +929,8 @@ in:
               - duration: 100
                 value: 20
         mask:
-          kind: single
-          texture: masks/wipe.png
+          - kind: single
+            texture: masks/wipe.png
 throws: animations[0].mask is only valid for transition animations.
 ---
 case: Throw when transition animation defines tween
@@ -1129,11 +1167,11 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          textures:
-            - masks/a.png
-            - masks/b.png
-throws: "animations[0].mask.textures is no longer supported. Use animations[0].mask.frames with texture and at entries instead."
+          - kind: sequence
+            textures:
+              - masks/a.png
+              - masks/b.png
+throws: "animations[0].mask[0].textures is no longer supported. Use animations[0].mask[0].frames with texture and at entries instead."
 ---
 case: Throw when transition mask uses composite kind
 in:
@@ -1143,11 +1181,11 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: composite
-          items:
-            - texture: masks/a.png
-            - texture: masks/b.png
-throws: "animations[0].mask.kind must be one of: single, sequence."
+          - kind: composite
+            items:
+              - texture: masks/a.png
+              - texture: masks/b.png
+throws: "animations[0].mask[0].kind must be one of: single, sequence."
 ---
 case: Throw when sequence mask uses softness
 in:
@@ -1157,14 +1195,14 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          softness: 0.02
-          frames:
-            - at: 0
-              texture: masks/a.png
-            - at: 1
-              texture: masks/b.png
-throws: "animations[0].mask.softness is not valid for sequence masks. Author feathering into animations[0].mask.frames[].texture instead."
+          - kind: sequence
+            softness: 0.02
+            frames:
+              - at: 0
+                texture: masks/a.png
+              - at: 1
+                texture: masks/b.png
+throws: "animations[0].mask[0].softness is not valid for sequence masks. Author feathering into animations[0].mask[0].frames[].texture instead."
 ---
 case: Throw when sequence mask has too few frames
 in:
@@ -1174,11 +1212,11 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          frames:
-            - at: 0
-              texture: masks/a.png
-throws: animations[0].mask.frames must be an array with at least two frames.
+          - kind: sequence
+            frames:
+              - at: 0
+                texture: masks/a.png
+throws: animations[0].mask[0].frames must be an array with at least two frames.
 ---
 case: Throw when sequence mask frames do not start at zero
 in:
@@ -1188,13 +1226,13 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          frames:
-            - at: 0.1
-              texture: masks/a.png
-            - at: 1
-              texture: masks/b.png
-throws: animations[0].mask.frames[0].at must be 0.
+          - kind: sequence
+            frames:
+              - at: 0.1
+                texture: masks/a.png
+              - at: 1
+                texture: masks/b.png
+throws: animations[0].mask[0].frames[0].at must be 0.
 ---
 case: Throw when sequence mask frames do not end at one
 in:
@@ -1204,13 +1242,13 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          frames:
-            - at: 0
-              texture: masks/a.png
-            - at: 0.8
-              texture: masks/b.png
-throws: animations[0].mask.frames[1].at must be 1.
+          - kind: sequence
+            frames:
+              - at: 0
+                texture: masks/a.png
+              - at: 0.8
+                texture: masks/b.png
+throws: animations[0].mask[0].frames[1].at must be 1.
 ---
 case: Throw when sequence mask frames are not sorted and unique
 in:
@@ -1220,17 +1258,17 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          frames:
-            - at: 0
-              texture: masks/a.png
-            - at: 0.5
-              texture: masks/b.png
-            - at: 0.5
-              texture: masks/c.png
-            - at: 1
-              texture: masks/d.png
-throws: animations[0].mask.frames must be sorted by ascending unique at values.
+          - kind: sequence
+            frames:
+              - at: 0
+                texture: masks/a.png
+              - at: 0.5
+                texture: masks/b.png
+              - at: 0.5
+                texture: masks/c.png
+              - at: 1
+                texture: masks/d.png
+throws: animations[0].mask[0].frames must be sorted by ascending unique at values.
 ---
 case: Throw when sequence mask sample is unsupported
 in:
@@ -1240,14 +1278,14 @@ in:
         targetId: scene-root
         type: transition
         mask:
-          kind: sequence
-          sample: nearest
-          frames:
-            - at: 0
-              texture: masks/a.png
-            - at: 1
-              texture: masks/b.png
-throws: "animations[0].mask.sample must be one of: hold, linear."
+          - kind: sequence
+            sample: nearest
+            frames:
+              - at: 0
+                texture: masks/a.png
+              - at: 1
+                texture: masks/b.png
+throws: "animations[0].mask[0].sample must be one of: hold, linear."
 ---
 case: Throw when target mixes update and transition types
 in:

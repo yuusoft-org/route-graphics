@@ -426,6 +426,12 @@ $defs:
       sample:
         type: string
         enum: [hold, linear]
+      delay:
+        type: integer
+        minimum: 0
+        maximum: 9007199254740991
+        default: 0
+        description: Time in milliseconds before the mask becomes active and its progress timeline begins.
       progress:
         $ref: "#/$defs/maskProgress"
     additionalProperties: false
@@ -538,7 +544,11 @@ $defs:
         properties: { transitionSurface: { enum: [prev, next] } }
         additionalProperties: false
       - required: [transitionMask]
-        properties: { transitionMask: { const: true } }
+        properties:
+          transitionMask:
+            oneOf:
+              - { const: true }
+              - { type: integer, minimum: 0, maximum: 9007199254740991 }
         additionalProperties: false
       - required: [transitionCompositor]
         properties: { transitionCompositor: { const: true } }
@@ -892,7 +902,12 @@ properties:
   next:
     $ref: "#/$defs/transitionSide"
   mask:
-    $ref: "#/$defs/mask"
+    oneOf:
+      - $ref: "#/$defs/mask"
+      - type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/mask"
   compositor:
     $ref: "../shader-config.yaml#/definitions/compositor"
 additionalProperties: false

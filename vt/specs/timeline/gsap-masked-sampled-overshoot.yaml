@@ -48,9 +48,9 @@ states:
         targetId: sampled-target
         type: transition
         mask:
-          kind: single
-          texture: mask-full
-          channel: red
+          - kind: single
+            texture: mask-full
+            channel: red
         gsap:
           profile: portable-v1
           targets:

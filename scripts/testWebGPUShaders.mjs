@@ -30,6 +30,22 @@ const loadStates = async (relativePath) => {
   return spec.states;
 };
 
+const multipleMaskStates = await loadStates(
+  "vt/specs/shadertransition/rect-mask-multipass-animated-compositor.yaml",
+);
+multipleMaskStates[1].animations[0].mask.push({
+  kind: "single",
+  texture: "mask-diagonal",
+  channel: "red",
+  invert: true,
+  delay: 200,
+  softness: 0.06,
+  progress: {
+    initialValue: 0,
+    keyframes: [{ duration: 600, value: 1, easing: "linear" }],
+  },
+});
+
 const cases = {
   timedUpdate: {
     states: await loadStates(
@@ -54,6 +70,10 @@ const cases = {
     states: await loadStates(
       "vt/specs/shadertransition/rect-mask-multipass-animated-compositor.yaml",
     ),
+    sampleTime: 400,
+  },
+  multipleMasks: {
+    states: multipleMaskStates,
     sampleTime: 400,
   },
 };

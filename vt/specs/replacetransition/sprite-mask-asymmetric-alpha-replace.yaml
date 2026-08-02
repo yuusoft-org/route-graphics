@@ -55,13 +55,13 @@ states:
         targetId: sample-bg
         type: transition
         mask:
-          kind: single
-          texture: sprite-mask-asym-alpha
-          channel: alpha
-          softness: 0.08
-          progress:
-            initialValue: 0
-            keyframes:
-              - duration: 4000
-                value: 1
-                easing: linear
+          - kind: single
+            texture: sprite-mask-asym-alpha
+            channel: alpha
+            softness: 0.08
+            progress:
+              initialValue: 0
+              keyframes:
+                - duration: 4000
+                  value: 1
+                  easing: linear

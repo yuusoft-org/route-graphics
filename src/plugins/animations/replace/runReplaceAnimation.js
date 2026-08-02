@@ -14,6 +14,7 @@ import {
   compileTransitionAnimation,
   createGsapTimelineEvaluator,
   getEasingCriticalProgresses,
+  mapDomainTime,
 } from "../timeline/index.js";
 import {
   clearDeferredMountOperations,
@@ -209,18 +210,19 @@ const createTransitionTimelineController = ({
   program,
   prevSubject,
   nextSubject,
-  maskController,
+  maskControllers = [],
   compositorEffect,
   validateTerminal = false,
 }) => {
   const valueTypes = new Map(
     program.clipTemplates.map((clip) => [clip.channel, clip.valueType]),
   );
-  const maskHandle = {
+  const maskHandles = (animation.mask ?? []).map((mask, index) => ({
     kind: "mask",
-    progress: animation.mask?.progress?.initialValue ?? 0,
-    apply: (value) => maskController?.apply(clamp01(value)),
-  };
+    index,
+    progress: mask.progress?.initialValue ?? 0,
+    apply: (value) => maskControllers[index]?.apply(clamp01(value)),
+  }));
   const compositorHandle = {
     kind: "compositor",
     progress:
@@ -231,7 +233,10 @@ const createTransitionTimelineController = ({
   const transitionTargets = {
     prev: createTransitionSurfaceTarget("prev", prevSubject),
     next: createTransitionSurfaceTarget("next", nextSubject),
-    mask: { handle: maskHandle, identity: "transition:mask" },
+    mask: maskHandles.map((handle, index) => ({
+      handle,
+      identity: `transition:mask:${index}`,
+    })),
     compositor: {
       handle: compositorHandle,
       identity: "transition:compositor",
@@ -349,17 +354,25 @@ const createTransitionTimelineController = ({
   try {
     const terminalFrame = timelineEvaluator.evaluate(instance.duration);
     if (validateTerminal && animation.gsap) {
-      for (const [configured, channel, label] of [
-        [animation.mask, "transition.mask.progress", "mask"],
-        [animation.compositor, "transition.compositor.progress", "compositor"],
-      ]) {
-        if (!configured) continue;
+      for (const [index] of (animation.mask ?? []).entries()) {
         const value = terminalFrame.values.find(
-          (item) => item.channel === channel,
+          (item) =>
+            item.targetIdentity === `transition:mask:${index}` &&
+            item.channel === "transition.mask.progress",
         )?.value;
         if (value !== 1) {
           throw new Error(
-            `Transition animation "${animation.id}" ${label} must have effective terminal progress 1.`,
+            `Transition animation "${animation.id}" mask[${index}] must have effective terminal progress 1.`,
+          );
+        }
+      }
+      if (animation.compositor) {
+        const value = terminalFrame.values.find(
+          (item) => item.channel === "transition.compositor.progress",
+        )?.value;
+        if (value !== 1) {
+          throw new Error(
+            `Transition animation "${animation.id}" compositor must have effective terminal progress 1.`,
           );
         }
       }
@@ -393,7 +406,17 @@ const createTransitionTimelineController = ({
     backend: timelineEvaluator.backend,
     duration: instance.duration,
     sampleTimes: [...sampleTimes].sort((left, right) => left - right),
-    apply: timelineEvaluator.apply,
+    apply: (time) => {
+      if (maskControllers.length > 0) {
+        const rootTime = mapDomainTime(instance.domains.root, time);
+        for (const [index, mask] of (animation.mask ?? []).entries()) {
+          maskControllers[index]?.setActive(
+            rootTime.localTime >= (mask.delay ?? 0),
+          );
+        }
+      }
+      timelineEvaluator.apply(time);
+    },
     destroy: timelineEvaluator.destroy,
   };
 };
@@ -497,6 +520,7 @@ uniform float uSoftness;
 uniform float uMaskMix;
 uniform float uMaskInvert;
 uniform float uMaskDirectReveal;
+uniform float uMaskActive;
 uniform vec4 uMaskChannelWeights;
 uniform vec4 uSecondaryClamp;
 
@@ -534,7 +558,7 @@ void main()
     vec4 prevColor = texture(uTexture, uv);
     vec4 nextColor = texture(uNextTexture, secondaryUv);
     float maskValue = sampleMaskValue(secondaryUv);
-    float reveal = mix(
+    float reveal = clamp(uMaskActive, 0.0, 1.0) * mix(
         sampleReveal(maskValue),
         clamp(maskValue, 0.0, 1.0),
         clamp(uMaskDirectReveal, 0.0, 1.0)
@@ -560,6 +584,7 @@ struct ReplaceMaskUniforms {
   uMaskMix: f32,
   uMaskInvert: f32,
   uMaskDirectReveal: f32,
+  uMaskActive: f32,
   uMaskChannelWeights: vec4<f32>,
   uSecondaryMatrix: mat3x3<f32>,
   uSecondaryClamp: vec4<f32>,
@@ -649,13 +674,175 @@ fn mainFragment(
   let prevColor = textureSample(uTexture, uSampler, clampedUv);
   let nextColor = textureSample(uNextTexture, uSampler, clampedSecondaryUv);
   let maskValue = sampleMaskValue(clampedSecondaryUv);
-  let reveal = mix(
+  let reveal = clamp(replaceMaskUniforms.uMaskActive, 0.0, 1.0) * mix(
     sampleReveal(maskValue),
     clamp(maskValue, 0.0, 1.0),
     clamp(replaceMaskUniforms.uMaskDirectReveal, 0.0, 1.0),
   );
 
   return mix(prevColor, nextColor, reveal);
+}
+`;
+
+const MASK_ACCUMULATE_FILTER_FRAGMENT = `
+in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform sampler2D uMaskTextureA;
+uniform sampler2D uMaskTextureB;
+uniform float uProgress;
+uniform float uSoftness;
+uniform float uMaskMix;
+uniform float uMaskInvert;
+uniform float uMaskDirectReveal;
+uniform float uMaskActive;
+uniform vec4 uMaskChannelWeights;
+
+float sampleAccumulatedMaskValue(vec2 uv)
+{
+    vec4 rawMaskA = texture(uMaskTextureA, uv);
+    vec4 rawMaskB = texture(uMaskTextureB, uv);
+    float maskA = dot(rawMaskA, uMaskChannelWeights);
+    float maskB = dot(rawMaskB, uMaskChannelWeights);
+    float maskValue = mix(maskA, maskB, clamp(uMaskMix, 0.0, 1.0));
+
+    return mix(maskValue, 1.0 - maskValue, clamp(uMaskInvert, 0.0, 1.0));
+}
+
+float sampleAccumulatedReveal(float maskValue)
+{
+    float progress = clamp(uProgress, 0.0, 1.0);
+    float revealThreshold = 1.0 - clamp(maskValue, 0.0, 1.0);
+    float lowerEdge = clamp(revealThreshold - uSoftness, 0.0, 1.0);
+    float upperEdge = clamp(revealThreshold + uSoftness, 0.0, 1.0);
+
+    if (lowerEdge == upperEdge) {
+        return progress < lowerEdge ? 0.0 : 1.0;
+    }
+
+    float t = clamp((progress - lowerEdge) / (upperEdge - lowerEdge), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+void main()
+{
+    vec2 uv = clamp(vTextureCoord, vec2(0.0), vec2(1.0));
+    float accumulated = texture(uTexture, uv).r;
+    float maskValue = sampleAccumulatedMaskValue(uv);
+    float reveal = clamp(uMaskActive, 0.0, 1.0) * mix(
+        sampleAccumulatedReveal(maskValue),
+        clamp(maskValue, 0.0, 1.0),
+        clamp(uMaskDirectReveal, 0.0, 1.0)
+    );
+    float combined = max(accumulated, reveal);
+
+    finalColor = vec4(combined, combined, combined, 1.0);
+}
+`;
+
+const MASK_ACCUMULATE_FILTER_WGSL = `
+struct GlobalFilterUniforms {
+  uInputSize: vec4<f32>,
+  uInputPixel: vec4<f32>,
+  uInputClamp: vec4<f32>,
+  uOutputFrame: vec4<f32>,
+  uGlobalFrame: vec4<f32>,
+  uOutputTexture: vec4<f32>,
+};
+
+struct ReplaceMaskUniforms {
+  uProgress: f32,
+  uSoftness: f32,
+  uMaskMix: f32,
+  uMaskInvert: f32,
+  uMaskDirectReveal: f32,
+  uMaskActive: f32,
+  uMaskChannelWeights: vec4<f32>,
+  uSecondaryMatrix: mat3x3<f32>,
+  uSecondaryClamp: vec4<f32>,
+};
+
+@group(0) @binding(0) var<uniform> gfu: GlobalFilterUniforms;
+@group(0) @binding(1) var uTexture: texture_2d<f32>;
+@group(0) @binding(2) var uSampler: sampler;
+@group(1) @binding(0) var<uniform> replaceMaskUniforms: ReplaceMaskUniforms;
+@group(1) @binding(1) var uMaskTextureA: texture_2d<f32>;
+@group(1) @binding(2) var uMaskTextureB: texture_2d<f32>;
+
+struct VSOutput {
+  @builtin(position) position: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+};
+
+fn filterVertexPosition(aPosition: vec2<f32>) -> vec4<f32>
+{
+  var position = aPosition * gfu.uOutputFrame.zw + gfu.uOutputFrame.xy;
+
+  position.x = position.x * (2.0 / gfu.uOutputTexture.x) - 1.0;
+  position.y = position.y * (2.0 * gfu.uOutputTexture.z / gfu.uOutputTexture.y) - gfu.uOutputTexture.z;
+
+  return vec4(position, 0.0, 1.0);
+}
+
+fn filterTextureCoord(aPosition: vec2<f32>) -> vec2<f32>
+{
+  return aPosition * (gfu.uOutputFrame.zw * gfu.uInputSize.zw);
+}
+
+fn sampleAccumulatedMaskValue(uv: vec2<f32>) -> f32
+{
+  let rawMaskA = textureSample(uMaskTextureA, uSampler, uv);
+  let rawMaskB = textureSample(uMaskTextureB, uSampler, uv);
+  let maskA = dot(rawMaskA, replaceMaskUniforms.uMaskChannelWeights);
+  let maskB = dot(rawMaskB, replaceMaskUniforms.uMaskChannelWeights);
+  let maskValue = mix(maskA, maskB, clamp(replaceMaskUniforms.uMaskMix, 0.0, 1.0));
+
+  return mix(maskValue, 1.0 - maskValue, clamp(replaceMaskUniforms.uMaskInvert, 0.0, 1.0));
+}
+
+fn sampleAccumulatedReveal(maskValue: f32) -> f32
+{
+  let progress = clamp(replaceMaskUniforms.uProgress, 0.0, 1.0);
+  let revealThreshold = 1.0 - clamp(maskValue, 0.0, 1.0);
+  let lowerEdge = clamp(revealThreshold - replaceMaskUniforms.uSoftness, 0.0, 1.0);
+  let upperEdge = clamp(revealThreshold + replaceMaskUniforms.uSoftness, 0.0, 1.0);
+
+  if (lowerEdge == upperEdge) {
+    if (progress < lowerEdge) {
+      return 0.0;
+    }
+
+    return 1.0;
+  }
+
+  let t = clamp((progress - lowerEdge) / (upperEdge - lowerEdge), 0.0, 1.0);
+  return t * t * (3.0 - 2.0 * t);
+}
+
+@vertex
+fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput
+{
+  return VSOutput(
+    filterVertexPosition(aPosition),
+    filterTextureCoord(aPosition),
+  );
+}
+
+@fragment
+fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32>
+{
+  let clampedUv = clamp(uv, vec2(0.0), vec2(1.0));
+  let accumulated = textureSample(uTexture, uSampler, clampedUv).r;
+  let maskValue = sampleAccumulatedMaskValue(clampedUv);
+  let reveal = clamp(replaceMaskUniforms.uMaskActive, 0.0, 1.0) * mix(
+    sampleAccumulatedReveal(maskValue),
+    clamp(maskValue, 0.0, 1.0),
+    clamp(replaceMaskUniforms.uMaskDirectReveal, 0.0, 1.0),
+  );
+  let combined = max(accumulated, reveal);
+
+  return vec4(combined, combined, combined, 1.0);
 }
 `;
 
@@ -898,8 +1085,8 @@ const createMaskTextures = (app, mask, width, height) => {
   throw new Error(`Unsupported replace mask kind: ${mask.kind}.`);
 };
 
-const createReplaceMaskFilter = () => {
-  const replaceMaskUniforms = new UniformGroup({
+const createReplaceMaskUniforms = ({ active = true } = {}) =>
+  new UniformGroup({
     uProgress: {
       value: 0,
       type: "f32",
@@ -920,6 +1107,10 @@ const createReplaceMaskFilter = () => {
       value: 0,
       type: "f32",
     },
+    uMaskActive: {
+      value: active ? 1 : 0,
+      type: "f32",
+    },
     uMaskChannelWeights: {
       value: new Float32Array([1, 0, 0, 0]),
       type: "vec4<f32>",
@@ -933,6 +1124,9 @@ const createReplaceMaskFilter = () => {
       type: "vec4<f32>",
     },
   });
+
+const createReplaceMaskFilter = ({ active = true } = {}) => {
+  const replaceMaskUniforms = createReplaceMaskUniforms({ active });
   const filter = Filter.from({
     gpu: {
       vertex: {
@@ -961,6 +1155,34 @@ const createReplaceMaskFilter = () => {
     filter,
     replaceMaskUniforms,
   };
+};
+
+const createMaskAccumulateFilter = ({ active = true } = {}) => {
+  const replaceMaskUniforms = createReplaceMaskUniforms({ active });
+  const filter = Filter.from({
+    gpu: {
+      vertex: {
+        source: MASK_ACCUMULATE_FILTER_WGSL,
+        entryPoint: "mainVertex",
+      },
+      fragment: {
+        source: MASK_ACCUMULATE_FILTER_WGSL,
+        entryPoint: "mainFragment",
+      },
+    },
+    gl: {
+      vertex: REPLACE_MASK_FILTER_VERTEX,
+      fragment: MASK_ACCUMULATE_FILTER_FRAGMENT,
+      name: "replace-mask-accumulate-filter",
+    },
+    resources: {
+      replaceMaskUniforms,
+      uMaskTextureA: Texture.EMPTY.source,
+      uMaskTextureB: Texture.EMPTY.source,
+    },
+  });
+
+  return { filter, replaceMaskUniforms };
 };
 
 export const selectSequenceMaskFrameState = ({
@@ -1048,6 +1270,12 @@ const createMaskTextureController = (app, mask, width, height, filter) => {
   let lastToIndex = -1;
 
   return {
+    setActive: (active) => {
+      const value = active ? 1 : 0;
+      if (replaceMaskUniforms.uniforms.uMaskActive === value) return;
+      replaceMaskUniforms.uniforms.uMaskActive = value;
+      replaceMaskUniforms.update();
+    },
     apply: (progress) => {
       const selection =
         mask?.kind === "sequence"
@@ -1084,6 +1312,133 @@ const createMaskTextureController = (app, mask, width, height, filter) => {
       replaceMaskUniforms.update();
     },
     destroy,
+  };
+};
+
+// Each filter consumes the previous grayscale reveal field and writes the
+// per-pixel maximum with its own reveal, producing an order-independent union.
+const createMaskCompositionController = ({ app, masks, width, height }) => {
+  const outputTexture = createShaderRenderTexture(width, height);
+  const sprite = new Sprite(Texture.WHITE);
+  sprite.width = width;
+  sprite.height = height;
+  sprite.tint = 0x000000;
+  sprite.filterArea = new Rectangle(0, 0, width, height);
+
+  const container = new Container();
+  container.addChild(sprite);
+
+  const entries = masks.map((mask) => {
+    const { filter } = createMaskAccumulateFilter({
+      active: !(mask.delay > 0),
+    });
+    return {
+      filter,
+      controller: createMaskTextureController(app, mask, width, height, filter),
+    };
+  });
+  sprite.filters = entries.map(({ filter }) => filter);
+
+  return {
+    textureSource: outputTexture.source,
+    controllers: entries.map(({ controller }) => controller),
+    render: () => {
+      app.renderer.render({
+        container,
+        target: outputTexture,
+        clear: true,
+        clearColor: [0, 0, 0, 1],
+      });
+    },
+    destroy: () => {
+      sprite.filters = [];
+      for (const { filter } of entries) filter.destroy();
+      for (const { controller } of entries) controller.destroy();
+      container.destroy({ children: true });
+      outputTexture.destroy(true);
+    },
+  };
+};
+
+const bindComposedMaskTexture = (filter, textureSource) => {
+  const uniforms = filter.resources.replaceMaskUniforms;
+  filter.resources.uMaskTextureA = textureSource;
+  filter.resources.uMaskTextureB = textureSource;
+  uniforms.uniforms.uProgress = 0;
+  uniforms.uniforms.uSoftness = 0.001;
+  uniforms.uniforms.uMaskMix = 0;
+  uniforms.uniforms.uMaskInvert = 0;
+  uniforms.uniforms.uMaskDirectReveal = 1;
+  uniforms.uniforms.uMaskActive = 1;
+  uniforms.uniforms.uMaskChannelWeights = OUTPUT_MASK_CHANNEL_WEIGHTS;
+  uniforms.update();
+};
+
+const createOverlayMaskResources = ({
+  app,
+  masks,
+  width,
+  height,
+  nextTextureSource,
+  sprite,
+}) => {
+  if (!masks?.length) {
+    return null;
+  }
+
+  const singleMask = masks.length === 1 ? masks[0] : null;
+  const { filter } = createReplaceMaskFilter({
+    active: singleMask ? !(singleMask.delay > 0) : true,
+  });
+  filter.resources.uNextTexture = nextTextureSource;
+
+  let composition = null;
+  let controllers;
+  if (singleMask) {
+    controllers = [
+      createMaskTextureController(app, singleMask, width, height, filter),
+    ];
+  } else {
+    composition = createMaskCompositionController({
+      app,
+      masks,
+      width,
+      height,
+    });
+    controllers = composition.controllers;
+    bindComposedMaskTexture(filter, composition.textureSource);
+  }
+
+  const secondaryClamp = createFullFrameClamp(width, height);
+  const baseApplyFilter =
+    typeof filter.apply === "function"
+      ? filter.apply.bind(filter)
+      : (filterManager, input, output, clearMode) => {
+          filterManager.applyFilter(filter, input, output, clearMode);
+        };
+  filter.apply = (filterManager, input, output, clearMode) => {
+    const replaceMaskUniforms = filter.resources.replaceMaskUniforms;
+    filterManager.calculateSpriteMatrix(
+      replaceMaskUniforms.uniforms.uSecondaryMatrix,
+      sprite,
+    );
+    replaceMaskUniforms.uniforms.uSecondaryClamp = secondaryClamp;
+    replaceMaskUniforms.update();
+    baseApplyFilter(filterManager, input, output, clearMode);
+  };
+
+  return {
+    filter,
+    controllers,
+    render: () => composition?.render(),
+    destroy: () => {
+      filter.destroy();
+      if (composition) {
+        composition.destroy();
+      } else {
+        controllers[0].destroy();
+      }
+    },
   };
 };
 
@@ -1496,40 +1851,17 @@ const createCompositorOverlay = ({
       return parameter;
     });
 
-  let maskFilter = null;
-  let maskTextureController = null;
-  if (animation.mask) {
-    ({ filter: maskFilter } = createReplaceMaskFilter());
-    maskFilter.resources.uNextTexture = nextTexture.source;
-
-    const baseApplyMaskFilter =
-      typeof maskFilter.apply === "function"
-        ? maskFilter.apply.bind(maskFilter)
-        : (filterManager, input, output, clearMode) => {
-            filterManager.applyFilter(maskFilter, input, output, clearMode);
-          };
-    maskFilter.apply = (filterManager, input, output, clearMode) => {
-      const replaceMaskUniforms = maskFilter.resources.replaceMaskUniforms;
-      filterManager.calculateSpriteMatrix(
-        replaceMaskUniforms.uniforms.uSecondaryMatrix,
-        sprite,
-      );
-      replaceMaskUniforms.uniforms.uSecondaryClamp = nextTextureClamp;
-      replaceMaskUniforms.update();
-      baseApplyMaskFilter(filterManager, input, output, clearMode);
-    };
-
-    maskTextureController = createMaskTextureController(
-      app,
-      animation.mask,
-      unionBounds.width,
-      unionBounds.height,
-      maskFilter,
-    );
-  }
+  const maskResources = createOverlayMaskResources({
+    app,
+    masks: animation.mask,
+    width: unionBounds.width,
+    height: unionBounds.height,
+    nextTextureSource: nextTexture.source,
+    sprite,
+  });
 
   sprite.filters = [
-    ...(maskFilter ? [maskFilter] : []),
+    ...(maskResources ? [maskResources.filter] : []),
     ...compositorEffect.filters,
   ];
 
@@ -1538,7 +1870,7 @@ const createCompositorOverlay = ({
     program,
     prevSubject,
     nextSubject,
-    maskController: maskTextureController,
+    maskControllers: maskResources?.controllers,
     compositorEffect,
     validateTerminal: true,
   });
@@ -1572,6 +1904,7 @@ const createCompositorOverlay = ({
     timelineController,
     apply: (time) => {
       timelineController.apply(time);
+      maskResources?.render();
 
       if (
         prevSubject?.wrapper &&
@@ -1610,8 +1943,7 @@ const createCompositorOverlay = ({
       timelineController.destroy();
       overlay.removeFromParent();
       sprite.filters = [];
-      maskFilter?.destroy();
-      maskTextureController?.destroy();
+      maskResources?.destroy();
       destroyShaderEffect(compositorEffect);
       cleanupParticlesInTree({ app, root: overlay });
       cleanupParticlesInTree({ app, root: prevRoot });
@@ -1684,43 +2016,21 @@ const createMaskedOverlay = ({
   );
   overlay.addChild(sprite);
 
-  const { filter: maskFilter } = createReplaceMaskFilter();
-  maskFilter.resources.uNextTexture = nextTexture.source;
-  sprite.filters = [maskFilter];
-  const secondaryClamp = createFullFrameClamp(
-    unionBounds.width,
-    unionBounds.height,
-  );
-  const baseApplyMaskFilter =
-    typeof maskFilter.apply === "function"
-      ? maskFilter.apply.bind(maskFilter)
-      : (filterManager, input, output, clearMode) => {
-          filterManager.applyFilter(maskFilter, input, output, clearMode);
-        };
-  maskFilter.apply = (filterManager, input, output, clearMode) => {
-    const replaceMaskUniforms = maskFilter.resources.replaceMaskUniforms;
-    filterManager.calculateSpriteMatrix(
-      replaceMaskUniforms.uniforms.uSecondaryMatrix,
-      sprite,
-    );
-    replaceMaskUniforms.uniforms.uSecondaryClamp = secondaryClamp;
-    replaceMaskUniforms.update();
-    baseApplyMaskFilter(filterManager, input, output, clearMode);
-  };
-
-  const maskTextureController = createMaskTextureController(
+  const maskResources = createOverlayMaskResources({
     app,
-    animation.mask,
-    unionBounds.width,
-    unionBounds.height,
-    maskFilter,
-  );
+    masks: animation.mask,
+    width: unionBounds.width,
+    height: unionBounds.height,
+    nextTextureSource: nextTexture.source,
+    sprite,
+  });
+  sprite.filters = [maskResources.filter];
   const timelineController = createTransitionTimelineController({
     animation,
     program,
     prevSubject,
     nextSubject,
-    maskController: maskTextureController,
+    maskControllers: maskResources.controllers,
     validateTerminal: true,
   });
   let prevStaticRendered = false;
@@ -1750,6 +2060,7 @@ const createMaskedOverlay = ({
     timelineController,
     apply: (time) => {
       timelineController.apply(time);
+      maskResources.render();
 
       if (
         prevSubject?.wrapper &&
@@ -1781,7 +2092,7 @@ const createMaskedOverlay = ({
       timelineController.destroy();
       overlay.removeFromParent();
       sprite.filters = [];
-      maskFilter.destroy();
+      maskResources.destroy();
       cleanupParticlesInTree({ app, root: overlay });
       cleanupParticlesInTree({ app, root: prevRoot });
       cleanupParticlesInTree({ app, root: nextRoot });
@@ -1792,7 +2103,6 @@ const createMaskedOverlay = ({
       nextTexture.destroy(true);
       destroySubjectSnapshot(prevSubject, app);
       destroySubjectSnapshot(nextSubject, app);
-      maskTextureController.destroy();
     },
   };
 };
@@ -1954,10 +2264,20 @@ export const runReplaceAnimation = ({
     sourcePath: `animation.${animation.id}`,
   });
   for (const query of Object.values(transitionProgram.targetQueries)) {
-    if (query.kind === "transitionMask" && !animation.mask) {
-      throw new Error(
-        `Transition animation "${animation.id}" targets a mask but has no mask resource.`,
-      );
+    if (query.kind === "transitionMask") {
+      if (!animation.mask?.length) {
+        throw new Error(
+          `Transition animation "${animation.id}" targets a mask but has no mask resource.`,
+        );
+      }
+      if (
+        query.index !== undefined &&
+        animation.mask[query.index] === undefined
+      ) {
+        throw new Error(
+          `Transition animation "${animation.id}" targets missing mask index ${query.index}.`,
+        );
+      }
     }
     if (query.kind === "transitionCompositor" && !animation.compositor) {
       throw new Error(
