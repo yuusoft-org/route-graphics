@@ -1084,4 +1084,193 @@ describe("command-controlled sound playback", () => {
 
     expect(eventsByName(eventHandler, "soundComplete")).toEqual([]);
   });
+
+  it("runs inline enter once for same-source transport plays and again for replacement", async () => {
+    const { context, render, stage } = await setupControlledStage({
+      assets: new Map([
+        ["track", { duration: 10 }],
+        ["next", { duration: 10 }],
+      ]),
+    });
+    const enter = {
+      enter: {
+        volume: {
+          initialValue: 0,
+          keyframes: [{ value: 80, duration: 500 }],
+        },
+      },
+    };
+
+    render([
+      playbackSound({
+        commandId: 1,
+        operation: "play",
+        positionMs: 0,
+        volume: 80,
+        transition: enter,
+      }),
+    ]);
+    await flushMicrotasks();
+    const firstKey = stage._inspect().currentSoundKeyById.get("player");
+    const firstInstance = stage._inspect().sounds.get(firstKey);
+    expect(
+      firstInstance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenCalledTimes(1);
+
+    render([
+      playbackSound({
+        commandId: 2,
+        operation: "play",
+        positionMs: 1000,
+        volume: 80,
+        transition: enter,
+      }),
+    ]);
+    await flushMicrotasks();
+
+    expect(context.sources).toHaveLength(2);
+    expect(stage._inspect().currentSoundKeyById.get("player")).toBe(firstKey);
+    expect(
+      firstInstance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenCalledTimes(1);
+
+    render([
+      playbackSound({
+        commandId: 3,
+        operation: "play",
+        positionMs: 0,
+        src: "next",
+        volume: 80,
+        transition: enter,
+      }),
+    ]);
+    await flushMicrotasks();
+
+    const replacementKey = stage._inspect().currentSoundKeyById.get("player");
+    const replacement = stage._inspect().sounds.get(replacementKey);
+    expect(replacementKey).not.toBe(firstKey);
+    expect(context.sources).toHaveLength(3);
+    expect(replacement.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0,
+      10,
+    );
+    expect(
+      replacement.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenCalledWith(0.8, 10.5);
+  });
+
+  it("carries active playback-rate automation across a same-source transport restart", async () => {
+    const { context, render } = await setupControlledStage();
+    const transition = {
+      enter: {
+        playbackRate: {
+          initialValue: 0.5,
+          keyframes: [{ value: 2, duration: 1000 }],
+        },
+      },
+    };
+
+    render([
+      playbackSound({
+        commandId: 1,
+        operation: "play",
+        positionMs: 0,
+        playbackRate: 2,
+        transition,
+      }),
+    ]);
+    await flushMicrotasks();
+    context.currentTime = 10.25;
+
+    render([
+      playbackSound({
+        commandId: 2,
+        operation: "play",
+        positionMs: 1000,
+        playbackRate: 2,
+        transition,
+      }),
+    ]);
+    await flushMicrotasks();
+
+    const restartedRate = context.sources[1].playbackRate;
+    expect(restartedRate.setValueAtTime.mock.calls.at(-1)[0]).toBeCloseTo(
+      0.875,
+    );
+    expect(restartedRate.setValueAtTime.mock.calls.at(-1)[1]).toBe(10.25);
+    expect(restartedRate.linearRampToValueAtTime).toHaveBeenCalledWith(2, 11);
+  });
+
+  it("starts a replacement enter after pending decode without delaying outgoing exit", async () => {
+    let resolveDecode;
+    const decodePromise = new Promise((resolve) => {
+      resolveDecode = resolve;
+    });
+    const { context, render, stage } = await setupControlledStage({
+      assets: new Map([["track", { duration: 10 }]]),
+      pendingAssets: new Map([["next", decodePromise]]),
+    });
+    const outgoing = playbackSound({
+      commandId: 1,
+      operation: "play",
+      positionMs: 0,
+      volume: 80,
+      transition: {
+        exit: {
+          volume: {
+            keyframes: [{ value: 0, duration: 1000 }],
+          },
+        },
+      },
+    });
+
+    render([outgoing]);
+    await flushMicrotasks();
+    const outgoingKey = stage._inspect().currentSoundKeyById.get("player");
+    const outgoingInstance = stage._inspect().sounds.get(outgoingKey);
+    const outgoingSource = context.sources[0];
+
+    render([
+      playbackSound({
+        commandId: 2,
+        operation: "play",
+        positionMs: 0,
+        src: "next",
+        volume: 80,
+        transition: {
+          enter: {
+            volume: {
+              initialValue: 0,
+              keyframes: [{ value: 80, duration: 500 }],
+            },
+          },
+        },
+      }),
+    ]);
+
+    const incomingKey = stage._inspect().currentSoundKeyById.get("player");
+    const incomingInstance = stage._inspect().sounds.get(incomingKey);
+    expect(incomingKey).not.toBe(outgoingKey);
+    expect(outgoingSource.stop).toHaveBeenCalledWith(11);
+    expect(
+      outgoingInstance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenCalledWith(0, 11);
+    expect(context.sources).toHaveLength(1);
+    expect(
+      incomingInstance.gainNode.gain.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
+
+    context.currentTime = 11.5;
+    vi.advanceTimersByTime(1000);
+    resolveDecode({ duration: 10 });
+    await flushMicrotasks();
+
+    expect(context.sources).toHaveLength(2);
+    expect(
+      incomingInstance.gainNode.gain.setValueAtTime,
+    ).toHaveBeenLastCalledWith(0, 11.5);
+    expect(
+      incomingInstance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenCalledWith(0.8, 12);
+  });
 });

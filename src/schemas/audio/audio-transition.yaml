@@ -77,6 +77,11 @@ definitions:
         type: number
         minimum: 0
         description: Duration to reach this value in milliseconds
+      delay:
+        type: number
+        minimum: 0
+        default: 0
+        description: Time to hold the preceding value before this ramp
       easing:
         $ref: "#/definitions/easing"
       relative:
@@ -161,6 +166,48 @@ definitions:
         minItems: 1
         items:
           $ref: "#/definitions/playbackRateKeyframe"
+    additionalProperties: false
+  soundInlinePhase:
+    type: object
+    minProperties: 1
+    properties:
+      volume:
+        $ref: "#/definitions/volumePhase"
+      pan:
+        $ref: "#/definitions/panPhase"
+      playbackRate:
+        $ref: "#/definitions/playbackRatePhase"
+    additionalProperties: false
+  channelInlinePhase:
+    type: object
+    minProperties: 1
+    properties:
+      volume:
+        $ref: "#/definitions/volumePhase"
+      pan:
+        $ref: "#/definitions/panPhase"
+    additionalProperties: false
+  soundInlineTransition:
+    type: object
+    minProperties: 1
+    properties:
+      enter:
+        $ref: "#/definitions/soundInlinePhase"
+      update:
+        $ref: "#/definitions/soundInlinePhase"
+      exit:
+        $ref: "#/definitions/soundInlinePhase"
+    additionalProperties: false
+  channelInlineTransition:
+    type: object
+    minProperties: 1
+    properties:
+      enter:
+        $ref: "#/definitions/channelInlinePhase"
+      update:
+        $ref: "#/definitions/channelInlinePhase"
+      exit:
+        $ref: "#/definitions/channelInlinePhase"
     additionalProperties: false
   volumeLifecycle:
     type: object

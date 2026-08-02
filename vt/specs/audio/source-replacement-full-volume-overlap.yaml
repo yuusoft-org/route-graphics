@@ -1,0 +1,39 @@
+---
+title: Audio Manual - Full-Volume Replacement Overlap
+description: Inline replacement fixture where both sources overlap at full volume before the outgoing fade.
+skipScreenshot: true
+specs:
+  - state 1 is silent so pressing n or clicking Next starts audio from a user gesture
+  - state 2 should start looping bgm-1 at volume 80
+  - state 3 should start bgm-2 immediately, overlap both tracks at full volume for one second, then fade out bgm-1 over two seconds
+  - state 4 should fade out and stop bgm-2
+---
+states:
+  - id: replacement-full-ready
+    audio: []
+  - id: replacement-full-first
+    audio:
+      - id: replacement-full-bgm
+        type: sound
+        src: bgm-1
+        loop: true
+        volume: 80
+        transition:
+          exit:
+            volume:
+              keyframes:
+                - { delay: 1000, value: 0, duration: 2000, easing: linear }
+  - id: replacement-full-second
+    audio:
+      - id: replacement-full-bgm
+        type: sound
+        src: bgm-2
+        loop: true
+        volume: 80
+        transition:
+          exit:
+            volume:
+              keyframes:
+                - { value: 0, duration: 1200, easing: linear }
+  - id: replacement-full-stopped
+    audio: []

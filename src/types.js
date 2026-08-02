@@ -733,6 +733,7 @@
  * @property {number} [startAt=0] - Start offset in seconds
  * @property {number|null} [endAt=null] - Optional end time in seconds
  * @property {SoundPlaybackCommand} [playback] - Optional command-controlled playback instruction
+ * @property {InlineAudioTransition} [transition] - Inline lifecycle property automation
  */
 
 /**
@@ -752,12 +753,43 @@
  * @property {'immediate' | 'loopEnd'} [interruption='immediate'] - Whether interruption stops immediately or finishes the active schedule iteration
  * @property {AudioChannelPlaybackCommand} [playback] - Optional cursor-preserving channel transport instruction
  * @property {SoundElement[]} [children=[]] - Sound nodes owned by the channel
+ * @property {InlineAudioTransition} [transition] - Inline lifecycle property automation
+ */
+
+/**
+ * @typedef {Object} InlineAudioTransitionKeyframe
+ * @property {number} value - Absolute target value, or delta when relative is true
+ * @property {number} duration - Ramp duration in milliseconds
+ * @property {number} [delay=0] - Time to hold the preceding value before the ramp
+ * @property {string} [easing="linear"] - Animation easing name
+ * @property {boolean} [relative=false] - Whether value is relative to the previous value
+ */
+
+/**
+ * @typedef {Object} InlineAudioTransitionTrack
+ * @property {number} [initialValue] - Optional starting value before the first keyframe
+ * @property {InlineAudioTransitionKeyframe[]} keyframes - Ordered property keyframes
+ */
+
+/**
+ * @typedef {Object} InlineAudioTransitionPhase
+ * @property {InlineAudioTransitionTrack} [volume] - Volume automation
+ * @property {InlineAudioTransitionTrack} [pan] - Stereo-pan automation
+ * @property {InlineAudioTransitionTrack} [playbackRate] - Playback-rate automation for sounds
+ */
+
+/**
+ * @typedef {Object} InlineAudioTransition
+ * @property {InlineAudioTransitionPhase} [enter] - Automation for creation or incoming replacement
+ * @property {InlineAudioTransitionPhase} [update] - Automation for changed properties
+ * @property {InlineAudioTransitionPhase} [exit] - Automation for removal or outgoing replacement
  */
 
 /**
  * @typedef {Object} AudioTransitionKeyframe
  * @property {number} value - Absolute target value, or delta when relative is true
  * @property {number} duration - Duration to reach this value in milliseconds
+ * @property {number} [delay=0] - Time to hold the preceding value before the ramp
  * @property {string} [easing="linear"] - Animation easing name
  * @property {boolean} [relative=false] - Whether value is relative to the previous value
  */
