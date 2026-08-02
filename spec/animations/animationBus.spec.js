@@ -1103,6 +1103,7 @@ describe("animationBus auto tween shorthand", () => {
     const animationBus = createAnimationBus();
     const applyFrame = vi.fn();
     const onComplete = vi.fn();
+    const onReverseComplete = vi.fn();
     const dispose = vi.fn();
     const reverseCompleted = vi.fn();
     animationBus.on("reverseCompleted", reverseCompleted);
@@ -1116,6 +1117,7 @@ describe("animationBus auto tween shorthand", () => {
         duration: 100,
         applyFrame,
         onComplete,
+        onReverseComplete,
         dispose,
       },
     });
@@ -1127,9 +1129,44 @@ describe("animationBus auto tween shorthand", () => {
 
     expect(applyFrame).toHaveBeenLastCalledWith(0);
     expect(reverseCompleted).toHaveBeenCalledWith({ id: "reverse-update" });
-    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onReverseComplete).toHaveBeenCalledTimes(1);
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(animationBus.getState().activeCount).toBe(0);
+  });
+
+  it("clears deferred terminal completion when seeking away from the end", () => {
+    const animationBus = createAnimationBus();
+    const applyFrame = vi.fn();
+    const onComplete = vi.fn();
+
+    animationBus.dispatch({
+      type: "START",
+      payload: {
+        id: "seek-deferred-transition",
+        driver: "custom",
+        animationType: "transition",
+        duration: 100,
+        deferCompletionUntilNextFrame: true,
+        applyFrame,
+        onComplete,
+      },
+    });
+    animationBus.flush();
+    animationBus.tick(100);
+
+    expect(animationBus.getState().animations[0]).toMatchObject({
+      currentTime: 100,
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(animationBus.seek("seek-deferred-transition", 40)).toBe(true);
+    animationBus.tick(10);
+
+    expect(animationBus.getState().animations[0]).toMatchObject({
+      currentTime: 50,
+    });
+    expect(applyFrame).toHaveBeenLastCalledWith(50);
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   it("rejects player-controlled reverse for transitions without mutating playback", () => {

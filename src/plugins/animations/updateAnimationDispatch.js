@@ -44,39 +44,49 @@ const animationsUseTranslate = (animations) =>
     Object.keys(animation.tween ?? {}).some(isTranslateAnimationProperty),
   );
 
-const queryIncludesOwner = (
-  targetQueries,
-  alias,
-  ownerId,
-  seen = new Set(),
-) => {
-  if (seen.has(alias)) return false;
-  seen.add(alias);
-  const query = targetQueries[alias];
-  if (!query) return false;
-  if (query.kind === "element") return query.elementId === ownerId;
-  if (query.kind === "elements") return query.elementIds.includes(ownerId);
-  if (query.kind === "union") {
-    return query.aliases.some((child) =>
-      queryIncludesOwner(targetQueries, child, ownerId, seen),
-    );
+const findInSubtree = (root, label) => {
+  if (!root) return null;
+  if (root.label === label) return root;
+  for (const child of root.children ?? []) {
+    const match = findInSubtree(child, label);
+    if (match) return match;
   }
-  return false;
+  return null;
 };
 
-const getGsapOwnerChannels = (animation) => {
-  if (!animation.gsap) return [];
-  const program = compilePortableGsapAnimation(animation);
-  const channels = new Set();
-  for (const clip of program.clipTemplates) {
-    if (
-      !queryIncludesOwner(program.targetQueries, clip.targets, program.ownerId)
-    ) {
-      continue;
+const getQueryElementIds = (program, alias, resolving = new Set()) => {
+  if (resolving.has(alias)) return new Set();
+  const query = program.targetQueries[alias];
+  if (!query) return new Set();
+  if (query.kind === "element") return new Set([query.elementId]);
+  if (query.kind === "elements") return new Set(query.elementIds);
+  if (query.kind !== "union") return new Set();
+
+  const nextResolving = new Set(resolving).add(alias);
+  const elementIds = new Set();
+  for (const childAlias of query.aliases) {
+    for (const elementId of getQueryElementIds(
+      program,
+      childAlias,
+      nextResolving,
+    )) {
+      elementIds.add(elementId);
     }
-    channels.add(clip.channel);
   }
-  return [...channels];
+  return elementIds;
+};
+
+const getGsapElementChannels = (program) => {
+  const entries = new Map();
+  for (const clip of program.clipTemplates) {
+    for (const elementId of getQueryElementIds(program, clip.targets)) {
+      entries.set(`${elementId}\u0000${clip.channel}`, {
+        elementId,
+        channel: clip.channel,
+      });
+    }
+  }
+  return [...entries.values()];
 };
 
 const parseFilterChannel = (channel) => {
@@ -110,61 +120,80 @@ const captureLiveTweenValues = (
   element,
   animations,
   propertyPathMap = TRANSITION_PROPERTY_PATH_MAP,
+  compiledGsapPrograms = new Map(),
 ) => {
   const values = new Map();
 
-  const captureProperty = (property) => {
+  const captureProperty = (target, elementId, property) => {
     const liveProperty = getLiveTweenProperty(property);
-    const key = `property:${liveProperty}`;
+    const key = `property:${elementId ?? "@owner"}:${liveProperty}`;
     if (values.has(key)) return;
-    const value = getAnimationProperty(element, liveProperty, propertyPathMap);
+    const value = getAnimationProperty(target, liveProperty, propertyPathMap);
     if (value !== undefined) {
       values.set(key, {
         kind: "property",
+        elementId,
         property: liveProperty,
         value: cloneTimelineValue(value),
       });
     }
   };
 
-  const captureFilter = (filterId, parameter, animationId) => {
-    const key = `filter:${filterId}:${parameter}`;
+  const captureFilter = (
+    target,
+    elementId,
+    filterId,
+    parameter,
+    animationId,
+  ) => {
+    const key = `filter:${elementId ?? "@owner"}:${filterId}:${parameter}`;
     if (values.has(key)) return;
-    const target = getShaderFilterAnimationTarget(
-      element,
+    const filterTarget = getShaderFilterAnimationTarget(
+      target,
       filterId,
       animationId,
     );
     values.set(key, {
       kind: "filter",
+      elementId,
       filterId,
       parameter,
       animationId,
-      value: cloneTimelineValue(target[parameter]),
+      value: cloneTimelineValue(filterTarget[parameter]),
     });
   };
 
   for (const animation of animations) {
     for (const property of Object.keys(animation.tween ?? {})) {
-      captureProperty(property);
+      captureProperty(element, null, property);
     }
     for (const [filterId, tween] of Object.entries(
       animation.filterTweens ?? {},
     )) {
       for (const parameter of Object.keys(tween)) {
-        captureFilter(filterId, parameter, animation.id);
+        captureFilter(element, null, filterId, parameter, animation.id);
       }
     }
 
-    for (const channel of getGsapOwnerChannels(animation)) {
+    const program = compiledGsapPrograms.get(animation.id);
+    if (!program) continue;
+    for (const { elementId, channel } of getGsapElementChannels(program)) {
+      const target = findInSubtree(element, elementId);
+      if (!target) continue;
       const property = getLegacyPropertyForChannel(channel);
       if (property) {
-        captureProperty(property);
+        captureProperty(target, elementId, property);
         continue;
       }
       const filter = parseFilterChannel(channel);
       if (filter) {
-        captureFilter(filter.filterId, filter.parameter, animation.id);
+        captureFilter(
+          target,
+          elementId,
+          filter.filterId,
+          filter.parameter,
+          animation.id,
+        );
       }
     }
   }
@@ -181,29 +210,57 @@ const restoreLiveTweenValues = (
     return;
   }
 
-  const frameHooks = getPixiTimelineAnimationBatchHooks(element);
-  frameHooks.beforeApplyFrame?.();
-  try {
-    for (const entry of values) {
-      if (entry.kind === "filter") {
-        const target = getShaderFilterAnimationTarget(
-          element,
-          entry.filterId,
-          entry.animationId,
-        );
-        target[entry.parameter] = cloneTimelineValue(entry.value);
-        continue;
-      }
-      applyAnimationProperty({
-        object: element,
-        property: entry.property,
-        propertyPathMap,
-        value: cloneTimelineValue(entry.value),
-      });
+  const frameValues = [];
+  const groups = new WeakMap();
+  const getGroup = (target) => {
+    if (!groups.has(target)) {
+      groups.set(target, getPixiTimelineAnimationBatchHooks(target));
     }
-  } finally {
-    frameHooks.afterApplyFrame?.();
+    return groups.get(target);
+  };
+  for (const entry of values) {
+    const target = entry.elementId
+      ? findInSubtree(element, entry.elementId)
+      : element;
+    if (!target || target.destroyed) continue;
+    const group = getGroup(target);
+    if (entry.kind === "filter") {
+      const filterTarget = getShaderFilterAnimationTarget(
+        target,
+        entry.filterId,
+        entry.animationId,
+      );
+      frameValues.push({
+        target,
+        value: cloneTimelineValue(entry.value),
+        binding: {
+          group,
+          get: () => filterTarget[entry.parameter],
+          apply: (_target, value) => {
+            filterTarget[entry.parameter] = value;
+          },
+        },
+      });
+      continue;
+    }
+    frameValues.push({
+      target,
+      value: cloneTimelineValue(entry.value),
+      binding: {
+        group,
+        get: () =>
+          getAnimationProperty(target, entry.property, propertyPathMap),
+        apply: (_target, value) =>
+          applyAnimationProperty({
+            object: target,
+            property: entry.property,
+            propertyPathMap,
+            value,
+          }),
+      },
+    });
   }
+  if (frameValues.length > 0) applyTimelineFrame({ values: frameValues });
 };
 
 const applyBoundTimelineTargetStates = (instance) => {
@@ -235,6 +292,7 @@ const settleLoopingUpdateState = ({
   element,
   targetState,
   onComplete,
+  compiledGsapPrograms,
   isInfiniteAnimation = (animation) =>
     animation.playback?.loop === true ||
     animation.playback?.repeat === "infinite",
@@ -245,7 +303,12 @@ const settleLoopingUpdateState = ({
   }
 
   const resolveCurrentElement = createCurrentElementResolver(element);
-  const liveTweenValues = captureLiveTweenValues(element, animations);
+  const liveTweenValues = captureLiveTweenValues(
+    element,
+    animations,
+    TRANSITION_PROPERTY_PATH_MAP,
+    compiledGsapPrograms,
+  );
   let currentElement = element;
   const restore = () => {
     currentElement = resolveCurrentElement();
@@ -424,6 +487,7 @@ export const dispatchUpdateAnimationsNow = ({
     element,
     targetState,
     onComplete,
+    compiledGsapPrograms,
     isInfiniteAnimation: (animation) =>
       animation.playback?.loop === true ||
       animation.playback?.repeat === "infinite" ||
@@ -586,6 +650,7 @@ export const dispatchUpdateAnimationsNow = ({
           },
           onComplete: complete,
           onCancel: releaseCompletion,
+          onReverseComplete: releaseCompletion,
         },
       });
       continue;
@@ -621,6 +686,7 @@ export const dispatchUpdateAnimationsNow = ({
         yoyo: animation.playback?.yoyo,
         onComplete: complete,
         onCancel: releaseCompletion,
+        onReverseComplete: releaseCompletion,
       },
     });
   }

@@ -453,6 +453,84 @@ describe("TimelineProgram binder and pure evaluator", () => {
     expect(sample(175)).toBe(75);
   });
 
+  it.each([false, true])(
+    "rejects overwrite error conflicts in later repeated occurrences with yoyo=%s",
+    (yoyo) => {
+      const source = {
+        id: `repeated-overwrite-error-${yoyo}`,
+        targetId: "hero",
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          steps: [
+            {
+              kind: "to",
+              values: { x: 100 },
+              duration: 100,
+              repeat: 1,
+              yoyo,
+            },
+            {
+              kind: "to",
+              values: { x: 200 },
+              duration: 50,
+              start: { time: 150 },
+              overwrite: "error",
+            },
+          ],
+        },
+      };
+      const program = compilePortableGsapAnimation(source);
+
+      expect(() =>
+        bindTimelineProgram(program, {
+          capabilities: new Set(program.requirements),
+          targetRegistry: {
+            hero: { handle: { x: 0 }, identity: "hero" },
+          },
+          channelRegistry: { "transform.x": makeAdapter("x") },
+        }),
+      ).toThrow(/steps\[1\].*steps\[0\].*transform\.x/);
+    },
+  );
+
+  it("allows overwrite error clips that remain disjoint across repeat gaps", () => {
+    const program = compilePortableGsapAnimation({
+      id: "repeat-gap-disjoint",
+      targetId: "hero",
+      type: "update",
+      gsap: {
+        profile: "portable-v1",
+        steps: [
+          {
+            kind: "to",
+            values: { x: 10 },
+            duration: 50,
+            repeat: 1,
+            repeatDelay: 50,
+          },
+          {
+            kind: "to",
+            values: { x: 20 },
+            duration: 50,
+            start: { time: 50 },
+            overwrite: "error",
+          },
+        ],
+      },
+    });
+
+    expect(() =>
+      bindTimelineProgram(program, {
+        capabilities: new Set(program.requirements),
+        targetRegistry: {
+          hero: { handle: { x: 0 }, identity: "hero" },
+        },
+        channelRegistry: { "transform.x": makeAdapter("x") },
+      }),
+    ).not.toThrow();
+  });
+
   it("inherits repeat-refresh through a speed domain", () => {
     const program = compilePortableGsapAnimation({
       id: "nested-refresh",

@@ -2325,6 +2325,7 @@ describe("RouteGraphics public API", () => {
     frameTick({ deltaMS: 13 });
 
     expect(app.getAnimationState("controlled-update")).toBeNull();
+    expect(app.findElementByLabel("controlled-rect")?.x).toBe(0);
     expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
       id: "controlled-active",
       aborted: false,

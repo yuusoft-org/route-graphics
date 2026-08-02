@@ -307,6 +307,18 @@ export const createAnimationBus = () => {
     }
   };
 
+  const fireReverseCompleteEvent = (context) => {
+    emit("reverseCompleted", { id: context.id });
+
+    if (context.onReverseComplete) {
+      try {
+        context.onReverseComplete();
+      } catch {
+        // Reverse-completion callbacks are best-effort.
+      }
+    }
+  };
+
   const attachAnimationMetadata = (context, metadata = {}) => {
     context.animationType = metadata.animationType ?? context.animationType;
     context.targetId = metadata.targetId ?? context.targetId;
@@ -427,6 +439,7 @@ export const createAnimationBus = () => {
       targetState,
       onComplete,
       onCancel,
+      onReverseComplete,
       propertyPathMap = TRANSITION_PROPERTY_PATH_MAP,
       animationBaseState,
     } = payload;
@@ -527,6 +540,7 @@ export const createAnimationBus = () => {
       targetState,
       onComplete,
       onCancel,
+      onReverseComplete,
       animationBackend: timelineEvaluator.backend,
       applyFrame: timelineEvaluator.apply,
       dispose: timelineEvaluator.destroy,
@@ -602,6 +616,7 @@ export const createAnimationBus = () => {
       stateVersion,
       onComplete: payload.onComplete,
       onCancel: payload.onCancel,
+      onReverseComplete: payload.onReverseComplete,
       animationBackend: payload.animationBackend,
       dispose: payload.dispose,
       applyFrame: payload.applyFrame ?? (() => {}),
@@ -631,6 +646,7 @@ export const createAnimationBus = () => {
       stateVersion,
       onComplete: payload.onComplete,
       onCancel: payload.onCancel,
+      onReverseComplete: payload.onReverseComplete,
       animationBackend: timelineEvaluator.backend,
       dispose: timelineEvaluator.destroy,
       applyFrame: payload.applyFrame ?? timelineEvaluator.apply,
@@ -946,8 +962,7 @@ export const createAnimationBus = () => {
           toRemove.push(id);
           continue;
         }
-        emit("reverseCompleted", { id });
-        fireCompleteEvent(context);
+        fireReverseCompleteEvent(context);
         toRemove.push(id);
         continue;
       }
@@ -1065,6 +1080,9 @@ export const createAnimationBus = () => {
       : clampAnimationTime(timeMS, context.duration);
     context.applyFrame(time);
     context.currentTime = time;
+    if (time < context.duration) {
+      context.pendingCompletion = false;
+    }
     deliverTimelineEvents(context, previousTime, time, {
       seek: true,
       replay: emitEvents,

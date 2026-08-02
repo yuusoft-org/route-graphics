@@ -258,6 +258,93 @@ const intervalsOverlap = (leftStart, leftEnd, rightStart, rightEnd) => {
   return leftStart < rightEnd && rightStart < leftEnd;
 };
 
+const MAX_OVERWRITE_OCCURRENCE_INTERVALS = 100_000;
+
+const getOccurrenceIntervalsInAncestor = (
+  domains,
+  domainId,
+  start,
+  end,
+  ancestorDomainId,
+) => {
+  let intervals = [{ start: Math.min(start, end), end: Math.max(start, end) }];
+  let currentId = domainId;
+
+  while (currentId !== ancestorDomainId) {
+    const domain = domains[currentId];
+    if (domain.iterations === null) {
+      throw new Error(
+        `overwrite:error cannot prove disjointness across infinite descendant domain "${currentId}".`,
+      );
+    }
+    if (
+      intervals.length >
+      Math.floor(MAX_OVERWRITE_OCCURRENCE_INTERVALS / domain.iterations)
+    ) {
+      throw new Error(
+        `overwrite:error occurrence analysis exceeds the ${MAX_OVERWRITE_OCCURRENCE_INTERVALS} interval limit.`,
+      );
+    }
+
+    const parentIntervals = [];
+    for (let iteration = 0; iteration < domain.iterations; iteration++) {
+      for (const interval of intervals) {
+        const mappedStart = getParentTimeForDomainLocal(
+          domain,
+          interval.start,
+          iteration,
+        );
+        const mappedEnd = getParentTimeForDomainLocal(
+          domain,
+          interval.end,
+          iteration,
+        );
+        parentIntervals.push({
+          start: Math.min(mappedStart, mappedEnd),
+          end: Math.max(mappedStart, mappedEnd),
+        });
+      }
+    }
+    intervals = parentIntervals;
+    currentId = domain.parent;
+  }
+
+  return intervals;
+};
+
+const segmentsOverlapAcrossOccurrences = (domains, left, right) => {
+  const commonDomain = getClosestCommonDomain(
+    domains,
+    left.domain,
+    right.domain,
+  );
+  const leftIntervals = getOccurrenceIntervalsInAncestor(
+    domains,
+    left.domain,
+    left.start,
+    left.start + left.duration,
+    commonDomain,
+  );
+  const rightIntervals = getOccurrenceIntervalsInAncestor(
+    domains,
+    right.domain,
+    right.start,
+    right.start + right.duration,
+    commonDomain,
+  );
+
+  return leftIntervals.some((leftInterval) =>
+    rightIntervals.some((rightInterval) =>
+      intervalsOverlap(
+        leftInterval.start,
+        leftInterval.end,
+        rightInterval.start,
+        rightInterval.end,
+      ),
+    ),
+  );
+};
+
 const expressionContainsKind = (expression, kind) => {
   if (!expression || typeof expression !== "object") return false;
   if (expression.kind === kind) return true;
@@ -614,15 +701,11 @@ export const bindTimelineProgram = (rawProgram, context) => {
             )
           : [track];
       if (overwrite === "error") {
+        const pendingSegment = { domain: clip.domain, start, duration };
         for (const candidate of earlierTracks) {
           for (const segment of candidate.segments) {
             if (
-              intervalsOverlap(
-                segment.rootStart,
-                segment.rootEnd,
-                rootStart,
-                rootEnd,
-              )
+              segmentsOverlapAcrossOccurrences(domains, segment, pendingSegment)
             ) {
               throw new Error(
                 `${clip.sourcePath ?? clip.id} conflicts with ${segment.sourcePath ?? segment.id} on target "${target.identity}" channel "${candidate.channel}".`,

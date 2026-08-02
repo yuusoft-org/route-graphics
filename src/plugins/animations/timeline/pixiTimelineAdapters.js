@@ -14,7 +14,10 @@ import {
   getShaderFilterTargetState,
 } from "../../elements/util/shaderFilterEffect.js";
 import { getBlurTargetState } from "../../elements/util/blurEffect.js";
-import { getElementRenderState } from "../../elements/elementRenderState.js";
+import {
+  getElementRenderState,
+  setElementRenderState,
+} from "../../elements/elementRenderState.js";
 import { getElementTransformTargetState } from "../../elements/util/transform.js";
 import {
   CanvasTextMetrics,
@@ -31,6 +34,18 @@ export const PIXI_TIMELINE_TEXT_UNITS = Symbol.for(
 
 const pendingTextUnitPreparations = new WeakMap();
 const textUnitStateByHandle = new WeakMap();
+const textInteractionEvents = Object.freeze([
+  "pointerover",
+  "pointerout",
+  "pointerdown",
+  "pointerupoutside",
+  "pointerup",
+  "rightdown",
+  "rightclick",
+  "rightup",
+  "rightupoutside",
+  "wheel",
+]);
 
 const copyDisplayTransform = (source, target) => {
   target.x = source.x ?? 0;
@@ -231,6 +246,29 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
   let destroyWithTextUnits = null;
   const originalRenderable = textElement.renderable;
   const originalFilters = textElement.filters;
+  const syncSemanticProxy = () => {
+    if (
+      committed &&
+      getTextUnitFingerprint(sourceText, textElement.style, query) !==
+        fingerprint
+    ) {
+      preparation.destroy();
+      return;
+    }
+    copyDisplayTransform(textElement, container);
+    container.eventMode = textElement.eventMode;
+    container.cursor = textElement.cursor;
+    for (const target of targets) {
+      if (
+        !target.handle.destroyed &&
+        target.handle.style !== textElement.style
+      ) {
+        target.handle.style = textElement.style;
+      }
+    }
+    const renderState = getElementRenderState(textElement);
+    if (renderState) setElementRenderState(container, renderState);
+  };
   const preparation = {
     fingerprint,
     originalText: sourceText,
@@ -260,6 +298,12 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
         parent.setChildIndex?.(container, originalIndex);
       }
       textElement[PIXI_TIMELINE_TEXT_UNITS] = preparation;
+      for (const event of textInteractionEvents) {
+        container.on(event, (...args) => {
+          textElement.emit(event, ...args);
+          preparation.sync();
+        });
+      }
       sourceDestroy = textElement.destroy;
       destroyWithTextUnits = function destroyTextWithUnits(...args) {
         preparation.destroy({ sourceDestroying: true });
@@ -268,6 +312,7 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
       textElement.destroy = destroyWithTextUnits;
       pendingTextUnitPreparations.delete(textElement);
       committed = true;
+      syncSemanticProxy();
     },
     rollback: () => {
       if (committed) {
@@ -279,7 +324,7 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
     },
     matches: (text, style) =>
       getTextUnitFingerprint(String(text ?? ""), style, query) === fingerprint,
-    sync: () => copyDisplayTransform(textElement, container),
+    sync: syncSemanticProxy,
     destroy: ({ sourceDestroying = false } = {}) => {
       pendingTextUnitPreparations.delete(textElement);
       if (textElement.destroy === destroyWithTextUnits && sourceDestroy) {
@@ -544,7 +589,13 @@ export const createPixiTimelineBindingContext = ({
           throw new Error(
             `Target query "${alias}" cannot find text element "${query.elementId}".`,
           );
-        if (resolveTextUnits) return resolveTextUnits(textElement, query);
+        if (resolveTextUnits) {
+          const targets = resolveTextUnits(textElement, query);
+          if (targets.length === 0 && !query.allowEmpty) {
+            throw new Error(`Target query "${alias}" resolved no text units.`);
+          }
+          return targets;
+        }
         if (typeof textElement.handle?.text !== "string") {
           throw new Error(
             `Target query "${alias}" requires a plain Pixi text element.`,
@@ -555,6 +606,9 @@ export const createPixiTimelineBindingContext = ({
         const preparation = createPixiTextUnitPreparation(textElement, query);
         if (preparation !== existingPreparation) {
           stagedTextUnits.add(preparation);
+        }
+        if (preparation.targets.length === 0 && !query.allowEmpty) {
+          throw new Error(`Target query "${alias}" resolved no text units.`);
         }
         return preparation.targets;
       }

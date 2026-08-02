@@ -7,6 +7,7 @@ specs:
   - the complete text animation should restore every line to the source baseline
   - a later whole-text GSAP animation should visibly move and fade the retained unit container
   - the whole-text animation should settle at its authored position and alpha
+  - later fill, stroke, and shadow updates should propagate to the retained visible units
   - removing the source text should also remove every generated text-unit child
 steps:
   - action: keypress
@@ -37,6 +38,9 @@ steps:
     name: snapShotKeyFrame
     detail:
       deltaMS: 200
+  - action: screenshot
+  - action: keypress
+    key: "n"
   - action: screenshot
   - action: keypress
     key: "n"
@@ -182,6 +186,50 @@ states:
               values: { x: 700, y: 390, alpha: 0.45 }
               duration: 400
               easing: linear
+  - id: text-units-restyled
+    elements:
+      - id: text-root
+        type: container
+        x: 0
+        "y": 0
+        width: 1280
+        height: 720
+        direction: absolute
+        children:
+          - id: text-background
+            type: rect
+            x: 180
+            "y": 160
+            width: 760
+            height: 260
+            fill: "#4D4D4D"
+          - id: unit-title
+            type: text
+            content: |-
+              TOP
+              BOTTOM
+            x: 700
+            "y": 390
+            alpha: 0.45
+            textStyle:
+              fontSize: 64
+              lineHeight: 1.25
+              fill: "#70E1A1"
+              strokeColor: "#173F5F"
+              strokeWidth: 5
+              shadow:
+                color: "#000000"
+                offsetX: 7
+                offsetY: 7
+                blur: 3
+              fontFamily: Courier New
+          - id: text-foreground
+            type: rect
+            x: 430
+            "y": 250
+            width: 150
+            height: 120
+            fill: "#737373"
   - id: text-units-removed
     elements:
       - id: text-root

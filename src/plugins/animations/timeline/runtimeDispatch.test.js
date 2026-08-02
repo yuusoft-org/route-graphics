@@ -4,7 +4,11 @@ import { dispatchUpdateAnimationsNow } from "../updateAnimationDispatch.js";
 import { createCompletionTracker } from "../../../util/completionTracker.js";
 import { normalizeAnimations } from "../../../util/normalizeAnimations.js";
 import { Container, Text } from "pixi.js";
-import { setElementRenderState } from "../../elements/elementRenderState.js";
+import {
+  getElementRenderState,
+  setElementRenderState,
+} from "../../elements/elementRenderState.js";
+import { hitTestElementBounds } from "../../../util/hitTestElementBounds.js";
 
 const display = (label, children = []) => ({
   label,
@@ -82,6 +86,55 @@ describe("portable GSAP update runtime integration", () => {
     expect(root.x).toBe(25);
     bus.tick(50);
     expect(root.x).toBe(30);
+  });
+
+  it("preserves descendant alias channels while settling an infinite update", () => {
+    const child = display("child");
+    const root = display("root", [child]);
+    const animation = normalizeAnimations([
+      {
+        id: "infinite-descendant-relative",
+        targetId: "root",
+        type: "update",
+        playback: { repeat: "infinite" },
+        gsap: {
+          profile: "portable-v1",
+          targets: {
+            child: { element: "child" },
+          },
+          steps: [
+            {
+              kind: "to",
+              targets: "child",
+              values: { x: { by: 100 } },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]);
+    const tracker = createCompletionTracker();
+    tracker.reset("settled-descendant-gsap");
+    const bus = createAnimationBus();
+    const onComplete = vi.fn(() => {
+      child.x = 100;
+    });
+
+    dispatchUpdateAnimationsNow({
+      animations: animation,
+      animationBus: bus,
+      completionTracker: tracker,
+      element: root,
+      targetState: {},
+      onComplete,
+    });
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(child.x).toBe(0);
+    bus.flush();
+    bus.tick(50);
+    expect(child.x).toBe(50);
   });
 
   it("settles and does not completion-track a nested infinite GSAP group", () => {
@@ -224,6 +277,9 @@ describe("portable GSAP update runtime integration", () => {
     const tracker = createCompletionTracker(eventHandler);
     tracker.reset("reverse-tracked-state");
     const bus = createAnimationBus();
+    const onComplete = vi.fn(() => {
+      root.x = 100;
+    });
 
     dispatchUpdateAnimationsNow({
       animations: animation,
@@ -231,6 +287,7 @@ describe("portable GSAP update runtime integration", () => {
       completionTracker: tracker,
       element: root,
       targetState: { x: 100 },
+      onComplete,
     });
     bus.flush();
     tracker.completeIfEmpty();
@@ -240,6 +297,8 @@ describe("portable GSAP update runtime integration", () => {
     bus.tick(40);
 
     expect(bus.getState().activeCount).toBe(0);
+    expect(root.x).toBe(0);
+    expect(onComplete).not.toHaveBeenCalled();
     expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
       id: "reverse-tracked-state",
       aborted: false,
@@ -702,6 +761,20 @@ describe("portable GSAP update runtime integration", () => {
     });
     const foreground = new Container({ label: "foreground" });
     root.addChild(background, title, foreground);
+    const semanticState = {
+      id: "title",
+      type: "text",
+      content: "e\u0301👨‍👩‍👧‍👦!",
+      x: 0,
+      y: 0,
+      width: title.width,
+      height: title.height,
+      alpha: 1,
+    };
+    setElementRenderState(title, semanticState);
+    title.eventMode = "static";
+    const pointerUp = vi.fn();
+    title.on("pointerup", pointerUp);
     const animation = normalizeAnimations([
       {
         id: "characters",
@@ -751,6 +824,22 @@ describe("portable GSAP update runtime integration", () => {
     expect(root.getChildIndex(unitContainer)).toBe(1);
     expect(root.getChildIndex(background)).toBe(0);
     expect(root.getChildIndex(foreground)).toBe(3);
+    expect(getElementRenderState(unitContainer)).toBe(semanticState);
+    expect(unitContainer.eventMode).toBe("static");
+    expect(
+      hitTestElementBounds({
+        stage: root,
+        elements: [semanticState],
+        x: 1,
+        y: 1,
+      }),
+    ).toEqual([
+      {
+        path: [expect.objectContaining({ id: "title", type: "text" })],
+      },
+    ]);
+    unitContainer.emit("pointerup", { button: 0 });
+    expect(pointerUp).toHaveBeenCalledTimes(1);
     expect(unitContainer.children.map((child) => child.text)).toEqual([
       "e\u0301",
       "👨‍👩‍👧‍👦",
@@ -763,7 +852,74 @@ describe("portable GSAP update runtime integration", () => {
     expect(unitContainer.children.map((child) => child.alpha)).toEqual([
       0.6, 0.5, 0.4,
     ]);
+    title.style = { fontSize: 24 };
+    title[Symbol.for("routeGraphics.timelineTextUnits")].sync();
+    expect(unitContainer.destroyed).toBe(true);
+    expect(title.renderable).toBe(true);
     root.destroy({ children: true });
+  });
+
+  it("enforces allowEmpty for Pixi text-unit queries", () => {
+    const createAnimation = (allowEmpty) =>
+      normalizeAnimations([
+        {
+          id: `empty-words-${allowEmpty}`,
+          targetId: "root",
+          type: "update",
+          gsap: {
+            profile: "portable-v1",
+            targets: {
+              words: {
+                textUnits: {
+                  elementId: "title",
+                  unit: "word",
+                  order: "logical",
+                  ...(allowEmpty === undefined ? {} : { allowEmpty }),
+                },
+              },
+            },
+            steps: [{ kind: "set", targets: "words", values: { alpha: 0 } }],
+          },
+        },
+      ]);
+    const createRuntime = () => {
+      const root = new Container({ label: "root" });
+      const title = new Text({
+        label: "title",
+        text: "   ",
+        style: { fontSize: 20 },
+      });
+      root.addChild(title);
+      const tracker = createCompletionTracker();
+      tracker.reset("empty-text-state");
+      return { root, title, tracker, bus: createAnimationBus() };
+    };
+
+    const rejected = createRuntime();
+    expect(() =>
+      dispatchUpdateAnimationsNow({
+        animations: createAnimation(undefined),
+        animationBus: rejected.bus,
+        completionTracker: rejected.tracker,
+        element: rejected.root,
+        targetState: {},
+      }),
+    ).toThrow('Target query "words" resolved no text units.');
+    expect(rejected.title.renderable).toBe(true);
+    rejected.root.destroy({ children: true });
+
+    const allowed = createRuntime();
+    expect(() =>
+      dispatchUpdateAnimationsNow({
+        animations: createAnimation(true),
+        animationBus: allowed.bus,
+        completionTracker: allowed.tracker,
+        element: allowed.root,
+        targetState: {},
+      }),
+    ).not.toThrow();
+    allowed.bus.flush();
+    allowed.root.destroy({ children: true });
   });
 
   it("keeps retained text units synced during later tween and GSAP self animations", () => {

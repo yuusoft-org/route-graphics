@@ -8,6 +8,7 @@ import { createAnimationBus } from "../../src/plugins/animations/animationBus.js
 import { dispatchUpdateAnimationsNow } from "../../src/plugins/animations/updateAnimationDispatch.js";
 import { normalizeAnimations } from "../../src/util/normalizeAnimations.js";
 import { createCompletionTracker } from "../../src/util/completionTracker.js";
+import { getElementRenderState } from "../../src/plugins/elements/elementRenderState.js";
 
 const createSharedParams = () => ({
   app: {
@@ -39,7 +40,11 @@ describe("text rich content", () => {
         y: 30,
         alpha: 1,
         content: "A",
-        textStyle: { fontSize: 24, fontFamily: "Arial" },
+        textStyle: {
+          fontSize: 24,
+          fontFamily: "Arial",
+          fill: "#FF0000",
+        },
       },
     });
     const nextElement = parseText({
@@ -50,7 +55,14 @@ describe("text rich content", () => {
         y: 90,
         alpha: 0.4,
         content: "A",
-        textStyle: { fontSize: 24, fontFamily: "Arial" },
+        textStyle: {
+          fontSize: 24,
+          fontFamily: "Arial",
+          fill: "#00FF00",
+          strokeColor: "#0000FF",
+          strokeWidth: 2,
+          shadow: { color: "#111111", offsetX: 2, offsetY: 3, blur: 1 },
+        },
       },
     });
     addText({ ...shared, parent, element: prevElement, zIndex: 0 });
@@ -108,6 +120,17 @@ describe("text rich content", () => {
 
     expect(source).toMatchObject({ x: 140, y: 90, alpha: 0.4 });
     expect(units).toMatchObject({ x: source.x, y: source.y, alpha: 0.4 });
+    expect(units.children[0].style).toBe(source.style);
+    expect(units.children[0].style.fill).toBe("#00FF00");
+    expect(units.children[0].style.stroke).toMatchObject({
+      color: "#0000FF",
+      width: 2,
+    });
+    expect(units.children[0].style.dropShadow).toMatchObject({
+      color: "#111111",
+      blur: 1,
+    });
+    expect(getElementRenderState(units)).toBe(nextElement);
     parent.destroy({ children: true });
   });
 
