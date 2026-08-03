@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "wavSha256": "42a6152520a9f268e195770317655273990b6bfc75f762f4a8adbec76556d366",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 86400,
+    "durationMs": 1800,
+    "byteLength": 345644,
+    "signal": {
+      "peak": 0.2386474609375,
+      "rms": 0.11932059984001928,
+      "nonZeroSamples": 86382
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "controlled-natural-complete",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundReady",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 100,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 351,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 601,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 852,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundComplete",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 1000,
+          "durationMs": 1000
+        }
+      }
+    }
+  ]
+}

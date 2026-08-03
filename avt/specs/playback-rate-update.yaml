@@ -1,0 +1,41 @@
+title: Playback-rate automation
+description: Verifies retained-source playback-rate transition output.
+durationMs: 3250
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone330:
+    generator: tone
+    frequency: 330
+states:
+  - atMs: 0
+    state:
+      id: rate-before
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone330
+          loop: true
+          volume: 70
+          playbackRate: 0.75
+  - atMs: 750
+    state:
+      id: rate-after
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone330
+          loop: true
+          volume: 70
+          playbackRate: 1.75
+          transition:
+            update:
+              playbackRate:
+                keyframes:
+                  - value: 1.75
+                    duration: 900
+                    easing: linear

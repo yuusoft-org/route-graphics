@@ -1,0 +1,67 @@
+title: Command-controlled playback
+description: Verifies play, pause, resume, stop, cursor output, and public events.
+durationMs: 3250
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: controlled-play
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: tone440
+          loop: true
+          volume: 80
+          playback:
+            commandId: 1
+            operation: play
+            positionMs: 100
+  - atMs: 750
+    state:
+      id: controlled-pause
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: tone440
+          loop: true
+          volume: 80
+          playback:
+            commandId: 2
+            operation: pause
+  - atMs: 1250
+    state:
+      id: controlled-resume
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: tone440
+          loop: true
+          volume: 80
+          playback:
+            commandId: 3
+            operation: resume
+  - atMs: 2250
+    state:
+      id: controlled-stop
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: tone440
+          loop: true
+          volume: 80
+          playback:
+            commandId: 4
+            operation: stop

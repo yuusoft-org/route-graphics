@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "wavSha256": "039cdab21f7e08ca0331f2f2daf0fffaae068d91d3ff42e2fbe0ef7af89828b1",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 144000,
+    "durationMs": 3000,
+    "byteLength": 576044,
+    "signal": {
+      "peak": 0.33258056640625,
+      "rms": 0.11429037654262865,
+      "nonZeroSamples": 287520
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "relative-before",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "relative-after",
+        "aborted": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+title: Legacy audio effect compatibility
+description: Verifies retained update and removal exit ramps through the legacy audioEffects interface.
+durationMs: 3000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: legacy-before
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 90
+      audioEffects: []
+  - atMs: 500
+    state:
+      id: legacy-after
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 35
+      audioEffects:
+        - id: tone-transition
+          type: audio-transition
+          targetId: tone
+          properties:
+            volume:
+              update:
+                keyframes:
+                  - value: 35
+                    duration: 700
+                    easing: linear
+              exit:
+                keyframes:
+                  - delay: 200
+                    value: 0
+                    duration: 500
+                    easing: linear
+  - atMs: 1800
+    state:
+      id: legacy-removed
+      elements: []
+      animations: []
+      audio: []
+      audioEffects: []

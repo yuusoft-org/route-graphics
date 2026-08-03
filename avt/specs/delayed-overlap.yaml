@@ -1,0 +1,52 @@
+title: Delayed replacement overlap
+description: Verifies independent outgoing and incoming holds before overlapping fades.
+durationMs: 3000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+  tone880:
+    generator: tone
+    frequency: 880
+states:
+  - atMs: 0
+    state:
+      id: delayed-overlap-before
+      elements: []
+      animations: []
+      audio:
+        - id: bgm
+          type: sound
+          src: tone440
+          loop: true
+          volume: 85
+          transition:
+            exit:
+              volume:
+                keyframes:
+                  - delay: 400
+                    value: 0
+                    duration: 600
+                    easing: linear
+  - atMs: 500
+    state:
+      id: delayed-overlap-after
+      elements: []
+      animations: []
+      audio:
+        - id: bgm
+          type: sound
+          src: tone880
+          loop: true
+          volume: 85
+          transition:
+            enter:
+              volume:
+                initialValue: 0
+                keyframes:
+                  - delay: 200
+                    value: 85
+                    duration: 800
+                    easing: linear

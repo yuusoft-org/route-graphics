@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "wavSha256": "1a84f49ccba8a099acdd2534fd3db7606b7fa07dd60691773f7e6ca052ebb4a6",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 156000,
+    "durationMs": 3250,
+    "byteLength": 624044,
+    "signal": {
+      "peak": 0.254547119140625,
+      "rms": 0.13216126869167305,
+      "nonZeroSamples": 167910
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "controlled-play",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundReady",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 100,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 351,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 601,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "controlled-pause",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 2,
+          "positionMs": 852,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "controlled-resume",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 3,
+          "positionMs": 103,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 3,
+          "positionMs": 353,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 3,
+          "positionMs": 604,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "controlled-stop",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 4,
+          "positionMs": 0,
+          "durationMs": 1000
+        }
+      }
+    }
+  ]
+}

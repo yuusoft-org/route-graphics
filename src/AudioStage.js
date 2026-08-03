@@ -2,7 +2,7 @@ import { AudioAsset } from "./AudioAsset.js";
 import { getEasingFunction } from "./util/animationTimeline.js";
 import { normalizeVolume } from "./util/normalizeVolume.js";
 import { normalizeAudioRenderState } from "./util/normalizeAudio.js";
-import { getAudioContext } from "./audioContext.js";
+import { getAudioContext, getAudioRuntime } from "./audioContext.js";
 
 const ROOT_CHANNEL_ID = "__route_graphics_audio_root__";
 const DIRECT_CHANNEL_ID = "__route_graphics_audio_direct__";
@@ -10,6 +10,17 @@ const AUDIO_AUTOMATION_SAMPLE_INTERVAL_MS = 16;
 const AUDIO_AUTOMATION_MAX_SAMPLES = 1024;
 const CONTROLLED_PROGRESS_INTERVAL_MS = 250;
 const audioParamAutomation = new WeakMap();
+
+const getAudioNowMs = () => getAudioRuntime().nowMs();
+const scheduleTimeout = (callback, delayMs) =>
+  getAudioRuntime().setTimeout(callback, delayMs);
+const cancelTimeout = (timeoutId) => getAudioRuntime().clearTimeout(timeoutId);
+const scheduleInterval = (callback, intervalMs) =>
+  getAudioRuntime().setInterval(callback, intervalMs);
+const cancelInterval = (intervalId) =>
+  getAudioRuntime().clearInterval(intervalId);
+const scheduleMicrotask = (callback) =>
+  getAudioRuntime().queueMicrotask(callback);
 
 const isAudioDebugEnabled = () =>
   globalThis.window?.RTGL_AUDIO_DEBUG === true ||
@@ -926,7 +937,7 @@ const playSound = (
   { startOffset = sound.startAt ?? 0, startDelayMs = sound.startDelayMs } = {},
 ) => {
   if (sound.pendingTimeoutId !== null) {
-    clearTimeout(sound.pendingTimeoutId);
+    cancelTimeout(sound.pendingTimeoutId);
     sound.pendingTimeoutId = null;
   }
   sound.delayDeadlineMs = null;
@@ -981,8 +992,8 @@ const playSound = (
     }
 
     if (sound.pendingDelayMs > 0) {
-      sound.delayDeadlineMs = Date.now() + sound.pendingDelayMs;
-      sound.pendingTimeoutId = setTimeout(start, sound.pendingDelayMs);
+      sound.delayDeadlineMs = getAudioNowMs() + sound.pendingDelayMs;
+      sound.pendingTimeoutId = scheduleTimeout(start, sound.pendingDelayMs);
       return;
     }
 
@@ -1006,7 +1017,7 @@ const stopSource = (sound, delayMs = 0) => {
   sound.delayDeadlineMs = null;
 
   if (sound.pendingTimeoutId !== null) {
-    clearTimeout(sound.pendingTimeoutId);
+    cancelTimeout(sound.pendingTimeoutId);
     sound.pendingTimeoutId = null;
   }
 
@@ -1031,17 +1042,17 @@ const cleanupSound = (sound) => {
     sound.control.eventsSuppressed = true;
     sound.control.detached = true;
     if (sound.control.progressIntervalId !== null) {
-      clearInterval(sound.control.progressIntervalId);
+      cancelInterval(sound.control.progressIntervalId);
       sound.control.progressIntervalId = null;
     }
   }
 
   if (sound.pendingTimeoutId !== null) {
-    clearTimeout(sound.pendingTimeoutId);
+    cancelTimeout(sound.pendingTimeoutId);
     sound.pendingTimeoutId = null;
   }
   if (sound.cleanupTimeoutId !== null) {
-    clearTimeout(sound.cleanupTimeoutId);
+    cancelTimeout(sound.cleanupTimeoutId);
     sound.cleanupTimeoutId = null;
   }
 
@@ -1054,7 +1065,7 @@ const cleanupSound = (sound) => {
 
 const cleanupChannel = (channel) => {
   if (channel.cleanupTimeoutId !== null) {
-    clearTimeout(channel.cleanupTimeoutId);
+    cancelTimeout(channel.cleanupTimeoutId);
     channel.cleanupTimeoutId = null;
   }
   disconnect(channel.gainNode);
@@ -1067,7 +1078,7 @@ const schedule = (callback, delayMs) => {
     callback();
     return null;
   }
-  return setTimeout(callback, delayMs);
+  return scheduleTimeout(callback, delayMs);
 };
 
 /**
@@ -1245,7 +1256,7 @@ export const createAudioStage = () => {
     fields,
     commandId = instance.control?.commandId,
   ) => {
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       emitControlledEventNow(instance, eventName, fields, commandId);
     });
   };
@@ -1257,7 +1268,7 @@ export const createAudioStage = () => {
     const control = instance.control;
     if (!control?.ready || control.durationMs === null) return;
 
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       if (!isCurrentControlledInstance(instance)) {
         return;
       }
@@ -1291,7 +1302,7 @@ export const createAudioStage = () => {
     const control = instance.control;
     if (!control || control.progressIntervalId === null) return;
 
-    clearInterval(control.progressIntervalId);
+    cancelInterval(control.progressIntervalId);
     control.progressIntervalId = null;
   };
 
@@ -1302,7 +1313,7 @@ export const createAudioStage = () => {
       return;
     }
 
-    control.progressIntervalId = setInterval(() => {
+    control.progressIntervalId = scheduleInterval(() => {
       if (
         !isCurrentControlledInstance(instance) ||
         control.status !== "playing" ||
@@ -1322,7 +1333,7 @@ export const createAudioStage = () => {
       return Math.max(0, control.remainingDelayMs);
     }
 
-    return Math.max(0, control.delayDeadlineMs - Date.now());
+    return Math.max(0, control.delayDeadlineMs - getAudioNowMs());
   };
 
   const cancelControlledPendingStart = (
@@ -1338,7 +1349,7 @@ export const createAudioStage = () => {
     instance.playRequestId = (instance.playRequestId ?? 0) + 1;
     instance.playbackPending = false;
     if (instance.pendingTimeoutId !== null) {
-      clearTimeout(instance.pendingTimeoutId);
+      cancelTimeout(instance.pendingTimeoutId);
       instance.pendingTimeoutId = null;
     }
     control.delayDeadlineMs = null;
@@ -1623,8 +1634,11 @@ export const createAudioStage = () => {
       }
 
       if (control.remainingDelayMs > 0) {
-        control.delayDeadlineMs = Date.now() + control.remainingDelayMs;
-        instance.pendingTimeoutId = setTimeout(start, control.remainingDelayMs);
+        control.delayDeadlineMs = getAudioNowMs() + control.remainingDelayMs;
+        instance.pendingTimeoutId = scheduleTimeout(
+          start,
+          control.remainingDelayMs,
+        );
         return;
       }
       start();
@@ -1674,7 +1688,7 @@ export const createAudioStage = () => {
     }
 
     control.readyTaskQueued = true;
-    queueMicrotask(() => {
+    scheduleMicrotask(() => {
       control.readyTaskQueued = false;
       if (
         !isCurrentControlledInstance(instance) ||
@@ -1761,7 +1775,7 @@ export const createAudioStage = () => {
     instance.playbackPending = control.status === "playing";
     const cachedBuffer = AudioAsset.getAsset(instance.src);
     if (cachedBuffer) {
-      queueMicrotask(() => {
+      scheduleMicrotask(() => {
         settleControlledDecode(instance, decodeRequestId, cachedBuffer);
       });
       return;
@@ -1769,7 +1783,7 @@ export const createAudioStage = () => {
 
     const assetPromise = AudioAsset.getAssetPromise?.(instance.src);
     if (!assetPromise) {
-      queueMicrotask(() => {
+      scheduleMicrotask(() => {
         if (control.decodeRequestId !== decodeRequestId) return;
         control.decodePending = false;
         failControlledPlayback(instance, "asset-unavailable");
@@ -2045,7 +2059,7 @@ export const createAudioStage = () => {
       return Math.max(0, sound.pendingDelayMs);
     }
 
-    return Math.max(0, sound.delayDeadlineMs - Date.now());
+    return Math.max(0, sound.delayDeadlineMs - getAudioNowMs());
   };
 
   const getLegacyPlaybackOffset = (sound, context = getAudioContext()) => {
@@ -2118,7 +2132,7 @@ export const createAudioStage = () => {
     sound.pendingStartOffset = null;
     sound.delayDeadlineMs = null;
     if (sound.pendingTimeoutId !== null) {
-      clearTimeout(sound.pendingTimeoutId);
+      cancelTimeout(sound.pendingTimeoutId);
       sound.pendingTimeoutId = null;
     }
     if (!source) return;
@@ -2297,7 +2311,7 @@ export const createAudioStage = () => {
       sound.pendingStartOffset = null;
       sound.sourceEnded = true;
       if (sound.pendingTimeoutId !== null) {
-        clearTimeout(sound.pendingTimeoutId);
+        cancelTimeout(sound.pendingTimeoutId);
         sound.pendingTimeoutId = null;
       }
     }

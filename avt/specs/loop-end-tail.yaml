@@ -1,0 +1,43 @@
+title: Loop-end removal tail
+description: Verifies loopEnd interruption and exit automation finish together.
+durationMs: 3250
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: loop-tail-before
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          interruption: loopEnd
+        - id: tone
+          type: sound
+          src: tone440
+          channelId: music
+          loop: true
+          startAt: 0.2
+          endAt: 0.8
+          volume: 75
+          transition:
+            exit:
+              volume:
+                keyframes:
+                  - value: 0
+                    duration: 500
+                    easing: linear
+  - atMs: 900
+    state:
+      id: loop-tail-after
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          interruption: loopEnd

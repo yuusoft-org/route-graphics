@@ -1,0 +1,54 @@
+title: Audio channel automation
+description: Verifies retained channel volume and pan update tracks.
+durationMs: 3250
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: channel-before
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 100
+          pan: -0.75
+        - id: tone
+          type: sound
+          src: tone440
+          channelId: music
+          loop: true
+          volume: 80
+  - atMs: 750
+    state:
+      id: channel-after
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 45
+          pan: 0.65
+          transition:
+            update:
+              volume:
+                keyframes:
+                  - value: 45
+                    duration: 750
+                    easing: linear
+              pan:
+                keyframes:
+                  - value: 0.65
+                    duration: 750
+                    easing: linear
+        - id: tone
+          type: sound
+          src: tone440
+          channelId: music
+          loop: true
+          volume: 80

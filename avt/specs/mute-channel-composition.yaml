@@ -1,0 +1,64 @@
+title: Mute and channel composition
+description: Verifies sound mute gating and multiplied sound/channel gain and pan.
+durationMs: 2750
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: unmuted-before
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 50
+          pan: -0.3
+        - id: tone
+          type: sound
+          src: tone440
+          channelId: music
+          loop: true
+          volume: 60
+          pan: 0.4
+          muted: false
+  - atMs: 750
+    state:
+      id: muted
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 50
+          pan: -0.3
+        - id: tone
+          type: sound
+          src: tone440
+          channelId: music
+          loop: true
+          volume: 60
+          pan: 0.4
+          muted: true
+  - atMs: 1500
+    state:
+      id: unmuted-after
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 35
+          pan: 0.5
+        - id: tone
+          type: sound
+          src: tone440
+          channelId: music
+          loop: true
+          volume: 90
+          pan: -0.2
+          muted: false
