@@ -1,0 +1,27 @@
+title: Callback-driven looping channel
+description: Verifies source-ended callbacks start later channel schedule iterations during offline rendering.
+durationMs: 2200
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  chirp:
+    generator: tone
+    frequency: 220
+    endFrequency: 880
+    durationMs: 400
+states:
+  - atMs: 0
+    state:
+      id: looping-channel
+      elements: []
+      animations: []
+      audio:
+        - id: sequence
+          type: audio-channel
+          loop: true
+          children:
+            - id: phrase
+              type: sound
+              src: chirp
+              startDelayMs: 100
+              volume: 80

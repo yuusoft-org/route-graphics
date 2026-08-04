@@ -5,6 +5,50 @@ const flushMicrotasks = async () => {
   for (let index = 0; index < 12; index++) await Promise.resolve();
 };
 
+class FakeBufferSource {
+  constructor(context) {
+    this.context = context;
+    this.buffer = null;
+    this.loop = false;
+    this.onended = null;
+    this.playbackRate = { value: 1 };
+    this.listeners = [];
+    this.endTime = null;
+    this.endedQueued = false;
+  }
+
+  addEventListener(name, callback) {
+    if (name === "ended") this.listeners.push(callback);
+  }
+
+  start(when = 0, offset = 0, duration) {
+    const sourceDuration =
+      duration ?? (this.buffer.duration - offset) / this.playbackRate.value;
+    this.endTime = Math.max(this.context.currentTime, when) + sourceDuration;
+  }
+
+  stop(when = this.context.currentTime) {
+    this.endTime = when;
+  }
+
+  queueEndedAt(time) {
+    if (
+      this.endedQueued ||
+      this.loop ||
+      this.endTime === null ||
+      this.endTime - time > Number.EPSILON * 16
+    ) {
+      return;
+    }
+
+    this.endedQueued = true;
+    globalThis.setTimeout(() => {
+      for (const listener of this.listeners) listener();
+      this.onended?.();
+    }, 0);
+  }
+}
+
 class FakeOfflineAudioContext {
   constructor({ numberOfChannels, length, sampleRate }) {
     this.numberOfChannels = numberOfChannels;
@@ -14,8 +58,15 @@ class FakeOfflineAudioContext {
     this.state = "suspended";
     this.destination = { label: "destination" };
     this.suspensions = [];
+    this.sources = [];
     this.started = false;
     this.resumeCurrentBoundary = null;
+  }
+
+  createBufferSource() {
+    const source = new FakeBufferSource(this);
+    this.sources.push(source);
+    return source;
   }
 
   suspend(time) {
@@ -52,6 +103,9 @@ class FakeOfflineAudioContext {
       const resumed = new Promise((resolve) => {
         this.resumeCurrentBoundary = resolve;
       });
+      for (const source of this.sources) {
+        source.queueEndedAt(this.currentTime);
+      }
       next.resolve();
       await resumed;
     }
@@ -115,6 +169,44 @@ describe("deterministic audio runtime", () => {
     await runtime.render();
 
     expect(times).toEqual([16, 32]);
+  });
+
+  it("converts exact millisecond durations without adding a floating-point frame", () => {
+    const runtime = createRuntime({ durationMs: 2200, sampleRate: 48_000 });
+
+    expect(runtime.offlineContext.length).toBe(105_600);
+  });
+
+  it("yields for source-ended callbacks that extend the audio graph", async () => {
+    const runtime = createRuntime();
+    const endedAt = [];
+    const startIteration = () => {
+      const source = runtime.context.createBufferSource();
+      source.buffer = { duration: 0.03 };
+      source.onended = () => {
+        endedAt.push(runtime.nowMs());
+        if (endedAt.length < 3) startIteration();
+      };
+      source.start();
+    };
+    startIteration();
+
+    await runtime.render();
+
+    expect(endedAt).toEqual([30, 60, 90]);
+    expect(runtime.offlineContext.sources).toHaveLength(3);
+  });
+
+  it("does not add lifecycle checkpoints for a continuously looping source", async () => {
+    const runtime = createRuntime();
+    const source = runtime.context.createBufferSource();
+    source.buffer = { duration: 0.03 };
+    source.loop = true;
+    source.start();
+
+    await runtime.render();
+
+    expect(runtime.offlineContext.suspensions).toHaveLength(0);
   });
 
   it("runs zero-time work before offline rendering starts", async () => {

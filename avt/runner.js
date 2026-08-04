@@ -47,7 +47,7 @@ const createToneWav = ({
   });
   assertFiniteNumber(durationMs, "asset.durationMs", { exclusiveMin: 0 });
   assertFiniteNumber(amplitude, "asset.amplitude", { min: 0, max: 1 });
-  const frameCount = Math.ceil((durationMs / 1000) * sampleRate);
+  const frameCount = Math.ceil((durationMs * sampleRate) / 1000);
   const dataSize = frameCount * 2;
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);

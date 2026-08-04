@@ -24,6 +24,9 @@ const flushMicrotasks = async () => {
   }
 };
 
+const yieldToEventLoop = () =>
+  new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+
 /**
  * Creates a deterministic driver around the browser's OfflineAudioContext.
  * JavaScript timers and authored render steps are advanced on the same
@@ -72,19 +75,74 @@ export const createDeterministicAudioRuntime = ({
   }
 
   const frameCount = Math.ceil(
-    (normalizedDurationMs / 1000) * normalizedSampleRate,
+    (normalizedDurationMs * normalizedSampleRate) / 1000,
   );
   const offlineContext = new OfflineAudioContextCtor({
     numberOfChannels: normalizedChannelCount,
     length: frameCount,
     sampleRate: normalizedSampleRate,
   });
+  const activeLifecycleSources = new Set();
+
+  const wrapBufferSource = (source) => {
+    let started = false;
+    let ended = false;
+    let stopRequested = false;
+    const updateTracking = () => {
+      if (started && !ended && (!source.loop || stopRequested)) {
+        activeLifecycleSources.add(source);
+      } else {
+        activeLifecycleSources.delete(source);
+      }
+    };
+
+    source.addEventListener(
+      "ended",
+      () => {
+        ended = true;
+        activeLifecycleSources.delete(source);
+      },
+      { once: true },
+    );
+
+    return new Proxy(source, {
+      get(target, property) {
+        if (property === "start") {
+          return (...args) => {
+            const result = target.start(...args);
+            started = true;
+            updateTracking();
+            return result;
+          };
+        }
+        if (property === "stop") {
+          return (...args) => {
+            const result = target.stop(...args);
+            stopRequested = true;
+            updateTracking();
+            return result;
+          };
+        }
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+      set(target, property, value) {
+        const result = Reflect.set(target, property, value, target);
+        if (property === "loop") updateTracking();
+        return result;
+      },
+    });
+  };
+
   const context = new Proxy(offlineContext, {
     get(target, property) {
       // OfflineAudioContext stays suspended while its graph is authored. The
       // AudioStage must still schedule sources immediately at currentTime;
       // the deterministic runner alone owns actual suspend/resume operations.
       if (property === "state") return "running";
+      if (property === "createBufferSource") {
+        return () => wrapBufferSource(target.createBufferSource());
+      }
       const value = Reflect.get(target, property, target);
       return typeof value === "function" ? value.bind(target) : value;
     },
@@ -194,6 +252,18 @@ export const createDeterministicAudioRuntime = ({
     for (const task of tasks.values()) {
       nextBoundaryMs = Math.min(nextBoundaryMs, quantizeTimeMs(task.dueTimeMs));
     }
+    if (activeLifecycleSources.size > 0) {
+      const currentFrame = Math.round(
+        offlineContext.currentTime * normalizedSampleRate,
+      );
+      const nextQuantumFrame =
+        (Math.floor(currentFrame / normalizedQuantumSize) + 1) *
+        normalizedQuantumSize;
+      nextBoundaryMs = Math.min(
+        nextBoundaryMs,
+        (nextQuantumFrame / normalizedSampleRate) * 1000,
+      );
+    }
     return nextBoundaryMs;
   };
 
@@ -222,6 +292,11 @@ export const createDeterministicAudioRuntime = ({
         .suspend(boundaryMs / 1000)
         .then(async () => {
           try {
+            // AudioBufferSourceNode ended events are main-thread tasks rather
+            // than promise microtasks. Yield while offline rendering is
+            // suspended so onended can extend the graph at this exact quantum.
+            await yieldToEventLoop();
+            await flushMicrotasks();
             await drainDueTasks(nowMs());
             armNextSuspension();
           } catch (error) {
@@ -255,6 +330,7 @@ export const createDeterministicAudioRuntime = ({
   const destroy = () => {
     destroyed = true;
     tasks.clear();
+    activeLifecycleSources.clear();
   };
 
   return {

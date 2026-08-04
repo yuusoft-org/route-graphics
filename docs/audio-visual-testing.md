@@ -164,6 +164,7 @@ Use AVT for observable audio output and its matching public event sequence:
 
 - volume, mute, pan, and playback rate
 - segments and loops
+- callback-driven looping channel schedules
 - enter, update, and exit automation
 - delays, replacement, and overlap
 - channel composition and interruption tails
