@@ -40,6 +40,17 @@ jobs:
       - name: Run unit tests
         run: bun run test
 
+      - name: Run Deterministic Audio Tests
+        run: bun run avt:report
+
+      - name: Upload AVT Artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: avt-audio-${{ github.run_number }}
+          path: avt/output/
+          retention-days: 30
+
       - name: Run Visual Tests (Docker)
         env:
           RTGL_VT_DEBUG: true

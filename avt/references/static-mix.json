@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "wavSha256": "f7c9d8d0822e8982fe0d697deae876ce90121c5a84492ba8fd2c6721a3578719",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 156000,
+    "durationMs": 3250,
+    "byteLength": 624044,
+    "signal": {
+      "peak": 0.2606201171875,
+      "rms": 0.14620731581299226,
+      "nonZeroSamples": 311610
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "static-mix",
+        "aborted": false
+      }
+    }
+  ]
+}

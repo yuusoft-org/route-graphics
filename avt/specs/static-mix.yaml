@@ -1,0 +1,23 @@
+title: Static sound mix
+description: Verifies public volume, pan, looping, and playback-rate output.
+durationMs: 3250
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: static-mix
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 65
+          pan: -0.4
+          playbackRate: 0.75

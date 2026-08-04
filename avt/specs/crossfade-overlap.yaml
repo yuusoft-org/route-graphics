@@ -1,0 +1,50 @@
+title: Same-ID BGM crossfade
+description: Verifies outgoing and incoming sources overlap during replacement.
+durationMs: 3250
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+  tone880:
+    generator: tone
+    frequency: 880
+states:
+  - atMs: 0
+    state:
+      id: crossfade-outgoing
+      elements: []
+      animations: []
+      audio:
+        - id: bgm
+          type: sound
+          src: tone440
+          loop: true
+          volume: 100
+          transition:
+            exit:
+              volume:
+                keyframes:
+                  - value: 0
+                    duration: 1000
+                    easing: linear
+  - atMs: 500
+    state:
+      id: crossfade-incoming
+      elements: []
+      animations: []
+      audio:
+        - id: bgm
+          type: sound
+          src: tone880
+          loop: true
+          volume: 100
+          transition:
+            enter:
+              volume:
+                initialValue: 0
+                keyframes:
+                  - value: 100
+                    duration: 1000
+                    easing: linear

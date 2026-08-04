@@ -1,0 +1,54 @@
+title: Multi-keyframe relative update
+description: Verifies relative and absolute keyframes, holds, and easing on a retained sound.
+durationMs: 3000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: relative-before
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 80
+          pan: -0.5
+  - atMs: 500
+    state:
+      id: relative-after
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 30
+          pan: 0.6
+          transition:
+            update:
+              volume:
+                keyframes:
+                  - value: -20
+                    relative: true
+                    duration: 300
+                    easing: easeInQuad
+                  - delay: 200
+                    value: 30
+                    duration: 500
+                    easing: easeOutQuad
+              pan:
+                keyframes:
+                  - value: 0
+                    duration: 350
+                    easing: linear
+                  - value: 0.6
+                    duration: 650
+                    easing: easeInOutQuad

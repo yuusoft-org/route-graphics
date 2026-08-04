@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "wavSha256": "bc7302508e9be52ae8806682cf9a4a4e27587eecc0f916c75a9c908421faf911",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 144000,
+    "durationMs": 3000,
+    "byteLength": 576044,
+    "signal": {
+      "peak": 0.2386474609375,
+      "rms": 0.15092552888356345,
+      "nonZeroSamples": 230352
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "seek-play",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundReady",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 0,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 251,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 1,
+          "positionMs": 501,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "seek-forward",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 2,
+          "positionMs": 713,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 2,
+          "positionMs": 964,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 2,
+          "positionMs": 214,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 2,
+          "positionMs": 465,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "seek-backward",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 3,
+          "positionMs": 217,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 3,
+          "positionMs": 468,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 3,
+          "positionMs": 718,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 3,
+          "positionMs": 969,
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "seek-stop",
+        "aborted": false
+      }
+    },
+    {
+      "name": "soundProgress",
+      "payload": {
+        "_event": {
+          "id": "player",
+          "commandId": 4,
+          "positionMs": 0,
+          "durationMs": 1000
+        }
+      }
+    }
+  ]
+}

@@ -9,6 +9,10 @@ Define one stable standard for VT authoring:
 - Minimal visual language for consistent screenshots.
 - Deterministic behavior testing without flaky text-on-screen assertions.
 
+Audio output uses the separate exact-byte AVT workflow documented in
+[`audio-visual-testing.md`](./audio-visual-testing.md). Graphics VT must not
+attempt to assert audio through on-screen event logs.
+
 ## Core Principles
 
 - Keep snapshots simple and high-contrast.

@@ -1,0 +1,22 @@
+title: Sound start delay
+description: Verifies startDelayMs advances on deterministic audio time.
+durationMs: 2000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: start-delay
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 100
+          startDelayMs: 500

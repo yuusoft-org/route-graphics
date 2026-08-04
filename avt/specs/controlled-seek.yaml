@@ -1,0 +1,70 @@
+title: Command-controlled seek
+description: Verifies seek and replay commands change the rendered cursor deterministically.
+durationMs: 3000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  chirp:
+    generator: tone
+    frequency: 220
+    endFrequency: 1320
+states:
+  - atMs: 0
+    state:
+      id: seek-play
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: chirp
+          loop: true
+          volume: 75
+          playback:
+            commandId: 1
+            operation: play
+            positionMs: 0
+  - atMs: 600
+    state:
+      id: seek-forward
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: chirp
+          loop: true
+          volume: 75
+          playback:
+            commandId: 2
+            operation: seek
+            positionMs: 713
+  - atMs: 1400
+    state:
+      id: seek-backward
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: chirp
+          loop: true
+          volume: 75
+          playback:
+            commandId: 3
+            operation: seek
+            positionMs: 217
+  - atMs: 2400
+    state:
+      id: seek-stop
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: chirp
+          loop: true
+          volume: 75
+          playback:
+            commandId: 4
+            operation: stop

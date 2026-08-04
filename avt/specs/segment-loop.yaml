@@ -1,0 +1,31 @@
+title: Segmented looping playback
+description: Verifies startAt, endAt, looping, playback rate, and later removal.
+durationMs: 2750
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  chirp:
+    generator: tone
+    frequency: 220
+    endFrequency: 880
+states:
+  - atMs: 0
+    state:
+      id: segment-loop
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: chirp
+          loop: true
+          startAt: 0.2
+          endAt: 0.65
+          playbackRate: 1.25
+          volume: 70
+  - atMs: 2000
+    state:
+      id: segment-removed
+      elements: []
+      animations: []
+      audio: []

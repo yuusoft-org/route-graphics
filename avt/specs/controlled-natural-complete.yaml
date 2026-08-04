@@ -1,0 +1,26 @@
+title: Controlled natural completion
+description: Verifies one-shot output and the exact ready, progress, and completion event sequence.
+durationMs: 1800
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  chirp:
+    generator: tone
+    frequency: 220
+    endFrequency: 1320
+states:
+  - atMs: 0
+    state:
+      id: controlled-natural-complete
+      elements: []
+      animations: []
+      audio:
+        - id: player
+          type: sound
+          src: chirp
+          loop: false
+          volume: 75
+          playback:
+            commandId: 1
+            operation: play
+            positionMs: 100

@@ -1,0 +1,66 @@
+title: Channel pause and resume
+description: Verifies a channel command preserves its child cursor across a silent pause.
+durationMs: 3000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  chirp:
+    generator: tone
+    frequency: 220
+    endFrequency: 880
+    durationMs: 2600
+states:
+  - atMs: 0
+    state:
+      id: channel-playing
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          playback:
+            commandId: 1
+            operation: resume
+          children:
+            - id: theme
+              type: sound
+              src: chirp
+              volume: 80
+  - atMs: 600
+    state:
+      id: channel-paused
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          playback:
+            commandId: 2
+            operation: pause
+          children:
+            - id: theme
+              type: sound
+              src: chirp
+              volume: 80
+  - atMs: 1300
+    state:
+      id: channel-resumed
+      elements: []
+      animations: []
+      audio:
+        - id: music
+          type: audio-channel
+          playback:
+            commandId: 3
+            operation: resume
+          children:
+            - id: theme
+              type: sound
+              src: chirp
+              volume: 80
+  - atMs: 2600
+    state:
+      id: channel-removed
+      elements: []
+      animations: []
+      audio: []

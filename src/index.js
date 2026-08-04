@@ -1,6 +1,8 @@
 import { createAssetBufferManager } from "./util/createAssetBufferManager.js";
 import { Application, Assets } from "pixi.js";
 import { AudioAsset } from "./AudioAsset.js";
+import { configureAudioRuntime, resetAudioRuntime } from "./audioContext.js";
+import { createDeterministicAudioRuntime } from "./audio/deterministicAudioRuntime.js";
 import { createElementPlugin } from "./plugins/elements/elementPlugin.js";
 import { createAnimationPlugin } from "./plugins/animations/animationPlugin.js";
 import { createAudioPlugin } from "./plugins/audio/audioPlugin.js";
@@ -29,6 +31,9 @@ export {
   Application,
   Assets,
   AudioAsset,
+  configureAudioRuntime,
+  resetAudioRuntime,
+  createDeterministicAudioRuntime,
   createAssetBufferManager,
   createElementPlugin,
   createAnimationPlugin,
