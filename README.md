@@ -8,7 +8,6 @@ This README stays intentionally short. The hosted docs are the source of truth f
 
 - [Documentation](http://route-graphics.routevn.com/docs/introduction/introduction/)
 - [Playground](http://route-graphics.routevn.com/playground/)
-- [Tasks & Roadmap](http://route-graphics.routevn.com/tasks)
 
 ## Installation
 
