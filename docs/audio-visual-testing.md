@@ -158,6 +158,11 @@ operations. `AudioStage`, graph reconciliation, transitions, commands, Web
 Audio nodes, and public event emission are the same code used by realtime
 playback.
 
+Scheduled callbacks run at their quantized audio boundary. A returned promise
+does not pause the offline audio clock: its continuation runs when its awaited
+virtual timer or Web Audio lifecycle event becomes ready, and a rejection
+encountered during rendering rejects `runtime.render()`.
+
 ## Test Boundary
 
 Use AVT for observable audio output and its matching public event sequence:

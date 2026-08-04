@@ -171,6 +171,21 @@ describe("deterministic audio runtime", () => {
     expect(times).toEqual([16, 32]);
   });
 
+  it("preserves exact render-quantum boundaries at production sample rates", async () => {
+    const runtime = createRuntime({
+      durationMs: 200,
+      sampleRate: 48_000,
+      renderQuantumSize: 128,
+    });
+    const times = [];
+    runtime.scheduleAt(136, () => times.push(runtime.nowMs()));
+
+    await runtime.render();
+
+    expect(times).toEqual([136]);
+    expect(runtime.offlineContext.suspensions[0].time).toBe(0.136);
+  });
+
   it("converts exact millisecond durations without adding a floating-point frame", () => {
     const runtime = createRuntime({ durationMs: 2200, sampleRate: 48_000 });
 
@@ -207,6 +222,47 @@ describe("deterministic audio runtime", () => {
     await runtime.render();
 
     expect(runtime.offlineContext.suspensions).toHaveLength(0);
+  });
+
+  it("advances virtual time while an async callback waits for a later timeout", async () => {
+    const runtime = createRuntime();
+    const calls = [];
+    runtime.scheduleAt(10, async () => {
+      calls.push(`start:${runtime.nowMs()}`);
+      await new Promise((resolve) => runtime.setTimeout(resolve, 20));
+      calls.push(`end:${runtime.nowMs()}`);
+    });
+
+    await runtime.render();
+
+    expect(calls).toEqual(["start:10", "end:30"]);
+  });
+
+  it("reports an async callback failure after later virtual work", async () => {
+    const runtime = createRuntime();
+    runtime.scheduleAt(10, async () => {
+      await new Promise((resolve) => runtime.setTimeout(resolve, 20));
+      throw new Error("deferred callback failed");
+    });
+
+    await expect(runtime.render()).rejects.toThrow("deferred callback failed");
+  });
+
+  it("advances audio while an async callback waits for a source-ended event", async () => {
+    const runtime = createRuntime();
+    const calls = [];
+    runtime.scheduleAt(10, async () => {
+      const source = runtime.context.createBufferSource();
+      source.buffer = { duration: 0.03 };
+      source.start();
+      calls.push(`start:${runtime.nowMs()}`);
+      await new Promise((resolve) => source.addEventListener("ended", resolve));
+      calls.push(`end:${runtime.nowMs()}`);
+    });
+
+    await runtime.render();
+
+    expect(calls).toEqual(["start:10", "end:40"]);
   });
 
   it("runs zero-time work before offline rendering starts", async () => {

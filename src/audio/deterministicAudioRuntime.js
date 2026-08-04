@@ -2,6 +2,17 @@ const DEFAULT_RENDER_QUANTUM_SIZE = 128;
 const DEFAULT_MAX_CALLBACKS = 100_000;
 const TIME_EPSILON_MS = 1e-7;
 
+const toCeilingFrame = (timeMs, sampleRate) => {
+  const exactFrame = (timeMs * sampleRate) / 1000;
+  const nearestFrame = Math.round(exactFrame);
+  // Exact frame boundaries can land a few ULPs above their integer after
+  // decimal conversion. Snap only machine-scale error before applying ceil.
+  const tolerance = Number.EPSILON * Math.max(1, Math.abs(exactFrame)) * 8;
+  return Math.abs(exactFrame - nearestFrame) <= tolerance
+    ? nearestFrame
+    : Math.ceil(exactFrame);
+};
+
 const assertFiniteNonNegative = (value, name) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) {
@@ -74,9 +85,7 @@ export const createDeterministicAudioRuntime = ({
     );
   }
 
-  const frameCount = Math.ceil(
-    (normalizedDurationMs * normalizedSampleRate) / 1000,
-  );
+  const frameCount = toCeilingFrame(normalizedDurationMs, normalizedSampleRate);
   const offlineContext = new OfflineAudioContextCtor({
     numberOfChannels: normalizedChannelCount,
     length: frameCount,
@@ -152,12 +161,13 @@ export const createDeterministicAudioRuntime = ({
   let nextTaskId = 1;
   let nextOrder = 1;
   let callbackCount = 0;
+  let callbackFailure;
   let renderingStarted = false;
   let destroyed = false;
 
   const nowMs = () => offlineContext.currentTime * 1000;
   const quantizeTimeMs = (timeMs) => {
-    const frame = Math.ceil((timeMs / 1000) * normalizedSampleRate);
+    const frame = toCeilingFrame(timeMs, normalizedSampleRate);
     const quantizedFrame =
       Math.ceil(frame / normalizedQuantumSize) * normalizedQuantumSize;
     return (quantizedFrame / normalizedSampleRate) * 1000;
@@ -224,6 +234,7 @@ export const createDeterministicAudioRuntime = ({
 
   const drainDueTasks = async (boundaryMs) => {
     while (true) {
+      if (callbackFailure) throw callbackFailure;
       const dueTasks = getSortedDueTasks(boundaryMs);
       if (dueTasks.length === 0) return;
 
@@ -241,8 +252,18 @@ export const createDeterministicAudioRuntime = ({
         } else {
           task.dueTimeMs += task.intervalMs;
         }
-        await task.callback();
+        const result = task.callback();
+        if (
+          result !== null &&
+          (typeof result === "object" || typeof result === "function") &&
+          typeof result.then === "function"
+        ) {
+          Promise.resolve(result).catch((error) => {
+            callbackFailure ??= error;
+          });
+        }
         await flushMicrotasks();
+        if (callbackFailure) throw callbackFailure;
       }
     }
   };
@@ -279,7 +300,7 @@ export const createDeterministicAudioRuntime = ({
     let failure;
     const activeHandlers = new Set();
     const armNextSuspension = () => {
-      if (failure) return;
+      if (failure || callbackFailure) return;
       const boundaryMs = getNextBoundaryMs();
       if (
         !Number.isFinite(boundaryMs) ||
@@ -323,7 +344,7 @@ export const createDeterministicAudioRuntime = ({
     armNextSuspension();
     const renderedBuffer = await offlineContext.startRendering();
     await Promise.allSettled(activeHandlers);
-    if (failure) throw failure;
+    if (failure || callbackFailure) throw failure ?? callbackFailure;
     return renderedBuffer;
   };
 
