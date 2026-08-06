@@ -37,12 +37,15 @@ describe("negative scale parsing", () => {
     });
   });
 
-  it("preserves the established output shape for positive baked scales", () => {
+  it("retains explicit positive baked scales for animation targets", () => {
     const result = parseCommonObject(commonState({ scaleX: 1.5, scaleY: 2 }));
 
-    expect(result).toMatchObject({ width: 120, height: 100 });
-    expect(result).not.toHaveProperty("scaleX");
-    expect(result).not.toHaveProperty("scaleY");
+    expect(result).toMatchObject({
+      width: 120,
+      height: 100,
+      scaleX: 1.5,
+      scaleY: 2,
+    });
   });
 
   it("keeps a zero scale instead of treating it as an omitted value", () => {
@@ -214,8 +217,8 @@ describe("negative scale parsing", () => {
       originX: -100,
       originY: 50,
       scaleX: -2,
+      scaleY: 3,
     });
-    expect(result).not.toHaveProperty("scaleY");
     expect(result.children[0]).toMatchObject({
       width: 60,
       height: 60,
