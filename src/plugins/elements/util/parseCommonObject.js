@@ -60,8 +60,8 @@ export const parseCommonObject = (state, { scaleMode = "baked" } = {}) => {
   const {
     x: adjustedPositionX,
     y: adjustedPositionY,
-    originX: originX,
-    originY: originY,
+    originX,
+    originY,
   } = calculatePositionAfterAnchor({
     positionX: state.x,
     positionY: state.y,
@@ -75,9 +75,9 @@ export const parseCommonObject = (state, { scaleMode = "baked" } = {}) => {
   const transformOriginY =
     typeof state.originY === "number" ? state.originY : originY;
 
-  // Round all pixel calculations
-  const includeScaleX = scaleMode === "live" || scaleX <= 0;
-  const includeScaleY = scaleMode === "live" || scaleY <= 0;
+  // Round all pixel calculations. Preserve every explicitly authored scale so
+  // update animations can resolve positive, negative, and collapsed targets.
+  // Baked renderers still apply only its sign to the display transform.
   let computedObj = {
     id: state.id,
     type: state.type,
@@ -89,8 +89,8 @@ export const parseCommonObject = (state, { scaleMode = "baked" } = {}) => {
     originY: Math.round(transformOriginY),
     alpha: state.alpha ?? 1,
     rotation: state.rotation ?? 0,
-    ...(state.scaleX !== undefined && includeScaleX ? { scaleX } : {}),
-    ...(state.scaleY !== undefined && includeScaleY ? { scaleY } : {}),
+    ...(state.scaleX !== undefined ? { scaleX } : {}),
+    ...(state.scaleY !== undefined ? { scaleY } : {}),
   };
 
   if (state.hover) {

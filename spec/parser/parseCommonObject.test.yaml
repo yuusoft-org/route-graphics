@@ -39,6 +39,8 @@ out:
   "y": 218
   originX: 363
   originY: 22
+  scaleX: 1.5
+  scaleY: 1.5
   rotation: 0
   alpha: 1
   hover:

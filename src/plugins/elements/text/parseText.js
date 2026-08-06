@@ -106,6 +106,14 @@ export const parseText = ({ state }) => {
         value: typeof state.width === "number",
         enumerable: false,
       },
+      __layoutWidth: {
+        value: layoutWidth,
+        enumerable: false,
+      },
+      __layoutHeight: {
+        value: roundedHeight,
+        enumerable: false,
+      },
       ...(typeof state.originX === "number" && {
         __explicitOriginX: {
           value: true,
@@ -170,6 +178,14 @@ export const parseText = ({ state }) => {
     },
     __fixedWidth: {
       value: typeof state.width === "number",
+      enumerable: false,
+    },
+    __layoutWidth: {
+      value: layoutWidth,
+      enumerable: false,
+    },
+    __layoutHeight: {
+      value: roundedHeight,
       enumerable: false,
     },
     ...(typeof state.originX === "number" && {

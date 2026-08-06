@@ -21,6 +21,12 @@ import { getElementTransformTargetState } from "../util/transform.js";
 
 export const getTextAnimationTargetState = (textComputedNode) => ({
   ...getElementTransformTargetState(textComputedNode),
+  ...(textComputedNode.scaleX !== undefined && {
+    scaleX: textComputedNode.scaleX,
+  }),
+  ...(textComputedNode.scaleY !== undefined && {
+    scaleY: textComputedNode.scaleY,
+  }),
   alpha: textComputedNode.alpha,
 });
 
