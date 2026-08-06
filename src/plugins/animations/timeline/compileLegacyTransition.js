@@ -3,6 +3,24 @@ import { compilePortableGsapAnimation } from "./compilePortableGsap.js";
 const toPortableFrameValue = (frame) =>
   frame.relative ? { by: frame.value } : frame.value;
 
+const toPortableFrameStartValue = (frame) =>
+  frame.relative ? { by: frame.startValue } : frame.startValue;
+
+const toPortableFrameStep = (target, property, frame) => ({
+  kind: frame.startValue === undefined ? "to" : "fromTo",
+  targets: target,
+  overwrite: "none",
+  ...(frame.startValue === undefined
+    ? { values: { [property]: toPortableFrameValue(frame) } }
+    : {
+        from: { [property]: toPortableFrameStartValue(frame) },
+        to: { [property]: toPortableFrameValue(frame) },
+      }),
+  duration: frame.duration,
+  ...(frame.delay === undefined ? {} : { delay: frame.delay }),
+  ...(frame.easing === undefined ? {} : { easing: frame.easing }),
+});
+
 const addInitialTrackDelay = (config, delay = 0) => {
   if (delay === 0) return config;
 
@@ -25,17 +43,26 @@ const addLegacyTrack = (steps, { target, property, config }) => {
     });
   }
   if (config.keyframes.length > 0) {
-    children.push({
-      kind: "keyframes",
-      targets: target,
-      overwrite: "none",
-      frames: config.keyframes.map((frame) => ({
-        values: { [property]: toPortableFrameValue(frame) },
-        duration: frame.duration,
-        ...(frame.delay === undefined ? {} : { delay: frame.delay }),
-        ...(frame.easing === undefined ? {} : { easing: frame.easing }),
-      })),
-    });
+    if (config.keyframes.some((frame) => frame.startValue !== undefined)) {
+      children.push({
+        kind: "sequence",
+        steps: config.keyframes.map((frame) =>
+          toPortableFrameStep(target, property, frame),
+        ),
+      });
+    } else {
+      children.push({
+        kind: "keyframes",
+        targets: target,
+        overwrite: "none",
+        frames: config.keyframes.map((frame) => ({
+          values: { [property]: toPortableFrameValue(frame) },
+          duration: frame.duration,
+          ...(frame.delay === undefined ? {} : { delay: frame.delay }),
+          ...(frame.easing === undefined ? {} : { easing: frame.easing }),
+        })),
+      });
+    }
   }
   if (children.length === 1) steps.push(children[0]);
   else if (children.length > 1)

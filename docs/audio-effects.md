@@ -1,11 +1,14 @@
 # Audio Channel Design
 
-Last updated: 2026-07-15
+Last updated: 2026-08-06
 
-> **Design proposal:** [`Inline Audio Transition Interface`](./inline-audio-transitions.md)
-> defines a proposed inline replacement for separately authored
-> `audio-transition` records. It is not implemented. The interface documented
-> below remains the current runtime contract.
+[`Inline Audio Transition Interface`](./inline-audio-transitions.md) defines
+the canonical co-located interface. The separately authored
+`audio-transition` records documented below remain supported for compatibility.
+
+Both canonical inline transitions and the legacy interface below support the
+optional keyframe-level `startValue` semantics defined in
+[`Keyframe Start Value Design`](./keyframe-start-value-design.md).
 
 This document defines the channel-based audio interface for Route Graphics
 render state.
@@ -334,18 +337,21 @@ Phase fields:
 
 Keyframe fields:
 
-| Field      | Type    | Default  | Description                                              |
-| ---------- | ------- | -------- | -------------------------------------------------------- |
-| `value`    | number  | required | Absolute target, or a delta when `relative` is `true`    |
-| `duration` | number  | required | Milliseconds to reach this keyframe from the prior value |
-| `easing`   | string  | `linear` | Animation easing applied to the segment reaching it      |
-| `relative` | boolean | `false`  | Resolve `value` relative to the prior keyframe value     |
+| Field        | Type    | Default  | Description                                               |
+| ------------ | ------- | -------- | --------------------------------------------------------- |
+| `value`      | number  | required | Absolute target, or delta from the resolved segment start |
+| `startValue` | number  | previous | Explicit segment start, or delta when relative            |
+| `duration`   | number  | required | Milliseconds to reach the endpoint                        |
+| `delay`      | number  | `0`      | Milliseconds to hold the preceding endpoint               |
+| `easing`     | string  | `linear` | Animation easing applied to the segment                   |
+| `relative`   | boolean | `false`  | Resolve start and endpoint sequentially as deltas         |
 
 The first keyframe starts at `initialValue` when provided; otherwise it starts
-at the current audible value. Each later keyframe starts where the previous one
-ended. When a relative keyframe exceeds a property's range, its clamped audible
-endpoint is the baseline for the next relative keyframe. Total phase duration
-is the sum of its keyframe durations.
+at the current audible value. A keyframe with `startValue` holds the preceding
+endpoint during `delay`, then jumps to its resolved start before ramping. For a
+relative keyframe, the start is resolved and clamped before `value` is added;
+the clamped endpoint is the baseline for the next keyframe. Total phase
+duration is the sum of every `delay + duration`.
 
 Audio keyframes support the same easing names as visual animation keyframes.
 Resolved volume, pan, and playback-rate values are constrained to their valid

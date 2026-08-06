@@ -43,6 +43,12 @@ from the previous value. The first authored keyframe controls the segment from
 the current value to that keyframe. `auto.easing` controls the single segment
 from the current value to the next state value.
 
+Manual keyframes may define `startValue` to jump to an explicit segment start
+after any `delay`, then interpolate to `value`. With `relative: true`,
+`startValue` is added to the preceding endpoint and `value` is then added to
+that resolved start. Omitting `startValue` preserves ordinary endpoint
+chaining.
+
 Use `update` only when the same target stays mounted before and after the
 change. Do not use it for first-enter or final-exit. Those are `transition`
 cases.

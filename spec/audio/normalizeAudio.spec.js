@@ -82,7 +82,13 @@ describe("inline audio transition normalization", () => {
             volume: {
               initialValue: 0,
               keyframes: [
-                { value: 120, duration: 25, relative: true, delay: 10 },
+                {
+                  startValue: -20,
+                  value: 120,
+                  duration: 25,
+                  relative: true,
+                  delay: 10,
+                },
                 { value: 80, duration: 25 },
               ],
             },
@@ -230,6 +236,11 @@ describe("inline audio transition normalization", () => {
       "an out-of-range absolute volume",
       { enter: { volume: track(101) } },
       "must be less than or equal to 100",
+    ],
+    [
+      "an out-of-range absolute volume start",
+      { enter: { volume: track(80, { startValue: 101 }) } },
+      "startValue must be less than or equal to 100",
     ],
     [
       "a relative final enter keyframe",

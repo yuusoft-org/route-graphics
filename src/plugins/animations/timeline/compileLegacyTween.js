@@ -38,6 +38,14 @@ const addRelativeValue = (property, expression) => ({
     : expression,
 });
 
+const resolveFrameStart = (property, frame, currentExpression) => {
+  if (frame.startValue === undefined) return currentExpression;
+  const authored = constant(frame.startValue);
+  return frame.relative
+    ? addRelativeValue(property, authored)
+    : toSubjectCoordinate(property, authored);
+};
+
 const toIterations = (playback = {}) => {
   if (playback.loop === true || playback.repeat === "infinite") return null;
   return (playback.repeat ?? 0) + 1;
@@ -167,6 +175,11 @@ export const compileLegacyTweenAnimation = (
           frame.delay ?? 0,
           `${propertyPath}.keyframes[${index}].delay`,
         );
+        const startExpression = resolveFrameStart(
+          property,
+          frame,
+          currentExpression,
+        );
         const authored = constant(frame.value);
         const nextExpression = frame.relative
           ? addRelativeValue(property, authored)
@@ -183,7 +196,7 @@ export const compileLegacyTweenAnimation = (
           duration: frame.duration,
           sampler: {
             kind: "interpolate",
-            from: currentExpression,
+            from: startExpression,
             to: nextExpression,
             easing: getEasingId(frame.easing),
           },

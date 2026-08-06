@@ -289,6 +289,25 @@ describe("shader state validation", () => {
     ).toThrow(
       'Animation "bad-second-keyframe" parameter "amount" on shader filter "grade" on element "card" must be a finite number.',
     );
+
+    expect(() =>
+      validate([
+        {
+          id: "bad-start",
+          targetId: "card",
+          type: "update",
+          filterTweens: {
+            grade: {
+              amount: {
+                keyframes: [{ startValue: [1, 2], duration: 100, value: 1 }],
+              },
+            },
+          },
+        },
+      ]),
+    ).toThrow(
+      'Animation "bad-start" parameter "amount" on shader filter "grade" on element "card" must be a finite number.',
+    );
   });
 
   it.each([
