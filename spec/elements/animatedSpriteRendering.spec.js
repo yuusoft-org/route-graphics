@@ -205,6 +205,7 @@ describe("spritesheet animation rendering", () => {
     });
 
     const sprite = parent.addChild.mock.calls[0][0];
+    sprite.texture = { orig: { width: 100, height: 100 } };
     sprite.x = 333;
     sprite.y = 222;
     sprite.rotation = 1.25;
@@ -249,6 +250,45 @@ describe("spritesheet animation rendering", () => {
 
     expect(sprite.pivot.x).toBeCloseTo(pivotBeforeFrameChange.x);
     expect(sprite.pivot.y).toBeCloseTo(pivotBeforeFrameChange.y);
+  });
+
+  it("recomputes the geometry pivot without folding in the live scale", async () => {
+    const parent = {
+      destroyed: false,
+      addChild: vi.fn(),
+    };
+
+    await addAnimatedSprite({
+      app: {
+        debug: false,
+        render: vi.fn(),
+      },
+      parent,
+      element: createAnimatedSpriteElement({
+        width: 100,
+        height: 100,
+        originX: 20,
+        originY: 30,
+      }),
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      renderContext: {},
+      zIndex: 3,
+      signal: undefined,
+    });
+
+    const sprite = parent.addChild.mock.calls[0][0];
+    sprite.texture = { orig: { width: 200, height: 50 } };
+    sprite.scale.x = 0.75;
+    sprite.scale.y = 1;
+
+    sprite.onFrameChange(1);
+
+    expect(sprite.pivot.x).toBeCloseTo(40);
+    expect(sprite.pivot.y).toBeCloseTo(15);
+    expect(sprite.scale.x).toBeCloseTo(0.75);
+    expect(sprite.scale.y).toBeCloseTo(1);
   });
 
   it("keeps the previous origin during a live update tween", async () => {
@@ -515,6 +555,76 @@ describe("spritesheet animation rendering", () => {
       { frameName: "frame-1.png" },
       { frameName: "frame-2.png" },
     ]);
+  });
+
+  it("recomputes the pivot after a replacement atlas changes frame geometry", async () => {
+    const app = {
+      debug: false,
+      render: vi.fn(),
+    };
+    const animatedSpriteElement = new MockAnimatedSprite([
+      { frameName: "old" },
+    ]);
+    animatedSpriteElement.label = "animated-sprite-1";
+    let assignedTextures = animatedSpriteElement.textures;
+    Object.defineProperty(animatedSpriteElement, "textures", {
+      configurable: true,
+      get: () => assignedTextures,
+      set: (textures) => {
+        assignedTextures = textures;
+        animatedSpriteElement.texture = {
+          orig: { width: 200, height: 50 },
+        };
+        animatedSpriteElement.scale.x = animatedSpriteElement.width / 200;
+        animatedSpriteElement.scale.y = animatedSpriteElement.height / 50;
+      },
+    });
+    const parent = {
+      children: [animatedSpriteElement],
+    };
+    const prevElement = createAnimatedSpriteElement({
+      width: 100,
+      height: 100,
+      originX: 20,
+      originY: 30,
+    });
+    const nextElement = createAnimatedSpriteElement({
+      width: 100,
+      height: 100,
+      originX: 20,
+      originY: 30,
+      src: "fighter-spritesheet-v2",
+      atlas: {
+        frames: {
+          "frame-0.png": { x: 0, y: 0, width: 200, height: 50 },
+          "frame-1.png": { x: 200, y: 0, width: 200, height: 50 },
+          "frame-2.png": { x: 400, y: 0, width: 200, height: 50 },
+        },
+        width: 600,
+        height: 50,
+      },
+    });
+
+    await updateAnimatedSprite({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations: [],
+      animationBus: {},
+      completionTracker: {},
+      zIndex: 4,
+      signal: undefined,
+    });
+
+    expect(animatedSpriteElement.pivot.x).toBeCloseTo(40);
+    expect(animatedSpriteElement.pivot.y).toBeCloseTo(15);
+    expect(
+      animatedSpriteElement.pivot.x * animatedSpriteElement.scale.x,
+    ).toBeCloseTo(20);
+    expect(
+      animatedSpriteElement.pivot.y * animatedSpriteElement.scale.y,
+    ).toBeCloseTo(30);
   });
 
   it("reloads changed spritesheet resources before dispatching update animations", async () => {

@@ -27,14 +27,14 @@ export const refreshElementPivot = (displayObject) => {
 export const applyElementPivot = (
   displayObject,
   element,
-  { localOriginX, localOriginY } = {},
+  { localOriginX, localOriginY, baseScaleX, baseScaleY } = {},
 ) => {
   const originX = element.originX ?? 0;
   const originY = element.originY ?? 0;
   const pivotX = localOriginX ?? originX;
   const pivotY = localOriginY ?? originY;
-  const scaleX = getFiniteScale(displayObject.scale?.x);
-  const scaleY = getFiniteScale(displayObject.scale?.y);
+  const scaleX = getFiniteScale(baseScaleX ?? displayObject.scale?.x);
+  const scaleY = getFiniteScale(baseScaleY ?? displayObject.scale?.y);
 
   elementPivotValues.set(displayObject, {
     x: pivotX / scaleX,

@@ -248,13 +248,18 @@ export const updateAnimatedSprite = async ({
       return;
     }
 
-    animatedSpriteElement.width = Math.round(
+    const restoredWidth = Math.round(
       hasLiveAnimationTween("width") ? currentWidth : width,
     );
-    animatedSpriteElement.height = Math.round(
+    const restoredHeight = Math.round(
       hasLiveAnimationTween("height") ? currentHeight : height,
     );
-    refreshAnimatedSpritePivot(animatedSpriteElement);
+    animatedSpriteElement.width = restoredWidth;
+    animatedSpriteElement.height = restoredHeight;
+    refreshAnimatedSpritePivot(animatedSpriteElement, {
+      width: restoredWidth,
+      height: restoredHeight,
+    });
 
     if (typeof app.render === "function") {
       app.render();
