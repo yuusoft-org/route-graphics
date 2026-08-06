@@ -77,7 +77,8 @@ export const renderRichTextDisplayObject = (
     container.alpha = element.alpha ?? 1;
   }
 
-  const layoutWidth = element.width ?? element.measuredWidth ?? 0;
+  const layoutWidth =
+    element.__layoutWidth ?? element.width ?? element.measuredWidth ?? 0;
 
   for (let chunkIndex = 0; chunkIndex < element.content.length; chunkIndex++) {
     const chunk = element.content[chunkIndex];
@@ -119,12 +120,15 @@ export const renderRichTextDisplayObject = (
   }
 
   const hitAreaWidth = Math.max(0, layoutWidth);
-  const hitAreaHeight = Math.max(0, element.height ?? 0);
+  const hitAreaHeight = Math.max(
+    0,
+    element.__layoutHeight ?? element.height ?? 0,
+  );
   container.hitArea = new Rectangle(0, 0, hitAreaWidth, hitAreaHeight);
   if (preserveTransform) {
     applyElementPivot(container, element);
   } else {
-    applyElementTransform(container, element);
+    applyElementTransform(container, element, { scaleMode: "full" });
   }
   setElementHitTestBounds(container, (displayObject) =>
     getRichTextHitBounds(displayObject, hitAreaWidth, hitAreaHeight),

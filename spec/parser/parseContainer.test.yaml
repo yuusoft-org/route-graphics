@@ -906,6 +906,8 @@ out:
       "y": 0
       originX: 50
       originY: 100
+      scaleX: 1
+      scaleY: 1
       scroll: false
       rotation: 0
       gapX: 0
@@ -1454,6 +1456,8 @@ out:
   "y": 0
   originX: 0
   originY: 0
+  scaleX: 2
+  scaleY: 2
   scroll: false
   rotation: 0
   alpha: 1
@@ -1524,6 +1528,8 @@ out:
   "y": 0
   originX: 0
   originY: 0
+  scaleX: 2
+  scaleY: 2
   scroll: false
   rotation: 0
   alpha: 1
