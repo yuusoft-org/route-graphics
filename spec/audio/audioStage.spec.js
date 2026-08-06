@@ -1027,6 +1027,180 @@ describe("AudioStage graph rendering", () => {
     expect(gain.linearRampToValueAtTime.mock.calls.length).toBeGreaterThan(2);
   });
 
+  it("holds through delay, jumps to startValue, and ramps to the endpoint", async () => {
+    const { stage } = await setupAudioStage();
+
+    stage.renderGraph({
+      nextAudio: [
+        {
+          id: "bgm",
+          type: "sound",
+          src: "theme",
+          volume: 50,
+        },
+      ],
+      nextAudioEffects: [
+        {
+          id: "bgm-enter",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            volume: {
+              enter: {
+                initialValue: 100,
+                keyframes: [
+                  {
+                    delay: 200,
+                    startValue: 20,
+                    value: 50,
+                    duration: 300,
+                    easing: "linear",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    const gain = findCurrentSound(stage, "bgm").gainNode.gain;
+    expect(gain.linearRampToValueAtTime).toHaveBeenNthCalledWith(1, 1, 10.2);
+    expect(gain.setValueAtTime).toHaveBeenCalledWith(0.2, 10.2);
+    expect(gain.linearRampToValueAtTime).toHaveBeenNthCalledWith(2, 0.5, 10.5);
+  });
+
+  it("clamps a relative start before resolving its relative endpoint", async () => {
+    const { stage } = await setupAudioStage();
+
+    stage.renderGraph({
+      nextAudio: [{ id: "bgm", type: "sound", src: "theme", pan: 0.8 }],
+      nextAudioEffects: [
+        {
+          id: "bgm-enter",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            pan: {
+              enter: {
+                initialValue: 0.8,
+                keyframes: [
+                  {
+                    startValue: 0.5,
+                    value: -0.2,
+                    relative: true,
+                    duration: 100,
+                  },
+                  { value: 0.8, duration: 0 },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    const pan = findCurrentSound(stage, "bgm").pannerNode.pan;
+    expect(pan.setValueAtTime).toHaveBeenCalledWith(1, 10);
+    expect(pan.linearRampToValueAtTime).toHaveBeenCalledWith(0.8, 10.1);
+  });
+
+  it("tracks the held value before startValue and the ramp after it", async () => {
+    const { stage, context } = await setupAudioStage({
+      contextOptions: {
+        reflectScheduledAudioParamValue: false,
+        supportCancelAndHold: false,
+      },
+    });
+    const initialAudio = [{ id: "bgm", type: "sound", src: "theme", pan: 1 }];
+
+    stage.renderGraph({
+      nextAudio: initialAudio,
+      nextAudioEffects: [
+        {
+          id: "bgm-enter",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            pan: {
+              enter: {
+                initialValue: -1,
+                keyframes: [
+                  {
+                    delay: 500,
+                    startValue: 0.5,
+                    value: 1,
+                    duration: 500,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    context.currentTime = 10.25;
+    stage.renderGraph({
+      prevAudio: initialAudio,
+      nextAudio: [{ id: "bgm", type: "sound", src: "theme", pan: 0 }],
+      nextAudioEffects: [
+        {
+          id: "bgm-update",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            pan: { update: keyframePhase(0, 100) },
+          },
+        },
+      ],
+    });
+    let pan = findCurrentSound(stage, "bgm").pannerNode.pan;
+    expect(pan.setValueAtTime).toHaveBeenLastCalledWith(-1, 10.25);
+
+    stage.renderGraph({
+      prevAudio: [{ id: "bgm", type: "sound", src: "theme", pan: 0 }],
+      nextAudio: [{ id: "bgm", type: "sound", src: "theme", pan: 1 }],
+      nextAudioEffects: [
+        {
+          id: "bgm-enter-again",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            pan: {
+              update: {
+                initialValue: -1,
+                keyframes: [
+                  {
+                    delay: 500,
+                    startValue: 0.5,
+                    value: 1,
+                    duration: 500,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    });
+    context.currentTime = 11;
+    stage.renderGraph({
+      prevAudio: [{ id: "bgm", type: "sound", src: "theme", pan: 1 }],
+      nextAudio: [{ id: "bgm", type: "sound", src: "theme", pan: 0 }],
+      nextAudioEffects: [
+        {
+          id: "bgm-update-after-start",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: { pan: { update: keyframePhase(0, 100) } },
+        },
+      ],
+    });
+    pan = findCurrentSound(stage, "bgm").pannerNode.pan;
+    expect(pan.setValueAtTime).toHaveBeenLastCalledWith(0.75, 11);
+  });
+
   it("accumulates relative keyframes from clamped audible endpoints", async () => {
     const { stage } = await setupAudioStage();
 

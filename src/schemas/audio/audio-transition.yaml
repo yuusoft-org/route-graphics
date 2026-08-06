@@ -71,6 +71,9 @@ definitions:
       - value
       - duration
     properties:
+      startValue:
+        type: number
+        description: Absolute segment start, or delta from the preceding value when relative is true
       value:
         type: number
         description: Absolute target value, or delta when relative is true
@@ -98,6 +101,9 @@ definitions:
               const: false
         then:
           properties:
+            startValue:
+              minimum: 0
+              maximum: 100
             value:
               minimum: 0
               maximum: 100
@@ -110,6 +116,9 @@ definitions:
               const: false
         then:
           properties:
+            startValue:
+              minimum: -1
+              maximum: 1
             value:
               minimum: -1
               maximum: 1
@@ -122,6 +131,8 @@ definitions:
               const: false
         then:
           properties:
+            startValue:
+              minimum: 0
             value:
               minimum: 0
   volumePhase:

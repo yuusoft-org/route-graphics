@@ -154,7 +154,10 @@ export const buildTimeline = (keyframesInput) => {
   let latestValue;
 
   keyframesInput.forEach(
-    ({ value, delay = 0, duration, easing = "linear", relative }, index) => {
+    (
+      { value, startValue, delay = 0, duration, easing = "linear", relative },
+      index,
+    ) => {
       if (index === 0) {
         latestValue = value;
         timeline.push({ time: accumulatedTime, value, easing: "linear" });
@@ -167,6 +170,17 @@ export const buildTimeline = (keyframesInput) => {
 
       if (delay > 0) {
         accumulatedTime += delay;
+        timeline.push({
+          time: accumulatedTime,
+          value: latestValue,
+          easing: "linear",
+        });
+      }
+
+      if (startValue !== undefined) {
+        latestValue = relative
+          ? addTweenValues(latestValue, startValue)
+          : startValue;
         timeline.push({
           time: accumulatedTime,
           value: latestValue,

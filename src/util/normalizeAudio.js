@@ -27,6 +27,7 @@ const AUDIO_EASINGS = new Set(SUPPORTED_EASING_NAMES);
 const AUDIO_TRANSITION_PHASE_KEYS = new Set(["initialValue", "keyframes"]);
 const AUDIO_TRANSITION_KEYFRAME_KEYS = new Set([
   "value",
+  "startValue",
   "duration",
   "delay",
   "easing",
@@ -405,6 +406,16 @@ const validateTransitionPhase = (phase, path, propertyName) => {
         ? undefined
         : AUDIO_TRANSITION_PROPERTY_RANGES[propertyName],
     );
+
+    if (keyframe.startValue !== undefined) {
+      assertFiniteNumber(
+        keyframe.startValue,
+        `${keyframePath}.startValue`,
+        keyframe.relative
+          ? undefined
+          : AUDIO_TRANSITION_PROPERTY_RANGES[propertyName],
+      );
+    }
 
     if (keyframe.duration === undefined) {
       throw new Error(`Input error: ${keyframePath}.duration is required.`);

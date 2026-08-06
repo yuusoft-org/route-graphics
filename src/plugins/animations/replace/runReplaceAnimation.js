@@ -1843,7 +1843,10 @@ const createCompositorOverlay = ({
       }
       const parameterValues = [
         ...(config.initialValue === undefined ? [] : [config.initialValue]),
-        ...config.keyframes.map((keyframe) => keyframe.value),
+        ...config.keyframes.flatMap((keyframe) => [
+          ...(keyframe.startValue === undefined ? [] : [keyframe.startValue]),
+          keyframe.value,
+        ]),
       ];
       for (const value of parameterValues) {
         validateShaderEffectParameterValue(compositorEffect, parameter, value);

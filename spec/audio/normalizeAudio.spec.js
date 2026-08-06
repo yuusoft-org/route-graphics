@@ -45,7 +45,7 @@ describe("audio effect normalization", () => {
     expect(normalized.sounds[0]).not.toHaveProperty("transition");
   });
 
-  it("accepts signed relative deltas and delay in every phase", () => {
+  it("accepts signed relative start values, deltas, and delays in every phase", () => {
     expect(() =>
       normalizeAudioRenderState({
         audio: [sound()],
@@ -55,7 +55,13 @@ describe("audio effect normalization", () => {
               enter: {
                 initialValue: 0,
                 keyframes: [
-                  { value: 20, duration: 25, relative: true, delay: 10 },
+                  {
+                    startValue: -20,
+                    value: 120,
+                    duration: 25,
+                    relative: true,
+                    delay: 10,
+                  },
                   { value: 80, duration: 25 },
                 ],
               },
@@ -191,6 +197,11 @@ describe("audio effect normalization", () => {
       "an out-of-range absolute volume",
       { volume: { enter: track(101) } },
       "must be less than or equal to 100",
+    ],
+    [
+      "an out-of-range absolute volume start",
+      { volume: { enter: track(80, { startValue: 101 }) } },
+      "startValue must be less than or equal to 100",
     ],
   ])("rejects %s", (_name, properties, message) => {
     expect(() =>

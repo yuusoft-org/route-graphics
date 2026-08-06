@@ -1,11 +1,15 @@
 # Inline Audio Transitions Removed
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
 
 The `transition` field on `sound` and `audio-channel` nodes has been removed.
 Route Graphics intentionally has one automation interface: top-level
 `audioEffects`, matching the state/effect separation used by visual animations.
 There is no compatibility adapter.
+
+Canonical `audioEffects` keyframes retain the optional `startValue` segment-start
+semantics defined in
+[`Keyframe Start Value Design`](./keyframe-start-value-design.md).
 
 ## Migration
 

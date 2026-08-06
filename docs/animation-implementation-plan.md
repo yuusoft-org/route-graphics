@@ -1,6 +1,6 @@
 # Animation Implementation Plan
 
-Last updated: 2026-07-31
+Last updated: 2026-08-06
 
 ## Purpose
 
@@ -99,6 +99,22 @@ See `docs/shader-interface.md` for the full contract.
 
 These are animation-lifecycle improvements, not missing shader-effect
 capabilities.
+
+### Keyframe Start Values
+
+Status: implemented.
+
+Optional keyframe-level `startValue` is supported across the compact visual,
+shader-parameter, and audio keyframe interfaces. The runtime preserves the
+preceding value during `delay`, applies `startValue` when the interpolation
+duration begins, and resolves relative frames sequentially from the preceding
+endpoint through the explicit start to the endpoint.
+
+The schemas, normalizers, compilers, evaluators, public types, hosted docs, and
+conformance tests shipped together so no interface accepts the field with
+partial behavior. See `docs/keyframe-start-value-design.md` for the normative
+formulas, boundary rules, compatibility constraints, and implementation
+coverage.
 
 ### Tighten Update Lifecycle Semantics
 

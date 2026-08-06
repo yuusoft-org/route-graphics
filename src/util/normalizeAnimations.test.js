@@ -1363,3 +1363,75 @@ describe("normalizeAnimations rect style support", () => {
     ).toThrow(/second transition for target "panel"/);
   });
 });
+
+describe("normalizeAnimations keyframe start values", () => {
+  it("preserves scalar, shader-vector, and color start values", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "explicit-starts",
+        targetId: "panel",
+        type: "update",
+        tween: {
+          x: {
+            keyframes: [{ startValue: 10, value: 20, duration: 100 }],
+          },
+          filters: {
+            grade: {
+              tint: {
+                keyframes: [
+                  {
+                    startValue: [0.1, 0.2, 0.3],
+                    value: [0.4, 0.5, 0.6],
+                    duration: 100,
+                  },
+                ],
+              },
+            },
+          },
+          border: {
+            color: {
+              keyframes: [
+                {
+                  startValue: "#ff0000",
+                  value: "#0000ff",
+                  duration: 100,
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(animation.tween.x.keyframes[0].startValue).toBe(10);
+    expect(animation.filterTweens.grade.tint.keyframes[0].startValue).toEqual([
+      0.1, 0.2, 0.3,
+    ]);
+    expect(
+      animation.tween["rect.border.color"].keyframes[0].startValue,
+    ).toEqual([1, 0, 0, 1]);
+  });
+
+  it("validates start values through the same channel rules as endpoints", () => {
+    expect(() =>
+      normalizeAnimations([
+        {
+          id: "invalid-start",
+          targetId: "panel",
+          type: "update",
+          tween: {
+            filters: {
+              grade: {
+                tint: {
+                  keyframes: [
+                    { startValue: [1], value: [1, 1], duration: 100 },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      ]),
+    ).toThrow(/startValue must be a finite number or a numeric array/);
+  });
+});
