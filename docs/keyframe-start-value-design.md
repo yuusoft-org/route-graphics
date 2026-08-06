@@ -1,6 +1,6 @@
 # Keyframe Start Value Design
 
-Status: accepted design; not implemented
+Status: implemented
 
 Last updated: 2026-08-06
 
@@ -191,20 +191,21 @@ The portable `gsap` frontend does not add `startValue` to its multi-property
 `keyframes` frames. It already expresses this operation explicitly through a
 `fromTo` action or a `set` followed by `to`.
 
-## Implementation Requirements
+## Implementation Coverage
 
-Shipping this field requires one coordinated change across the public
-interfaces that use endpoint-style keyframes:
+The field ships as one coordinated change across the public interfaces that
+use endpoint-style keyframes:
 
-- add `startValue` to the visual animation, shader, and audio schemas with the
+- `startValue` is present in the visual animation, shader, and audio schemas with the
   same type and absolute-value range rules as `value`
-- validate and normalize `startValue` without changing omitted-field output
-- compile each segment from resolved `S` to resolved `E`
-- preserve delay holds and exact boundary ownership
-- apply relative scalar and vector addition in the order specified above
-- update public JSDoc types and hosted interface documentation
-- add conformance coverage for absolute, relative, delayed, vector, clamped,
+- runtime normalizers validate and preserve it without changing omitted-field output
+- compilers build each segment from resolved `S` to resolved `E`
+- delay holds and exact boundary ownership are preserved
+- relative scalar and vector addition follows the order specified above
+- public JSDoc types and hosted interface documentation expose it
+- conformance coverage includes absolute, relative, delayed, vector, clamped,
   zero-duration, repeated, yoyo, and interrupted segments
 
-Until those changes land together, schemas and runtimes must continue to reject
-`startValue` rather than accepting it with partial behavior.
+The schemas, runtime normalizers, visual and transition compilers, Web Audio
+automation scheduler, public types, documentation, and conformance tests all
+recognize the field together.

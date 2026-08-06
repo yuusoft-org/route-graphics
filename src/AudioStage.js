@@ -211,6 +211,20 @@ const buildAudioTimeline = ({
         easing: "linear",
       });
     }
+
+    if (keyframe.startValue !== undefined) {
+      const startAuthoredValue = keyframe.relative
+        ? authoredValue + keyframe.startValue
+        : keyframe.startValue;
+      const startValue = normalizeTransitionValue(startAuthoredValue);
+      authoredValue = denormalizeParamValue(startValue);
+      timeline.push({
+        time: elapsedMs,
+        value: startValue,
+        easing: "linear",
+      });
+    }
+
     elapsedMs += Math.max(0, toFiniteParamValue(keyframe.duration, 0));
     const nextAuthoredValue = keyframe.relative
       ? authoredValue + keyframe.value

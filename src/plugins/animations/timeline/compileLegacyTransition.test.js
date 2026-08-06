@@ -15,7 +15,12 @@ const bindVirtualTransition = (program) => {
       { values: { "transition.mask.progress": 0 } },
       { values: { "transition.mask.progress": 0 } },
     ],
-    compositor: { values: { "transition.compositor.progress": 0 } },
+    compositor: {
+      values: {
+        "transition.compositor.progress": 0,
+        "transition.compositor.parameter.tint": [0.1, 0.2, 0.3],
+      },
+    },
   };
   return bindTimelineProgram(program, {
     capabilities: new Set(program.requirements),
@@ -221,5 +226,80 @@ describe("legacy transition compiler", () => {
     expect(sample(300)).toBeCloseTo(0.5);
     expect(animation.mask[0].progress.keyframes[0].delay).toBe(50);
     evaluator.destroy();
+  });
+
+  it("honors explicit starts in transition surfaces and shader parameters", () => {
+    const [animation] = normalizeAnimations([
+      {
+        id: "explicit-transition-starts",
+        targetId: "scene",
+        type: "transition",
+        prev: {
+          tween: {
+            x: {
+              initialValue: 100,
+              keyframes: [
+                {
+                  delay: 50,
+                  startValue: 20,
+                  value: 60,
+                  duration: 100,
+                  easing: "linear",
+                },
+              ],
+            },
+          },
+        },
+        compositor: {
+          type: "shader",
+          source: {
+            webgl: { fragment: "void main(){}" },
+            webgpu: {
+              source:
+                "@vertex fn mainVertex() -> @builtin(position) vec4<f32> { return vec4<f32>(); } @fragment fn mainFragment() -> @location(0) vec4<f32> { return vec4<f32>(); }",
+            },
+          },
+          parameters: { tint: [0.1, 0.2, 0.3] },
+          tween: {
+            progress: {
+              initialValue: 0,
+              keyframes: [{ value: 1, duration: 150 }],
+            },
+            tint: {
+              initialValue: [0.1, 0.2, 0.3],
+              keyframes: [
+                {
+                  startValue: [0.1, 0.1, 0.1],
+                  value: [0.2, 0.3, 0.4],
+                  relative: true,
+                  duration: 100,
+                  easing: "linear",
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+    const program = compileLegacyTransitionAnimation(animation);
+    const instance = bindVirtualTransition(program);
+    const sample = (time, channel) =>
+      evaluateTimelineInstance(instance, time).values.find(
+        (entry) => entry.channel === channel,
+      )?.value;
+
+    expect(sample(49, "transform.x")).toBe(100);
+    expect(sample(50, "transform.x")).toBe(20);
+    expect(sample(100, "transform.x")).toBe(40);
+    expect(sample(150, "transform.x")).toBe(60);
+    const expectTint = (time, expected) => {
+      const actual = sample(time, "transition.compositor.parameter.tint");
+      expected.forEach((value, index) =>
+        expect(actual[index]).toBeCloseTo(value),
+      );
+    };
+    expectTint(0, [0.2, 0.3, 0.4]);
+    expectTint(50, [0.3, 0.45, 0.6]);
+    expectTint(100, [0.4, 0.6, 0.8]);
   });
 });

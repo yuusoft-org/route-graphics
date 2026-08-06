@@ -100,18 +100,18 @@ See `docs/shader-interface.md` for the full contract.
 These are animation-lifecycle improvements, not missing shader-effect
 capabilities.
 
-### Implement Keyframe Start Values
+### Keyframe Start Values
 
-Status: accepted design; not implemented.
+Status: implemented.
 
-Add optional keyframe-level `startValue` support across the compact visual,
-shader-parameter, and audio keyframe interfaces. Preserve the preceding value
-during `delay`, apply `startValue` when the interpolation duration begins, and
-resolve relative frames sequentially from the preceding endpoint through the
-explicit start to the endpoint.
+Optional keyframe-level `startValue` is supported across the compact visual,
+shader-parameter, and audio keyframe interfaces. The runtime preserves the
+preceding value during `delay`, applies `startValue` when the interpolation
+duration begins, and resolves relative frames sequentially from the preceding
+endpoint through the explicit start to the endpoint.
 
 The schemas, normalizers, compilers, evaluators, public types, hosted docs, and
-conformance tests must ship together so no interface accepts the field with
+conformance tests shipped together so no interface accepts the field with
 partial behavior. See `docs/keyframe-start-value-design.md` for the normative
 formulas, boundary rules, compatibility constraints, and implementation
 coverage.

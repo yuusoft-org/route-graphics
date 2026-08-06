@@ -731,6 +731,18 @@ describe("shader filter resources", () => {
       validateShaderFilterAnimationTarget(
         displayObject,
         "grade",
+        "bad-start-shape",
+        {
+          amount: {
+            keyframes: [{ startValue: [1, 2], duration: 100, value: 1 }],
+          },
+        },
+      ),
+    ).toThrow(/parameter "amount" must be a finite number/);
+    expect(() =>
+      validateShaderFilterAnimationTarget(
+        displayObject,
+        "grade",
         "unknown-parameter",
         {
           missing: {

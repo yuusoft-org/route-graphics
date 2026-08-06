@@ -185,11 +185,6 @@ The missing side is treated as transparent.
 
 ## Tween Payload
 
-> **Accepted future extension:** `docs/keyframe-start-value-design.md` defines
-> optional keyframe-level `startValue` semantics for an explicit segment start.
-> It is not implemented; the current schema and runtime continue to accept only
-> the endpoint-style keyframes described below.
-
 The existing keyframe format stays the standard:
 
 ```yaml
@@ -200,6 +195,7 @@ x:
       value: 180
       easing: "easeOutQuad"
     - delay: 300
+      startValue: 200
       duration: 150
       value: 220
       easing: "easeInQuad"
@@ -225,6 +221,16 @@ current live value; a later delay creates a gap between segments. Total track
 duration is the sum of every `delay + duration`. Delays scale with
 `playback.speed` and repeat with the rest of a loop. Omitting `delay`, or
 setting it to `0`, starts the segment immediately.
+
+Each manual keyframe may also define `startValue`. The preceding endpoint is
+still held throughout `delay`; at the end of that delay the value jumps to
+`startValue` and interpolation begins from there. For an absolute keyframe,
+the segment runs from `startValue` to `value`. With `relative: true`, both are
+sequential deltas: the start is the preceding endpoint plus `startValue`, and
+the endpoint is that resolved start plus `value`. Omitting `startValue`
+preserves normal endpoint chaining. See
+[`keyframe-start-value-design.md`](./keyframe-start-value-design.md) for exact
+boundary, zero-duration, repeat, and reverse semantics.
 
 The same payload is reused in two places:
 

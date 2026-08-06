@@ -11,10 +11,8 @@ This document defines the canonical inline transition interface on `sound` and
 accepted as a legacy compatibility interface documented in
 [`audio-effects.md`](./audio-effects.md).
 
-> **Accepted future extension:** [`Keyframe Start Value Design`](./keyframe-start-value-design.md)
-> defines optional keyframe-level `startValue` semantics shared with compact
-> visual tweens. It is not implemented; the current audio schema and runtime
-> continue to accept only the endpoint-style keyframes described below.
+Keyframes share the optional `startValue` segment-start semantics defined in
+[`Keyframe Start Value Design`](./keyframe-start-value-design.md).
 
 ## Goals
 
@@ -100,6 +98,7 @@ type InlineAudioTransitionTrack = {
 
 type InlineAudioTransitionKeyframe = {
   value: number;
+  startValue?: number;
   duration: number; // milliseconds
   delay?: number; // milliseconds; defaults to 0
   easing?: string; // defaults to linear
@@ -190,19 +189,20 @@ current audible value.
 
 ### Keyframe
 
-| Field      | Type    | Required | Default  | Description                                      |
-| ---------- | ------- | -------- | -------- | ------------------------------------------------ |
-| `value`    | number  | yes      | none     | Absolute endpoint, or delta when relative        |
-| `duration` | number  | yes      | none     | Ramp duration in milliseconds                    |
-| `delay`    | number  | no       | `0`      | Hold preceding value before this ramp            |
-| `easing`   | string  | no       | `linear` | Easing for the segment reaching this keyframe    |
-| `relative` | boolean | no       | `false`  | Resolve value relative to the preceding endpoint |
+| Field        | Type    | Required | Default  | Description                                         |
+| ------------ | ------- | -------- | -------- | --------------------------------------------------- |
+| `value`      | number  | yes      | none     | Absolute endpoint, or delta from the resolved start |
+| `startValue` | number  | no       | previous | Explicit segment start, or delta when relative      |
+| `duration`   | number  | yes      | none     | Ramp duration in milliseconds                       |
+| `delay`      | number  | no       | `0`      | Hold preceding value before this ramp               |
+| `easing`     | string  | no       | `linear` | Easing for the segment reaching this keyframe       |
+| `relative`   | boolean | no       | `false`  | Resolve start and endpoint sequentially as deltas   |
 
-`duration` and `delay` must be finite non-negative numbers, and `value` must be
-finite. Absolute values use the same ranges as their target fields. A relative
-value is a signed delta and is not itself restricted to the target field's
-range. Its resolved endpoint is clamped to that range before becoming the
-baseline for the following keyframe.
+`duration` and `delay` must be finite non-negative numbers, and `value` and any
+`startValue` must be finite. Absolute values use the same ranges as their
+target fields. Relative values are signed deltas. A relative start is resolved
+and clamped first; that audible start is then the base for the endpoint delta.
+The resolved endpoint becomes the baseline for the following keyframe.
 
 For `enter` and `update`, the last keyframe must be absolute and equal the value
 declared on the next audio node. This keeps the final audible value consistent
@@ -235,6 +235,11 @@ sum(keyframe.delay + keyframe.duration)
 
 Repeated keyframe delays allow holds between later ramp segments without a
 second step or offset vocabulary.
+
+When `startValue` is present, the preceding endpoint remains audible for the
+whole delay. The parameter jumps to the resolved start at the delay boundary
+and ramps from there. For a zero-duration keyframe, terminal `value` wins at
+that shared boundary.
 
 `sound.startDelayMs` remains separate: it delays when the source begins
 playback. `transition.*.*.keyframes[].delay` delays one automation segment

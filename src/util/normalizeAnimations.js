@@ -261,6 +261,9 @@ const normalizeKeyframes = (
     const keyframePath = `${path}.keyframes[${index}]`;
     assertPlainObject(keyframe, keyframePath);
     assertValue(keyframe.value, `${keyframePath}.value`);
+    if (keyframe.startValue !== undefined) {
+      assertValue(keyframe.startValue, `${keyframePath}.startValue`);
+    }
     assertNonNegativeSafeIntegerMilliseconds(
       keyframe.duration,
       `${keyframePath}.duration`,
@@ -295,6 +298,9 @@ const normalizeKeyframes = (
 
     return {
       value: normalizeValue(keyframe.value),
+      ...(keyframe.startValue === undefined
+        ? {}
+        : { startValue: normalizeValue(keyframe.startValue) }),
       duration: keyframe.duration,
       easing: keyframe.easing ?? "linear",
       ...(keyframe.delay > 0 ? { delay: keyframe.delay } : {}),

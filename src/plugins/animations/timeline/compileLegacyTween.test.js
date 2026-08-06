@@ -45,6 +45,171 @@ describe("legacy tween TimelineProgram compiler", () => {
     expect(sample(200)).toBe(30);
   });
 
+  it("jumps to delayed absolute starts and resolves relative starts in order", () => {
+    const program = compile({
+      id: "segment-starts",
+      targetId: "hero",
+      type: "update",
+      tween: {
+        x: {
+          initialValue: 10,
+          keyframes: [
+            { value: 100, duration: 100, easing: "linear" },
+            {
+              startValue: -20,
+              value: 50,
+              relative: true,
+              delay: 50,
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    });
+    const target = { x: 0 };
+    const instance = bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: { hero: { handle: target, identity: "hero" } },
+      channelRegistry: {
+        "transform.x": {
+          get: (handle) => handle.x,
+          apply: (handle, value) => {
+            handle.x = value;
+          },
+        },
+      },
+    });
+    const sample = (time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(149)).toBe(100);
+    expect(sample(150)).toBe(80);
+    expect(sample(200)).toBe(105);
+    expect(sample(250)).toBe(130);
+  });
+
+  it("gives zero-duration endpoints ownership and reapplies starts on repeat/yoyo", () => {
+    const zero = compile({
+      id: "zero-start",
+      targetId: "hero",
+      type: "update",
+      tween: {
+        x: {
+          initialValue: 10,
+          keyframes: [{ startValue: 0, value: 50, duration: 0 }],
+        },
+      },
+    });
+    const repeated = compile({
+      id: "repeat-start",
+      targetId: "hero",
+      type: "update",
+      playback: { repeat: 1, yoyo: true },
+      tween: {
+        x: {
+          initialValue: 10,
+          keyframes: [
+            {
+              startValue: 20,
+              value: 80,
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    });
+    const forwardRepeated = compile({
+      id: "forward-repeat-start",
+      targetId: "hero",
+      type: "update",
+      playback: { repeat: 1 },
+      tween: {
+        x: {
+          initialValue: 10,
+          keyframes: [
+            {
+              startValue: 20,
+              value: 80,
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    });
+    const bind = (program) =>
+      bindTimelineProgram(program, {
+        capabilities: new Set(program.requirements),
+        targetRegistry: { hero: { handle: { x: 0 }, identity: "hero" } },
+        channelRegistry: {
+          "transform.x": {
+            get: (handle) => handle.x,
+            apply: (handle, value) => {
+              handle.x = value;
+            },
+          },
+        },
+      });
+    const sample = (instance, time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(bind(zero), 0)).toBe(50);
+    const repeatedInstance = bind(repeated);
+    expect(sample(repeatedInstance, 0)).toBe(20);
+    expect(sample(repeatedInstance, 50)).toBe(50);
+    expect(sample(repeatedInstance, 100)).toBe(80);
+    expect(sample(repeatedInstance, 150)).toBe(50);
+    expect(sample(repeatedInstance, 200)).toBe(20);
+    const forwardRepeatedInstance = bind(forwardRepeated);
+    expect(sample(forwardRepeatedInstance, 99)).toBeCloseTo(79.4);
+    expect(sample(forwardRepeatedInstance, 100)).toBe(20);
+  });
+
+  it("interpolates absolute color start values", () => {
+    const program = compile({
+      id: "color-start",
+      targetId: "hero",
+      type: "update",
+      tween: {
+        border: {
+          color: {
+            initialValue: "#00ff00",
+            keyframes: [
+              {
+                startValue: "#ff0000",
+                value: "#0000ff",
+                duration: 100,
+                easing: "linear",
+              },
+            ],
+          },
+        },
+      },
+    });
+    const target = { color: [0, 1, 0, 1] };
+    const instance = bindTimelineProgram(program, {
+      capabilities: new Set(program.requirements),
+      targetRegistry: { hero: { handle: target, identity: "hero" } },
+      channelRegistry: {
+        "geometry.rect.border.color": {
+          valueType: "colorSrgb",
+          get: (handle) => handle.color,
+          apply: (handle, value) => {
+            handle.color = value;
+          },
+        },
+      },
+    });
+    const sample = (time) =>
+      evaluateTimelineInstance(instance, time).values[0].value;
+
+    expect(sample(0)).toEqual([1, 0, 0, 1]);
+    expect(sample(50)).toEqual([0.5, 0, 0.5, 1]);
+    expect(sample(100)).toEqual([0, 0, 1, 1]);
+  });
+
   it("accumulates consecutive subject-relative keyframes from the live position", () => {
     const program = compile({
       id: "relative-translate-chain",

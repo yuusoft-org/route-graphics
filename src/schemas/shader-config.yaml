@@ -135,6 +135,11 @@ definitions:
     required: [value, duration]
     additionalProperties: false
     properties:
+      startValue:
+        description: Optional explicit value at which this keyframe segment begins.
+        oneOf:
+          - type: number
+          - $ref: "#/definitions/numericArray"
       value:
         oneOf:
           - type: number
@@ -169,6 +174,8 @@ definitions:
     allOf:
       - $ref: "#/definitions/shaderTweenKeyframe"
       - properties:
+          startValue:
+            type: number
           value:
             type: number
   shaderProgressProperty:

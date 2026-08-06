@@ -54,9 +54,19 @@
  */
 
 /**
+ * @typedef {Object} AnimationKeyframe
+ * @property {number | number[] | string} value - Segment endpoint, or delta when relative is true
+ * @property {number | number[] | string} [startValue] - Explicit segment start, absolute or a delta when relative is true
+ * @property {number} duration - Segment duration in milliseconds
+ * @property {number} [delay=0] - Time to hold the preceding endpoint before the segment
+ * @property {string} [easing="linear"] - Animation easing name
+ * @property {boolean} [relative=false] - Whether numeric start and endpoint values are relative
+ */
+
+/**
  * @typedef {Object} ShaderTweenProperty
  * @property {number | number[]} [initialValue] - Optional override; otherwise inferred from the current parameter value
- * @property {Array<{value: number | number[], duration: number, easing?: string, relative?: boolean}>} keyframes - Parameter keyframes
+ * @property {Array<{value: number | number[], startValue?: number | number[], duration: number, delay?: number, easing?: string, relative?: boolean}>} keyframes - Parameter keyframes
  */
 
 /**
@@ -759,6 +769,7 @@
 /**
  * @typedef {Object} InlineAudioTransitionKeyframe
  * @property {number} value - Absolute target value, or delta when relative is true
+ * @property {number} [startValue] - Explicit segment start, absolute or a delta when relative is true
  * @property {number} duration - Ramp duration in milliseconds
  * @property {number} [delay=0] - Time to hold the preceding value before the ramp
  * @property {string} [easing="linear"] - Animation easing name
@@ -788,6 +799,7 @@
 /**
  * @typedef {Object} AudioTransitionKeyframe
  * @property {number} value - Absolute target value, or delta when relative is true
+ * @property {number} [startValue] - Explicit segment start, absolute or a delta when relative is true
  * @property {number} duration - Duration to reach this value in milliseconds
  * @property {number} [delay=0] - Time to hold the preceding value before the ramp
  * @property {string} [easing="linear"] - Animation easing name

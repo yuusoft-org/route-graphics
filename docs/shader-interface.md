@@ -319,6 +319,12 @@ finite, non-negative `delay` holds the preceding scalar, vector, or matrix
 value before interpolation. It contributes to total duration and repeats in a
 loop.
 
+An optional `startValue` supplies an explicit scalar, vector, or matrix value
+at which a segment begins after its delay. With `relative: true`, it is added
+component by component to the preceding endpoint, then `value` is added to
+that resolved start. `startValue` and `value` must both match the targeted
+parameter's shape.
+
 Only one active animation may write the same
 `targetId + filterId + parameter` channel in one state.
 

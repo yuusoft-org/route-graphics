@@ -13,6 +13,9 @@ $defs:
       - value
       - duration
     properties:
+      startValue:
+        type: number
+        description: Optional explicit value at which this keyframe segment begins.
       value:
         type: number
         description: The target value for this keyframe.
@@ -77,6 +80,9 @@ $defs:
       - value
       - duration
     properties:
+      startValue:
+        type: string
+        description: Optional explicit color at which this keyframe segment begins.
       value:
         type: string
         description: Target color value.
