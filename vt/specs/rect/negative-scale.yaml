@@ -1,0 +1,127 @@
+---
+title: Negative Rect Scale
+description: Asymmetric corner geometry verifies signed scale without relying on color.
+specs:
+  - negative scale should mirror rect geometry while keeping drawable dimensions positive
+  - anchor-derived centers should stay fixed for horizontal, vertical, and two-axis reflections
+  - scale magnitude should remain baked exactly once
+  - zero scale should collapse the overlaid rect completely
+---
+states:
+  - elements:
+      - id: rect-normal
+        type: rect
+        x: 240
+        "y": 190
+        width: 220
+        height: 140
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#FFFFFF"
+        cornerRadius:
+          topLeft: 64
+          topRight: 8
+          bottomRight: 32
+          bottomLeft: 0
+      - id: rect-flip-x
+        type: rect
+        x: 640
+        "y": 190
+        width: 220
+        height: 140
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+        fill: "#FFFFFF"
+        cornerRadius:
+          topLeft: 64
+          topRight: 8
+          bottomRight: 32
+          bottomLeft: 0
+      - id: rect-flip-y
+        type: rect
+        x: 1040
+        "y": 190
+        width: 220
+        height: 140
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleY: -1
+        fill: "#FFFFFF"
+        cornerRadius:
+          topLeft: 64
+          topRight: 8
+          bottomRight: 32
+          bottomLeft: 0
+      - id: rect-flip-both-magnitude
+        type: rect
+        x: 400
+        "y": 510
+        width: 160
+        height: 100
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1.5
+        scaleY: -1.4
+        fill: "#D9D9D9"
+        cornerRadius:
+          topLeft: 48
+          topRight: 4
+          bottomRight: 24
+          bottomLeft: 0
+      - id: zero-scale-underlay
+        type: rect
+        x: 820
+        "y": 510
+        width: 180
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#4D4D4D"
+      - id: zero-scale-overlay
+        type: rect
+        x: 820
+        "y": 510
+        width: 180
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: 0
+        scaleY: 0
+        fill: "#FFFFFF"
+      - id: marker-normal
+        type: rect
+        x: 240
+        "y": 190
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"
+      - id: marker-flip-x
+        type: rect
+        x: 640
+        "y": 190
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"
+      - id: marker-flip-y
+        type: rect
+        x: 1040
+        "y": 190
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"
+      - id: marker-both
+        type: rect
+        x: 400
+        "y": 510
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"

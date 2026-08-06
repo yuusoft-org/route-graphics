@@ -19,7 +19,6 @@ import {
   setManagedVideoSpriteResizeHandler,
 } from "./managedVideoTextureSizing.js";
 import {
-  applyElementPivot,
   applyElementTransform,
   getElementTransformTargetState,
 } from "../util/transform.js";
@@ -57,9 +56,9 @@ export const addVideo = ({
 
   sprite.width = Math.round(width);
   sprite.height = Math.round(height);
-  applyElementTransform(sprite, element);
+  applyElementTransform(sprite, element, { preserveScaleMagnitude: true });
   setManagedVideoSpriteResizeHandler(sprite, () => {
-    applyElementPivot(sprite, element);
+    applyElementTransform(sprite, element, { preserveScaleMagnitude: true });
   });
   registerManagedVideoSprite(sprite);
   sprite.alpha = alpha ?? 1;

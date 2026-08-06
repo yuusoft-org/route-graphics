@@ -48,7 +48,7 @@ export const addSprite = ({
   sprite.width = Math.round(width);
   sprite.height = Math.round(height);
   sprite.alpha = alpha;
-  applyElementTransform(sprite, element);
+  applyElementTransform(sprite, element, { preserveScaleMagnitude: true });
   const shouldForceBlur = hasBlurUpdateAnimation(animations, id);
   syncBlurEffect(sprite, element.blur, { force: shouldForceBlur });
   const shouldForceShaderProgress = hasShaderProgressUpdateAnimation(

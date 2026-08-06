@@ -29,7 +29,9 @@ export const setAnimatedSpriteTransformElement = (animatedSprite, element) => {
 
 export const applyAnimatedSpriteTransform = (animatedSprite, element) => {
   ensureAnimatedSpriteTransformState(animatedSprite, element);
-  applyElementTransform(animatedSprite, element);
+  applyElementTransform(animatedSprite, element, {
+    preserveScaleMagnitude: true,
+  });
 };
 
 export const refreshAnimatedSpritePivot = (animatedSprite) => {

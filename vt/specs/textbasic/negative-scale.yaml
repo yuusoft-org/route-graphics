@@ -1,0 +1,62 @@
+---
+title: Negative Text Scale
+description: Text content is the subject of this test, making glyph direction a direct reflection oracle.
+specs:
+  - negative horizontal scale should mirror the complete text layout
+  - negative vertical scale should reflect glyphs around the anchor-derived center
+  - two negative axes and non-unit magnitude should compose without corrupting layout
+---
+states:
+  - elements:
+      - id: text-normal
+        type: text
+        content: "LEFT  →  RIGHT"
+        x: 320
+        "y": 170
+        width: 360
+        anchorX: 0.5
+        anchorY: 0.5
+        textStyle:
+          fontSize: 42
+          align: center
+          fill: "#FFFFFF"
+      - id: text-flip-x
+        type: text
+        content: "LEFT  →  RIGHT"
+        x: 960
+        "y": 170
+        width: 360
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+        textStyle:
+          fontSize: 42
+          align: center
+          fill: "#FFFFFF"
+      - id: text-flip-y
+        type: text
+        content: "TOP  ↑  BOTTOM"
+        x: 320
+        "y": 480
+        width: 400
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleY: -1
+        textStyle:
+          fontSize: 40
+          align: center
+          fill: "#D9D9D9"
+      - id: text-flip-both
+        type: text
+        content: "DOUBLE  ↗  FLIP"
+        x: 930
+        "y": 480
+        width: 320
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1.2
+        scaleY: -1.35
+        textStyle:
+          fontSize: 36
+          align: center
+          fill: "#D9D9D9"

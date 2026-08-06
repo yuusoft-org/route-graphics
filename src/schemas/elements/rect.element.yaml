@@ -166,12 +166,10 @@ properties:
     description: Vertical transform origin in pixels from the element's top edge. Defaults to the anchor-derived Y origin.
   scaleX:
     type: number
-    exclusiveMinimum: 0
-    description: Horizontal scale baked into rect geometry
+    description: Horizontal scale. Negative values mirror the rectangle and zero collapses it.
   scaleY:
     type: number
-    exclusiveMinimum: 0
-    description: Vertical scale baked into rect geometry
+    description: Vertical scale. Negative values mirror the rectangle and zero collapses it.
   alpha:
     type: number
     description: Opacity/transparency of the rectangle (0-1)

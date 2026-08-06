@@ -36,6 +36,12 @@ properties:
   originY:
     type: number
     description: Transform origin Y in pixels
+  scaleX:
+    type: number
+    description: Authored horizontal scale when a live sign transform is required
+  scaleY:
+    type: number
+    description: Authored vertical scale when a live sign transform is required
   rotation:
     type: number
     description: Rotation in degrees

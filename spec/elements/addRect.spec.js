@@ -4,6 +4,51 @@ import { addRect } from "../../src/plugins/elements/rect/addRect.js";
 import { parseRect } from "../../src/plugins/elements/rect/parseRect.js";
 
 describe("addRect", () => {
+  it("renders negative scale as a live reflection over positive geometry", () => {
+    const parent = new Container();
+    const element = parseRect({
+      state: {
+        id: "mirrored-rect",
+        type: "rect",
+        x: 300,
+        y: 200,
+        width: 120,
+        height: 80,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        fill: "#737373",
+        scaleX: -1.5,
+        scaleY: -0.5,
+      },
+    });
+
+    addRect({
+      app: { audioStage: { add: vi.fn() } },
+      parent,
+      element,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {
+        getVersion: () => 0,
+        track: () => {},
+        complete: () => {},
+      },
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+
+    const rectElement = parent.getChildByLabel("mirrored-rect");
+
+    expect(element).toMatchObject({ width: 180, height: 40 });
+    expect(rectElement.scale.x).toBe(-1);
+    expect(rectElement.scale.y).toBe(-1);
+    expect(rectElement.width).toBe(180);
+    expect(rectElement.height).toBe(40);
+    expect(rectElement.x).toBe(300);
+    expect(rectElement.y).toBe(200);
+    expect(rectElement.pivot).toMatchObject({ x: 90, y: 20 });
+  });
+
   it("renders scaled rect geometry without double-applying the live scale", () => {
     const parent = new Container();
     const element = parseRect({

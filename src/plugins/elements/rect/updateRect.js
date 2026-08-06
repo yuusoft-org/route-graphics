@@ -121,14 +121,15 @@ export const updateRect = ({
   });
   const hasBakedWidth =
     liveScaleX &&
-    rectElement.scale.x === 1 &&
+    Math.abs(rectElement.scale.x) === 1 &&
     rectStyleRuntime.state.width === prevElement.width;
   const hasBakedHeight =
     liveScaleY &&
-    rectElement.scale.y === 1 &&
+    Math.abs(rectElement.scale.y) === 1 &&
     rectStyleRuntime.state.height === prevElement.height;
-  const shouldFlattenWidth = !liveScaleX && rectElement.scale.x !== 1;
-  const shouldFlattenHeight = !liveScaleY && rectElement.scale.y !== 1;
+  const shouldFlattenWidth = !liveScaleX && Math.abs(rectElement.scale.x) !== 1;
+  const shouldFlattenHeight =
+    !liveScaleY && Math.abs(rectElement.scale.y) !== 1;
 
   if (
     hasBakedWidth ||

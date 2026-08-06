@@ -1,10 +1,84 @@
 import { Container, Graphics } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
 import { updateRect } from "../../src/plugins/elements/rect/updateRect.js";
+import { addRect } from "../../src/plugins/elements/rect/addRect.js";
 import { parseRect } from "../../src/plugins/elements/rect/parseRect.js";
 import { getElementRenderState } from "../../src/plugins/elements/elementRenderState.js";
 
 describe("updateRect", () => {
+  it("updates cleanly between negative and positive static scale", () => {
+    const parent = new Container();
+    const app = { audioStage: { add: vi.fn() } };
+    const completionTracker = {
+      getVersion: () => 0,
+      track: () => {},
+      complete: () => {},
+    };
+    const prevElement = parseRect({
+      state: {
+        id: "rect-1",
+        type: "rect",
+        x: 200,
+        y: 100,
+        width: 100,
+        height: 60,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        scaleX: -2,
+        scaleY: -1,
+        fill: "red",
+      },
+    });
+    const nextElement = parseRect({
+      state: {
+        id: "rect-1",
+        type: "rect",
+        x: 200,
+        y: 100,
+        width: 100,
+        height: 60,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        scaleX: 1.5,
+        scaleY: 0.5,
+        fill: "red",
+      },
+    });
+
+    addRect({
+      app,
+      parent,
+      element: prevElement,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+    const rectElement = parent.getChildByLabel("rect-1");
+    expect(rectElement.scale.x).toBe(-1);
+    expect(rectElement.scale.y).toBe(-1);
+
+    updateRect({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker,
+      eventHandler: vi.fn(),
+      zIndex: 0,
+    });
+
+    expect(rectElement.scale.x).toBe(1);
+    expect(rectElement.scale.y).toBe(1);
+    expect(rectElement.width).toBe(150);
+    expect(rectElement.height).toBe(30);
+    expect(rectElement.x).toBe(200);
+    expect(rectElement.y).toBe(100);
+  });
+
   it("resets transient rect scale when returning to an unscaled state", () => {
     const parent = new Container();
     const rectElement = new Graphics();

@@ -128,7 +128,7 @@ export const addParticle = ({
 
   const width = element.width;
   const height = element.height;
-  applyElementTransform(container, element);
+  applyElementTransform(container, element, { scaleMode: "full" });
 
   // Build emitter config from custom behaviors
   const emitterConfig = {
@@ -242,6 +242,8 @@ export const addParticle = ({
     element: container,
     targetState: getElementTransformTargetState(element, {
       alpha: element.alpha ?? container.alpha,
+      ...(element.scaleX !== undefined ? { scaleX: element.scaleX } : {}),
+      ...(element.scaleY !== undefined ? { scaleY: element.scaleY } : {}),
     }),
     renderContext,
   });

@@ -33,6 +33,59 @@ function collectPositions(emitter) {
 }
 
 describe("addParticle", () => {
+  it("keeps particle bounds local and applies the full signed live scale", () => {
+    const parent = new Container();
+    const app = createApp();
+    const element = {
+      id: "mirrored-particles",
+      type: "particles",
+      x: 200,
+      y: 120,
+      width: 100,
+      height: 80,
+      originX: -50,
+      originY: 40,
+      scaleX: -1.5,
+      scaleY: 2,
+      count: 1,
+      texture: {
+        shape: "circle",
+        radius: 2,
+        color: "#ffffff",
+      },
+      behaviors: [],
+      emitter: {
+        lifetime: { min: 1, max: 1 },
+        frequency: 1,
+        maxParticles: 1,
+      },
+    };
+
+    addParticle({
+      app,
+      parent,
+      element,
+      animations: [],
+      animationBus: createAnimationBus(),
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      renderContext: {},
+      zIndex: 0,
+    });
+
+    const particles = parent.getChildByLabel(element.id);
+    expect(particles.scale.x).toBe(-1.5);
+    expect(particles.scale.y).toBe(2);
+    expect(particles.pivot).toMatchObject({ x: 100 / 3, y: 20 });
+    expect(particles.x).toBe(150);
+    expect(particles.y).toBe(160);
+    particles.emitter.destroy();
+    particles.destroy({ children: true });
+  });
+
   it("installs shader filters before dispatching mount animations", () => {
     const parent = new Container();
     const app = createApp();

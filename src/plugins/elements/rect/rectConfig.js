@@ -402,9 +402,7 @@ export const validateRectState = (state, path = "rect") => {
     assertOptionalFiniteNumber(state[key], `${path}.${key}`);
   }
   for (const key of ["scaleX", "scaleY"]) {
-    if (state[key] !== undefined) {
-      assertPositiveNumber(state[key], `${path}.${key}`);
-    }
+    assertOptionalFiniteNumber(state[key], `${path}.${key}`);
   }
   if (state.alpha !== undefined) {
     assertRange(state.alpha, `${path}.alpha`, 0, 1);

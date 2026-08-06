@@ -11,8 +11,6 @@ required:
   - height
   - originX
   - originY
-  - scaleX
-  - scaleY
   - alpha
   - volume
   - loop
@@ -48,10 +46,10 @@ properties:
     default: 0
   scaleX:
     type: number
-    description: X scale factor
+    description: Authored horizontal scale when a live sign transform is required
   scaleY:
     type: number
-    description: Y scale factor
+    description: Authored vertical scale when a live sign transform is required
   alpha:
     type: number
     description: Opacity/transparency of the video (0-1)

@@ -44,11 +44,7 @@ export const parseParticles = ({ state }) => {
 
   // Reconcile count with emitter.maxParticles
   const count = state.emitter?.maxParticles ?? state.count ?? 100;
-  const computedObj = parseCommonObject({
-    ...state,
-    scaleX: undefined,
-    scaleY: undefined,
-  });
+  const computedObj = parseCommonObject(state, { scaleMode: "live" });
 
   // Build emitter config with count synced to maxParticles
   let emitter = state.emitter;

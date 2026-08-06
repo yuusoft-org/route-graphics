@@ -72,6 +72,8 @@
  * @typedef {Object} BaseElement
  * @property {string} id - Unique identifier for the element
  * @property {string} type - Type of the element
+ * @property {number} [scaleX=1] - Horizontal scale. Negative values mirror the element; zero collapses it.
+ * @property {number} [scaleY=1] - Vertical scale. Negative values mirror the element; zero collapses it.
  * @property {ShaderFilter[]} [filters] - Ordered inline shader effects
  */
 
@@ -90,8 +92,7 @@
 
 /**
  * @typedef {Object} ParseCommonObjectOption
- * @property {number} providedWidth
- * @property {number} providedHeight
+ * @property {"baked" | "live"} [scaleMode="baked"] - Whether scale magnitude is baked into dimensions or kept as a live transform
  */
 
 /**
@@ -124,8 +125,8 @@
  * @property {number} height - Height of the computed node
  * @property {number} originX
  * @property {number} originY
- * @property {number} scaleX
- * @property {number} scaleY
+ * @property {number} [scaleX]
+ * @property {number} [scaleY]
  * @property {number} rotation - Rotation in degrees
  */
 

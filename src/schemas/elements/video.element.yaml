@@ -44,6 +44,12 @@ properties:
   originY:
     type: number
     description: Vertical transform origin in pixels from the video's top edge. Defaults to the anchor-derived Y origin.
+  scaleX:
+    type: number
+    description: Horizontal scale. Negative values mirror the video and zero collapses it.
+  scaleY:
+    type: number
+    description: Vertical scale. Negative values mirror the video and zero collapses it.
   rotation:
     type: number
     description: Rotation in degrees

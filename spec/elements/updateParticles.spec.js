@@ -81,6 +81,47 @@ describe("updateParticles", () => {
     renderContext.deferredMountOperations.length = 0;
   });
 
+  it("applies full signed scale when only the particle transform changes", () => {
+    const parent = new Container();
+    const container = new Container();
+    container.label = "snow-effect";
+    parent.addChild(container);
+    const prevElement = createParticleNode({
+      originX: 20,
+      originY: 10,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    const nextElement = createParticleNode({
+      x: 100,
+      y: 80,
+      originX: -30,
+      originY: 20,
+      scaleX: -1.5,
+      scaleY: 2,
+    });
+
+    updateParticles({
+      app,
+      parent,
+      prevElement,
+      nextElement,
+      animations,
+      animationBus,
+      completionTracker,
+      renderContext,
+      zIndex: 3,
+    });
+
+    expect(deleteParticles).not.toHaveBeenCalled();
+    expect(addParticle).not.toHaveBeenCalled();
+    expect(container.scale.x).toBe(-1.5);
+    expect(container.scale.y).toBe(2);
+    expect(container.pivot).toMatchObject({ x: 20, y: 10 });
+    expect(container.x).toBe(70);
+    expect(container.y).toBe(100);
+  });
+
   it("passes renderContext when adding particles to a missing container", () => {
     const parent = new Container();
     const nextElement = createParticleNode();

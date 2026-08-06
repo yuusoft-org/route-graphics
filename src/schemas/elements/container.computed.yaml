@@ -42,6 +42,12 @@ properties:
   originY:
     type: number
     description: Calculated origin Y coordinate based on anchor
+  scaleX:
+    type: number
+    description: Authored horizontal scale when a live sign transform is required
+  scaleY:
+    type: number
+    description: Authored vertical scale when a live sign transform is required
   children:
     type: array
     description: Parsed child elements with positions adjusted based on direction, gapX, and gapY

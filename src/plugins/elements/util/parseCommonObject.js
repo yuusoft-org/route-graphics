@@ -13,11 +13,11 @@ const SHADER_FILTER_ELEMENT_TYPES = new Set(Object.values(ComputedNodeType));
 
 /**
  * @param {BaseElement} state
- * @param {ParseCommonObjectOption} option
+ * @param {ParseCommonObjectOption} [option]
  * @returns  {ComputedNode}
  */
-export const parseCommonObject = (state) => {
-  if (!(typeof state.width === "number") || !(typeof state.height === "number"))
+export const parseCommonObject = (state, { scaleMode = "baked" } = {}) => {
+  if (!Number.isFinite(state.width) || !Number.isFinite(state.height))
     throw new Error("Input Error: Width or height is missing");
 
   if (!Object.values(ComputedNodeType).includes(state.type))
@@ -28,15 +28,33 @@ export const parseCommonObject = (state) => {
 
   if (!state.id) throw new Error("Input Error: Id is missing");
 
-  let widthAfterScale = state.scaleX ? state.scaleX * state.width : state.width;
-  let heightAfterScale = state.scaleY
-    ? state.scaleY * state.height
-    : state.height;
+  const scaleX = state.scaleX ?? 1;
+  const scaleY = state.scaleY ?? 1;
 
-  //We don't let scale affect container type for now
+  if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY)) {
+    throw new Error("Input Error: scaleX and scaleY must be finite numbers");
+  }
+
+  let widthAfterScale = Math.abs(scaleX * state.width);
+  let heightAfterScale = Math.abs(scaleY * state.height);
+  let anchorWidth = Math.sign(scaleX) * widthAfterScale;
+  let anchorHeight = Math.sign(scaleY) * heightAfterScale;
+
+  // Container scale magnitudes are baked into descendants. Only the sign is
+  // applied to the container itself so a negative scale mirrors the subtree as
+  // one group instead of mirroring every child around its own origin.
   if (state.type === ComputedNodeType.CONTAINER) {
-    widthAfterScale = state.width;
-    heightAfterScale = state.height;
+    widthAfterScale = Math.abs(state.width);
+    heightAfterScale = Math.abs(state.height);
+    anchorWidth = Math.sign(scaleX) * widthAfterScale;
+    anchorHeight = Math.sign(scaleY) * heightAfterScale;
+  } else if (scaleMode === "live") {
+    // Particle dimensions describe the emitter's local area, so its complete
+    // scale (magnitude and sign) remains a live transform.
+    widthAfterScale = Math.abs(state.width);
+    heightAfterScale = Math.abs(state.height);
+    anchorWidth = scaleX * widthAfterScale;
+    anchorHeight = scaleY * heightAfterScale;
   }
 
   const {
@@ -47,8 +65,8 @@ export const parseCommonObject = (state) => {
   } = calculatePositionAfterAnchor({
     positionX: state.x,
     positionY: state.y,
-    width: widthAfterScale,
-    height: heightAfterScale,
+    width: anchorWidth,
+    height: anchorHeight,
     anchorX: state.anchorX,
     anchorY: state.anchorY,
   });
@@ -58,6 +76,8 @@ export const parseCommonObject = (state) => {
     typeof state.originY === "number" ? state.originY : originY;
 
   // Round all pixel calculations
+  const includeScaleX = scaleMode === "live" || scaleX <= 0;
+  const includeScaleY = scaleMode === "live" || scaleY <= 0;
   let computedObj = {
     id: state.id,
     type: state.type,
@@ -69,6 +89,8 @@ export const parseCommonObject = (state) => {
     originY: Math.round(transformOriginY),
     alpha: state.alpha ?? 1,
     rotation: state.rotation ?? 0,
+    ...(state.scaleX !== undefined && includeScaleX ? { scaleX } : {}),
+    ...(state.scaleY !== undefined && includeScaleY ? { scaleY } : {}),
   };
 
   if (state.hover) {

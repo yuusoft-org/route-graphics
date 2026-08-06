@@ -1,0 +1,134 @@
+---
+title: Negative Container Scale
+description: Asymmetric grayscale child groups verify that a container reflects its subtree as one group.
+specs:
+  - a negative container scale should mirror child positions and geometry together
+  - scale magnitude should be baked into descendants while the sign stays on the group
+  - nested negative scales should compose back to a positive orientation
+---
+states:
+  - elements:
+      - id: group-normal
+        type: container
+        x: 240
+        "y": 190
+        width: 260
+        height: 160
+        anchorX: 0.5
+        anchorY: 0.5
+        children:
+          - id: normal-body
+            type: rect
+            x: 20
+            "y": 25
+            width: 150
+            height: 100
+            fill: "#D9D9D9"
+            cornerRadius:
+              topLeft: 36
+              topRight: 0
+              bottomRight: 16
+              bottomLeft: 0
+          - id: normal-tip
+            type: rect
+            x: 175
+            "y": 60
+            width: 65
+            height: 30
+            fill: "#737373"
+      - id: group-flipped
+        type: container
+        x: 640
+        "y": 190
+        width: 260
+        height: 160
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+        children:
+          - id: flipped-body
+            type: rect
+            x: 20
+            "y": 25
+            width: 150
+            height: 100
+            fill: "#D9D9D9"
+            cornerRadius:
+              topLeft: 36
+              topRight: 0
+              bottomRight: 16
+              bottomLeft: 0
+          - id: flipped-tip
+            type: rect
+            x: 175
+            "y": 60
+            width: 65
+            height: 30
+            fill: "#737373"
+      - id: group-flipped-magnitude
+        type: container
+        x: 1050
+        "y": 190
+        width: 220
+        height: 140
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1.25
+        scaleY: 1.2
+        children:
+          - id: magnitude-body
+            type: rect
+            x: 16
+            "y": 20
+            width: 125
+            height: 85
+            fill: "#D9D9D9"
+            cornerRadius:
+              topLeft: 30
+              topRight: 0
+              bottomRight: 12
+              bottomLeft: 0
+          - id: magnitude-tip
+            type: rect
+            x: 145
+            "y": 52
+            width: 55
+            height: 25
+            fill: "#737373"
+      - id: outer-double-flip
+        type: container
+        x: 640
+        "y": 520
+        width: 300
+        height: 160
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+        children:
+          - id: inner-double-flip
+            type: container
+            x: 20
+            "y": 20
+            width: 260
+            height: 120
+            scaleX: -1
+            children:
+              - id: double-body
+                type: rect
+                x: 15
+                "y": 15
+                width: 150
+                height: 90
+                fill: "#FFFFFF"
+                cornerRadius:
+                  topLeft: 34
+                  topRight: 0
+                  bottomRight: 14
+                  bottomLeft: 0
+              - id: double-tip
+                type: rect
+                x: 170
+                "y": 45
+                width: 70
+                height: 30
+                fill: "#737373"

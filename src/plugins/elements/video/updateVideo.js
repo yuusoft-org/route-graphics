@@ -149,7 +149,9 @@ export const updateVideo = ({
     if (!isDeepEqual(prevElement, nextElement)) {
       videoElement.width = Math.round(width);
       videoElement.height = Math.round(height);
-      applyElementTransform(videoElement, nextElement);
+      applyElementTransform(videoElement, nextElement, {
+        preserveScaleMagnitude: true,
+      });
       videoElement.alpha = alpha ?? 1;
       syncBlurEffect(videoElement, nextElement.blur, {
         force: shouldForceBlur,
