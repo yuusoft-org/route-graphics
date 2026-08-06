@@ -43,6 +43,12 @@ properties:
   originY:
     type: number
     description: Vertical transform origin in pixels from the element's top edge. Defaults to the anchor-derived Y origin.
+  scaleX:
+    type: number
+    description: Horizontal scale. Negative values mirror the sprite and zero collapses it.
+  scaleY:
+    type: number
+    description: Vertical scale. Negative values mirror the sprite and zero collapses it.
   src:
     type: string
     description: src of the sprite image. the alias of the pre loaded asset. can be empty

@@ -32,7 +32,7 @@ export const addTextRevealing = async ({
   container.label = element.id;
   container.zIndex = zIndex;
 
-  applyElementTransform(container, element);
+  applyElementTransform(container, element, { scaleMode: "full" });
   if (element.alpha !== undefined) container.alpha = element.alpha;
   parent.addChild(container);
   syncShaderFilters(container, element.filters, {
@@ -48,6 +48,8 @@ export const addTextRevealing = async ({
     element: container,
     targetState: getElementTransformTargetState(element, {
       alpha: element.alpha ?? container.alpha,
+      ...(element.scaleX !== undefined && { scaleX: element.scaleX }),
+      ...(element.scaleY !== undefined && { scaleY: element.scaleY }),
     }),
     renderContext,
   });

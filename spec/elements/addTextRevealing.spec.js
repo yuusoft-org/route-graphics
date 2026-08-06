@@ -19,6 +19,7 @@ import {
   flushDeferredMountOperations,
 } from "../../src/plugins/elements/renderContext.js";
 import { addTextRevealing } from "../../src/plugins/elements/text-revealing/addTextRevealing.js";
+import { parseTextRevealing } from "../../src/plugins/elements/text-revealing/parseTextRevealing.js";
 import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 import {
   createAnimatedShaderFilterFixture,
@@ -104,6 +105,54 @@ describe("addTextRevealing", () => {
     expect(text.pivot.x).toBe(16);
     expect(text.pivot.y).toBe(10);
     expect(text.rotation).toBeCloseTo(Math.PI / 3);
+  });
+
+  it("renders full positive and negative scale around the computed anchor", async () => {
+    const parent = new Container();
+    const element = parseTextRevealing({
+      state: {
+        id: "scaled-line",
+        type: "text-revealing",
+        x: 300,
+        y: 180,
+        width: 100,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        scaleX: -2,
+        scaleY: 1.5,
+        alpha: 1,
+        speed: 100,
+        content: [
+          {
+            text: "Asymmetric line",
+            textStyle: { fontFamily: "Arial", fontSize: 20 },
+          },
+        ],
+      },
+    });
+
+    await addTextRevealing({
+      parent,
+      element,
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {
+        getVersion: () => 0,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 0,
+      signal: new AbortController().signal,
+    });
+
+    const text = parent.getChildByLabel("scaled-line");
+
+    expect(element.width).toBe(200);
+    expect(text.scale.x).toBe(-2);
+    expect(text.scale.y).toBe(1.5);
+    expect(text.pivot.x).toBe(50);
+    expect(text.x).toBe(300);
+    expect(text.y).toBe(180);
   });
 
   it("pauses reveal work during suppressed mounts and starts it after finalize", async () => {

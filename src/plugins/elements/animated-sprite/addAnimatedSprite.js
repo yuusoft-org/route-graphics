@@ -20,7 +20,10 @@ import {
   playbackFpsToAnimationSpeed,
   resolveAnimatedSpriteFrameTextures,
 } from "./animatedSpriteConfig.js";
-import { getElementTransformTargetState } from "../util/transform.js";
+import {
+  getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
+} from "../util/transform.js";
 import { applyAnimatedSpriteTransform } from "./animatedSpriteTransform.js";
 
 /**
@@ -120,6 +123,10 @@ export const addAnimatedSprite = async ({
       element: animatedSprite,
       targetState: {
         ...getElementTransformTargetState(element),
+        ...getTextureBackedScaleTargetState(animatedSprite, element, {
+          width,
+          height,
+        }),
         width,
         height,
         alpha,

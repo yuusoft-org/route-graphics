@@ -88,6 +88,14 @@ properties:
     type: number
     description: Transform origin Y in pixels
 
+  scaleX:
+    type: number
+    description: Full horizontal live scale for the particle container
+
+  scaleY:
+    type: number
+    description: Full vertical live scale for the particle container
+
   rotation:
     type: number
     description: Element-level emitter container rotation in degrees

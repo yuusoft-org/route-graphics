@@ -45,7 +45,33 @@ export const setManagedVideoSpriteResizeHandler = (sprite, handler) => {
 export const requestManagedVideoTextureUpdate = (sprite) => {
   const runtime = sprite?.texture?.source?.__routeGraphicsVideoTextureRuntime;
 
-  runtime?.requestUpdate?.();
+  return runtime?.requestUpdate?.() ?? false;
+};
+
+export const hasManagedVideoTextureDimensions = (sprite) => {
+  const texture = sprite?.texture;
+  const source = texture?.source;
+  const resource = source?.resource;
+  const width = texture?.orig?.width ?? source?.width;
+  const height = texture?.orig?.height ?? source?.height;
+  const exposesVideoDimensions =
+    resource != null &&
+    ("videoWidth" in Object(resource) || "videoHeight" in Object(resource));
+
+  if (exposesVideoDimensions) {
+    return (
+      Number.isFinite(resource.videoWidth) &&
+      resource.videoWidth > 0 &&
+      Number.isFinite(resource.videoHeight) &&
+      resource.videoHeight > 0 &&
+      width === resource.videoWidth &&
+      height === resource.videoHeight
+    );
+  }
+
+  return (
+    Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
+  );
 };
 
 export const unregisterManagedVideoSprite = (

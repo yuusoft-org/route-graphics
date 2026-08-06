@@ -30,6 +30,7 @@ import { setupScrollInteraction } from "../util/setupScrollInteraction.js";
 import {
   applyElementTransform,
   getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
 } from "../util/transform.js";
 import { setElementRenderState } from "../elementRenderState.js";
 
@@ -301,7 +302,9 @@ export const updateSprite = ({
       spriteElement.width = Math.round(width);
       spriteElement.height = Math.round(height);
       spriteElement.alpha = alpha;
-      applyElementTransform(spriteElement, nextElement);
+      applyElementTransform(spriteElement, nextElement, {
+        preserveScaleMagnitude: true,
+      });
       syncBlurEffect(spriteElement, nextElement.blur, {
         force: shouldForceBlur,
       });
@@ -334,6 +337,10 @@ export const updateSprite = ({
     element: spriteElement,
     targetState: {
       ...getElementTransformTargetState(nextElement),
+      ...getTextureBackedScaleTargetState(spriteElement, nextElement, {
+        width,
+        height,
+      }),
       width,
       height,
       alpha,

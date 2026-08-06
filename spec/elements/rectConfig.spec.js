@@ -113,7 +113,6 @@ describe("rect runtime validation", () => {
     ["infinite position", { x: Infinity }, "rect.x"],
     ["infinite anchor", { anchorX: -Infinity }, "rect.anchorX"],
     ["NaN rotation", { rotation: Number.NaN }, "rect.rotation"],
-    ["zero scale", { scaleX: 0 }, "rect.scaleX"],
     ["infinite scale", { scaleY: Infinity }, "rect.scaleY"],
     ["out-of-range alpha", { alpha: 1.1 }, "rect.alpha"],
     ["invalid solid color", { fill: "not-a-real-color()" }, "rect.fill"],
@@ -185,6 +184,15 @@ describe("rect runtime validation", () => {
     ],
   ])("rejects %s", (_name, overrides, message) => {
     expect(() => parseRect({ state: createRect(overrides) })).toThrow(message);
+  });
+
+  it.each([
+    ["negative horizontal scale", { scaleX: -1 }],
+    ["negative vertical scale", { scaleY: -2.5 }],
+    ["zero horizontal scale", { scaleX: 0 }],
+    ["zero vertical scale", { scaleY: 0 }],
+  ])("accepts %s", (_name, overrides) => {
+    expect(() => parseRect({ state: createRect(overrides) })).not.toThrow();
   });
 
   it.each([

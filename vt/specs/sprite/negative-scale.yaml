@@ -1,0 +1,79 @@
+---
+title: Negative Sprite Scale
+description: Uses an intentionally asymmetric asset to make every reflection visually unambiguous (asset-based guideline exception).
+specs:
+  - negative scale should mirror sprite texture content around its anchor
+  - horizontal, vertical, and two-axis signs should compose independently
+  - updates between negative and positive signs should not retain a stale reflection
+steps:
+  - action: keypress
+    key: "n"
+  - action: screenshot
+  - action: keypress
+    key: b
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: sprite-left
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 320
+        "y": 230
+        width: 400
+        height: 225
+        anchorX: 0.5
+        anchorY: 0.5
+      - id: sprite-right
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 960
+        "y": 230
+        width: 400
+        height: 225
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+      - id: sprite-bottom
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 640
+        "y": 540
+        width: 320
+        height: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleY: -1
+  - elements:
+      - id: sprite-left
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 320
+        "y": 230
+        width: 400
+        height: 225
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: 1
+      - id: sprite-right
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 960
+        "y": 230
+        width: 400
+        height: 225
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+        scaleY: -1
+      - id: sprite-bottom
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 640
+        "y": 540
+        width: 320
+        height: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1.25
+        scaleY: 1

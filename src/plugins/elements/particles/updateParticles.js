@@ -107,7 +107,7 @@ export const updateParticles = ({
       if (nextElement.alpha !== undefined) {
         container.alpha = nextElement.alpha;
       }
-      applyElementTransform(container, nextElement);
+      applyElementTransform(container, nextElement, { scaleMode: "full" });
       setElementRenderState(container, nextElement);
       commitRenderState?.(container);
     };
@@ -120,6 +120,12 @@ export const updateParticles = ({
       element: container,
       targetState: getElementTransformTargetState(nextElement, {
         alpha: nextElement.alpha ?? container.alpha,
+        ...(nextElement.scaleX !== undefined
+          ? { scaleX: nextElement.scaleX }
+          : {}),
+        ...(nextElement.scaleY !== undefined
+          ? { scaleY: nextElement.scaleY }
+          : {}),
       }),
       onComplete: updateElement,
     });

@@ -291,6 +291,47 @@ describe("spritesheet animation rendering", () => {
     expect(sprite.scale.y).toBeCloseTo(1);
   });
 
+  it("preserves the authored scale sign when recomputing a mirrored frame pivot", async () => {
+    const parent = {
+      destroyed: false,
+      addChild: vi.fn(),
+    };
+
+    await addAnimatedSprite({
+      app: {
+        debug: false,
+        render: vi.fn(),
+      },
+      parent,
+      element: createAnimatedSpriteElement({
+        width: 100,
+        height: 100,
+        originX: -20,
+        originY: -30,
+        scaleX: -1,
+        scaleY: -1,
+      }),
+      animations: [],
+      animationBus: { dispatch: vi.fn() },
+      completionTracker: {},
+      renderContext: {},
+      zIndex: 3,
+      signal: undefined,
+    });
+
+    const sprite = parent.addChild.mock.calls[0][0];
+    sprite.texture = { orig: { width: 200, height: 50 } };
+    sprite.scale.x = -0.75;
+    sprite.scale.y = -1;
+
+    sprite.onFrameChange(1);
+
+    expect(sprite.pivot.x).toBeCloseTo(40);
+    expect(sprite.pivot.y).toBeCloseTo(15);
+    expect(sprite.scale.x).toBeCloseTo(-0.75);
+    expect(sprite.scale.y).toBeCloseTo(-1);
+  });
+
   it("keeps the previous origin during a live update tween", async () => {
     const liveAnimations = [
       {
@@ -371,6 +412,65 @@ describe("spritesheet animation rendering", () => {
     ).toBeCloseTo(12);
     expect(animatedSpriteElement.x).toBe(230);
     expect(animatedSpriteElement.y).toBe(172);
+  });
+
+  it("targets the signed post-sizing scale for animated sprite auto tweens", async () => {
+    const liveAnimations = [
+      {
+        id: "animated-sprite-scale",
+        targetId: "animated-sprite-1",
+        type: "update",
+        tween: {
+          scaleX: { auto: { duration: 300 } },
+          scaleY: { auto: { duration: 300 } },
+        },
+      },
+    ];
+    dispatchLiveAnimations.mockReturnValue(true);
+    getLiveAnimations.mockReturnValue(liveAnimations);
+
+    const animatedSpriteElement = new MockAnimatedSprite([
+      { frameName: "old" },
+    ]);
+    animatedSpriteElement.label = "animated-sprite-1";
+    animatedSpriteElement.texture = {
+      orig: { width: 50, height: 25 },
+    };
+    animatedSpriteElement.width = 100;
+    animatedSpriteElement.height = 50;
+    animatedSpriteElement.scale.x = -2;
+    animatedSpriteElement.scale.y = 2;
+    const prevElement = createAnimatedSpriteElement({
+      width: 100,
+      height: 50,
+      scaleX: -1,
+    });
+    const nextElement = createAnimatedSpriteElement({
+      width: 200,
+      height: 100,
+      scaleX: -1,
+    });
+
+    await updateAnimatedSprite({
+      app: { debug: false, render: vi.fn() },
+      parent: { children: [animatedSpriteElement] },
+      prevElement,
+      nextElement,
+      animations: liveAnimations,
+      animationBus: {},
+      completionTracker: {},
+      zIndex: 4,
+      signal: undefined,
+    });
+
+    expect(dispatchLiveAnimations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetState: expect.objectContaining({
+          scaleX: -4,
+          scaleY: 4,
+        }),
+      }),
+    );
   });
 
   it("renders after asynchronously adding a spritesheet animation in debug/manual flows", async () => {

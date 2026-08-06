@@ -1,0 +1,110 @@
+---
+title: Negative Particle Scale
+description: Deterministic asymmetric burst fields verify full signed live scale on particle containers.
+specs:
+  - particle effect dimensions should remain local while negative scale mirrors the complete field
+  - equal seeds should produce reflected copies around their anchor-derived centers
+  - particle scale magnitude and sign should be applied exactly once
+skipInitialScreenshot: true
+steps:
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 32
+  - action: wait
+    ms: 50
+  - action: customEvent
+    name: "primeVtScreenshot"
+  - action: wait
+    ms: 50
+  - action: screenshot
+---
+states:
+  - elements:
+      - id: normal-frame
+        type: rect
+        x: 300
+        "y": 340
+        width: 320
+        height: 220
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: transparent
+        border:
+          width: 2
+          color: "#4D4D4D"
+      - id: normal-particles
+        type: particles
+        x: 300
+        "y": 340
+        width: 320
+        height: 220
+        anchorX: 0.5
+        anchorY: 0.5
+        seed: 8642
+        modules:
+          emission:
+            mode: burst
+            burstCount: 50
+            maxActive: 50
+            duration: 0.1
+            particleLifetime: 10
+            source:
+              kind: rect
+              data:
+                x: 24
+                "y": 28
+                width: 135
+                height: 70
+          appearance:
+            texture:
+              shape: rect
+              width: 12
+              height: 7
+              color: "#FFFFFF"
+            rotation:
+              mode: none
+      - id: flipped-frame
+        type: rect
+        x: 900
+        "y": 340
+        width: 320
+        height: 220
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: transparent
+        border:
+          width: 2
+          color: "#4D4D4D"
+      - id: flipped-particles
+        type: particles
+        x: 900
+        "y": 340
+        width: 320
+        height: 220
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+        seed: 8642
+        modules:
+          emission:
+            mode: burst
+            burstCount: 50
+            maxActive: 50
+            duration: 0.1
+            particleLifetime: 10
+            source:
+              kind: rect
+              data:
+                x: 24
+                "y": 28
+                width: 135
+                height: 70
+          appearance:
+            texture:
+              shape: rect
+              width: 12
+              height: 7
+              color: "#FFFFFF"
+            rotation:
+              mode: none

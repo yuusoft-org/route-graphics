@@ -1,0 +1,77 @@
+---
+title: Rect Negative Scale Restoration
+description: A repeated render restores authored reflection after a transient scale tween ends positive.
+specs:
+  - the update tween should visibly end with the temporary positive scale
+  - the following unchanged render should restore the authored horizontal reflection
+  - the following render should restore the full 240 by 140 baked geometry
+  - the centered anchor should remain fixed through both representations
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: keypress
+    key: "n"
+  - action: screenshot
+---
+states:
+  - elements:
+      - &guide
+        id: guide
+        type: rect
+        x: 640
+        "y": 360
+        width: 240
+        height: 140
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#262626"
+      - &panel
+        id: reflected-panel
+        type: rect
+        x: 640
+        "y": 360
+        width: 120
+        height: 140
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -2
+        fill: "#D9D9D9"
+        cornerRadius:
+          topLeft: 56
+          topRight: 4
+          bottomRight: 28
+          bottomLeft: 0
+      - &anchor
+        id: anchor
+        type: rect
+        x: 640
+        "y": 360
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"
+  - elements:
+      - *guide
+      - *panel
+      - *anchor
+    animations:
+      - id: transient-positive-scale
+        targetId: reflected-panel
+        type: update
+        tween:
+          scaleX:
+            initialValue: -2
+            keyframes:
+              - duration: 300
+                value: 1
+                easing: linear
+  - elements:
+      - *guide
+      - *panel
+      - *anchor

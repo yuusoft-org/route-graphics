@@ -28,11 +28,7 @@ export function compileParticleModules(state) {
 
   const texture = compileTexture(state.modules.appearance.texture);
   const count = emitter.maxParticles;
-  const computedObj = parseCommonObject({
-    ...state,
-    scaleX: undefined,
-    scaleY: undefined,
-  });
+  const computedObj = parseCommonObject(state, { scaleMode: "live" });
 
   return {
     ...computedObj,

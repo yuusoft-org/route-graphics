@@ -18,10 +18,12 @@ const refreshAnimatedSpriteGeometryPivot = (animatedSprite, geometry = {}) => {
 
   const width = geometry.width ?? state.element.width;
   const height = geometry.height ?? state.element.height;
+  const scaleSignX = Math.sign(state.element.scaleX ?? 1);
+  const scaleSignY = Math.sign(state.element.scaleY ?? 1);
 
   applyElementPivot(animatedSprite, state.element, {
-    baseScaleX: width / textureWidth,
-    baseScaleY: height / textureHeight,
+    baseScaleX: (scaleSignX * width) / textureWidth,
+    baseScaleY: (scaleSignY * height) / textureHeight,
   });
 };
 
@@ -52,7 +54,9 @@ export const setAnimatedSpriteTransformElement = (animatedSprite, element) => {
 
 export const applyAnimatedSpriteTransform = (animatedSprite, element) => {
   ensureAnimatedSpriteTransformState(animatedSprite, element);
-  applyElementTransform(animatedSprite, element);
+  applyElementTransform(animatedSprite, element, {
+    preserveScaleMagnitude: true,
+  });
 };
 
 export const refreshAnimatedSpritePivot = (animatedSprite, geometry) =>
