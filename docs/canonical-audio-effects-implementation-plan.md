@@ -1,6 +1,6 @@
 # Canonical Audio Effects Implementation Plan
 
-Status: implementation-ready; reviewed in
+Status: implemented and verified; design reviewed in
 [`canonical-audio-effects-plan-review.md`](./canonical-audio-effects-plan-review.md)
 
 Last updated: 2026-08-06
@@ -593,17 +593,19 @@ remain the implementation base.
 ### 6. Integrate Route Graphics render state
 
 Update `renderAudio()` and `RouteGraphics` state reconciliation so the planner
-receives both graph states and both effect states once. Remove the current
-double independent `normalizeAudioRenderState()` calls that reject valid
-previous-only targets.
+receives both graph states and both effect states once. Per-state normalization
+may still enforce structure across built-in and plugin nodes, but target and
+lifecycle validation moves to the joint planner so valid previous-only targets
+are not rejected.
 
 Plugin-based non-graph audio remains unaffected.
 
 ### 7. Migrate tests and fixtures
 
 Convert every built-in inline transition fixture to `audioEffects`. Keep one
-negative fixture proving inline input is rejected. Rename any `legacy` audio
-effect fixture now representing the canonical path.
+negative fixture proving inline input is rejected. Historical fixture filenames
+may remain when needed to preserve checked-in binary reference identity, but
+their content and descriptions must identify `audioEffects` as canonical.
 
 The migration includes:
 

@@ -13,6 +13,7 @@ Try it in the [Playground](/playground/?template=sound-demo).
 ## Used In
 
 - `audio[]`
+- targeted by top-level `audioEffects[]`
 
 ## Field Reference
 
@@ -42,6 +43,8 @@ Try it in the [Playground](/playground/?template=sound-demo).
   `soundReady`, `soundProgress`, `soundComplete`, and `soundError`.
 - A command-controlled sound cannot be retained across a render that removes
   `playback`, and it cannot be a child of a looping audio channel.
+- Sound nodes do not accept an inline `transition` field. Put volume, pan, and
+  playback-rate automation in top-level `audioEffects`.
 
 ## Example: Minimal SFX
 
@@ -107,3 +110,38 @@ Keep `commandId` unchanged for ordinary UI, volume, mute, and progress renders.
 Increment it only when issuing another transport command. See
 [`docs/audio-playback-commands.md`](https://github.com/RouteVN/route-graphics/blob/main/docs/audio-playback-commands.md)
 for the complete operation, event, cursor, and error rules.
+
+## Example: Reusable Transition Output
+
+A consumer can compile a reusable transition resource into one concrete effect
+occurrence. The sound remains declarative; automation is separate:
+
+```yaml
+audio:
+  - id: bgm
+    type: sound
+    src: bgm-2
+    loop: true
+    volume: 80
+
+audioEffects:
+  - id: bgm-handoff:visit-42
+    type: audio-transition
+    targetId: bgm
+    properties:
+      volume:
+        exit:
+          keyframes:
+            - { value: 0, duration: 1000, easing: easeInOutSine }
+        enter:
+          initialValue: 0
+          keyframes:
+            - { value: 80, duration: 1000, easing: easeInOutSine }
+```
+
+On a same-ID source replacement, this one next-state effect controls both the
+outgoing and incoming playback instances. Use a new effect ID for each action
+occurrence; keep an unchanged effect present only to continue it without a
+restart. Removing it settles active automation. See
+[`docs/audio-effects.md`](https://github.com/RouteVN/route-graphics/blob/main/docs/audio-effects.md)
+for lifecycle and validation details.

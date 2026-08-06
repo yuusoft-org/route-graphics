@@ -406,7 +406,7 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: populatedAudio,
       nextAudio: emptyAudio,
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
           id: "outgoing-exit",
           type: "audio-transition",
@@ -932,7 +932,7 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: secondAudio,
       nextAudio: [],
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
           id: "music-exit",
           type: "audio-transition",
@@ -1051,6 +1051,7 @@ describe("AudioStage graph rendering", () => {
                 keyframes: [
                   { value: 0.5, duration: 100, relative: true },
                   { value: -0.2, duration: 100, relative: true },
+                  { value: 0.8, duration: 0 },
                 ],
               },
             },
@@ -1110,7 +1111,7 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: audio,
       nextAudio: [],
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
           id: "bgm-exit",
           type: "audio-transition",
@@ -1352,7 +1353,7 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: secondAudio,
       nextAudio: [],
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
           id: "music-exit",
           type: "audio-transition",
@@ -1394,7 +1395,7 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: audio,
       nextAudio: [],
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
           id: "bgm-exit",
           type: "audio-transition",
@@ -1472,7 +1473,7 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: secondAudio,
       nextAudio: [],
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
           id: "bgm-exit",
           type: "audio-transition",
@@ -1578,6 +1579,50 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: audio,
       nextAudio: audio,
+      prevAudioEffects: [
+        {
+          id: "music-enter",
+          type: "audio-transition",
+          targetId: "music",
+          properties: {
+            volume: {
+              enter: keyframePhase(80, 1000, { initialValue: 0 }),
+            },
+          },
+        },
+        {
+          id: "bgm-enter",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            volume: {
+              enter: keyframePhase(60, 1000, { initialValue: 0 }),
+            },
+          },
+        },
+      ],
+      nextAudioEffects: [
+        {
+          id: "music-enter",
+          type: "audio-transition",
+          targetId: "music",
+          properties: {
+            volume: {
+              enter: keyframePhase(80, 1000, { initialValue: 0 }),
+            },
+          },
+        },
+        {
+          id: "bgm-enter",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            volume: {
+              enter: keyframePhase(60, 1000, { initialValue: 0 }),
+            },
+          },
+        },
+      ],
     });
 
     expect(music.gainNode.gain.cancelScheduledValues).not.toHaveBeenCalled();
@@ -1612,7 +1657,7 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: firstAudio,
       nextAudio: [],
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
           id: "music-exit",
           type: "audio-transition",
@@ -1665,25 +1710,14 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: firstAudio,
       nextAudio: secondAudio,
-      prevAudioEffects: [
+      nextAudioEffects: [
         {
-          id: "bgm-exit",
+          id: "bgm-handoff",
           type: "audio-transition",
           targetId: "bgm",
           properties: {
             volume: {
               exit: keyframePhase(0, 1000),
-            },
-          },
-        },
-      ],
-      nextAudioEffects: [
-        {
-          id: "bgm-enter",
-          type: "audio-transition",
-          targetId: "bgm",
-          properties: {
-            volume: {
               enter: keyframePhase(100, 1000, { initialValue: 0 }),
             },
           },
@@ -1720,7 +1754,7 @@ describe("AudioStage graph rendering", () => {
       stage.renderGraph({
         prevAudio: firstAudio,
         nextAudio: secondAudio,
-        prevAudioEffects: [
+        nextAudioEffects: [
           {
             id: "bgm-exit",
             type: "audio-transition",
@@ -2426,21 +2460,13 @@ describe("AudioStage graph rendering", () => {
     ).toThrow('targetId "missing" does not resolve');
   });
 
-  it("applies inline channel enter, update, and exit tracks", async () => {
+  it("applies canonical channel enter, update, and exit effects", async () => {
     const { stage, context } = await setupAudioStage();
     const firstAudio = [
       {
         id: "music",
         type: "audio-channel",
         volume: 80,
-        transition: {
-          enter: {
-            volume: {
-              initialValue: 0,
-              keyframes: [{ value: 80, duration: 500 }],
-            },
-          },
-        },
         children: [{ id: "bgm", type: "sound", src: "theme", loop: true }],
       },
     ];
@@ -2449,23 +2475,28 @@ describe("AudioStage graph rendering", () => {
         id: "music",
         type: "audio-channel",
         volume: 40,
-        transition: {
-          update: {
-            volume: {
-              keyframes: [{ delay: 100, value: 40, duration: 400 }],
-            },
-          },
-          exit: {
-            volume: {
-              keyframes: [{ value: 0, duration: 750 }],
-            },
-          },
-        },
         children: [{ id: "bgm", type: "sound", src: "theme", loop: true }],
       },
     ];
 
-    stage.renderGraph({ nextAudio: firstAudio });
+    stage.renderGraph({
+      nextAudio: firstAudio,
+      nextAudioEffects: [
+        {
+          id: "music-enter",
+          type: "audio-transition",
+          targetId: "music",
+          properties: {
+            volume: {
+              enter: {
+                initialValue: 0,
+                keyframes: [{ value: 80, duration: 500 }],
+              },
+            },
+          },
+        },
+      ],
+    });
     const music = stage._inspect().channels.get("music");
     expect(music.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10);
     expect(music.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
@@ -2474,7 +2505,24 @@ describe("AudioStage graph rendering", () => {
     );
 
     context.currentTime = 10.5;
-    stage.renderGraph({ prevAudio: firstAudio, nextAudio: secondAudio });
+    stage.renderGraph({
+      prevAudio: firstAudio,
+      nextAudio: secondAudio,
+      nextAudioEffects: [
+        {
+          id: "music-update",
+          type: "audio-transition",
+          targetId: "music",
+          properties: {
+            volume: {
+              update: {
+                keyframes: [{ delay: 100, value: 40, duration: 400 }],
+              },
+            },
+          },
+        },
+      ],
+    });
     expect(music.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
       0.8,
       10.6,
@@ -2485,7 +2533,24 @@ describe("AudioStage graph rendering", () => {
     );
 
     const source = context.sources[0];
-    stage.renderGraph({ prevAudio: secondAudio, nextAudio: [] });
+    stage.renderGraph({
+      prevAudio: secondAudio,
+      nextAudio: [],
+      nextAudioEffects: [
+        {
+          id: "music-exit",
+          type: "audio-transition",
+          targetId: "music",
+          properties: {
+            volume: {
+              exit: {
+                keyframes: [{ value: 0, duration: 750 }],
+              },
+            },
+          },
+        },
+      ],
+    });
     expect(music.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
       0,
       11.25,
@@ -2493,7 +2558,7 @@ describe("AudioStage graph rendering", () => {
     expect(source.stop).toHaveBeenCalledWith(11.25);
   });
 
-  it("composes inline channel and sound enter tracks on independent gain nodes", async () => {
+  it("composes channel and sound effects on independent gain nodes", async () => {
     const { stage, context } = await setupAudioStage();
 
     stage.renderGraph({
@@ -2502,30 +2567,42 @@ describe("AudioStage graph rendering", () => {
           id: "music",
           type: "audio-channel",
           volume: 50,
-          transition: {
-            enter: {
-              volume: {
-                initialValue: 0,
-                keyframes: [{ value: 50, duration: 1000 }],
-              },
-            },
-          },
           children: [
             {
               id: "bgm",
               type: "sound",
               src: "theme",
               volume: 80,
-              transition: {
-                enter: {
-                  volume: {
-                    initialValue: 0,
-                    keyframes: [{ value: 80, duration: 500 }],
-                  },
-                },
-              },
             },
           ],
+        },
+      ],
+      nextAudioEffects: [
+        {
+          id: "music-enter",
+          type: "audio-transition",
+          targetId: "music",
+          properties: {
+            volume: {
+              enter: {
+                initialValue: 0,
+                keyframes: [{ value: 50, duration: 1000 }],
+              },
+            },
+          },
+        },
+        {
+          id: "bgm-enter",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            volume: {
+              enter: {
+                initialValue: 0,
+                keyframes: [{ value: 80, duration: 500 }],
+              },
+            },
+          },
         },
       ],
     });
@@ -2549,17 +2626,24 @@ describe("AudioStage graph rendering", () => {
     expect(context.sources[0].start).toHaveBeenCalledWith(10, 0);
   });
 
-  it("does not restart automation when only an inline transition declaration changes", async () => {
+  it("does not restart an unchanged effect occurrence", async () => {
     const { stage, context } = await setupAudioStage();
-    const firstAudio = [
+    const audio = [
       {
         id: "bgm",
         type: "sound",
         src: "theme",
         volume: 80,
-        transition: {
-          enter: {
-            volume: {
+      },
+    ];
+    const audioEffects = [
+      {
+        id: "bgm-enter:visit-1",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: {
+            enter: {
               initialValue: 0,
               keyframes: [{ value: 80, duration: 1000 }],
             },
@@ -2567,23 +2651,8 @@ describe("AudioStage graph rendering", () => {
         },
       },
     ];
-    const secondAudio = [
-      {
-        id: "bgm",
-        type: "sound",
-        src: "theme",
-        volume: 80,
-        transition: {
-          update: {
-            volume: {
-              keyframes: [{ value: 80, duration: 250 }],
-            },
-          },
-        },
-      },
-    ];
 
-    stage.renderGraph({ nextAudio: firstAudio });
+    stage.renderGraph({ nextAudio: audio, nextAudioEffects: audioEffects });
     const sound = findCurrentSound(stage, "bgm");
     const gain = sound.gainNode.gain;
     const cancelCount = gain.cancelScheduledValues.mock.calls.length;
@@ -2592,7 +2661,12 @@ describe("AudioStage graph rendering", () => {
     const rampCount = gain.linearRampToValueAtTime.mock.calls.length;
 
     context.currentTime = 10.25;
-    stage.renderGraph({ prevAudio: firstAudio, nextAudio: secondAudio });
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: audio,
+      prevAudioEffects: audioEffects,
+      nextAudioEffects: audioEffects,
+    });
 
     expect(context.sources).toHaveLength(1);
     expect(gain.cancelScheduledValues).toHaveBeenCalledTimes(cancelCount);
@@ -2602,7 +2676,7 @@ describe("AudioStage graph rendering", () => {
     expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.8, 11);
   });
 
-  it("waits for the longest delayed inline exit track before cleanup", async () => {
+  it("waits for the longest delayed exit effect track before cleanup", async () => {
     const { stage, context } = await setupAudioStage();
     const audio = [
       {
@@ -2612,26 +2686,40 @@ describe("AudioStage graph rendering", () => {
         volume: 100,
         pan: 0,
         playbackRate: 1,
-        transition: {
-          exit: {
-            volume: {
-              keyframes: [{ delay: 200, value: 0, duration: 300 }],
-            },
-            pan: {
-              keyframes: [{ delay: 100, value: 1, duration: 800 }],
-            },
-            playbackRate: {
-              keyframes: [{ delay: 300, value: 0.5, duration: 400 }],
-            },
-          },
-        },
       },
     ];
 
     stage.renderGraph({ nextAudio: audio });
     const sound = findCurrentSound(stage, "bgm");
     const source = context.sources[0];
-    stage.renderGraph({ prevAudio: audio, nextAudio: [] });
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: [
+        {
+          id: "bgm-exit",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            volume: {
+              exit: {
+                keyframes: [{ delay: 200, value: 0, duration: 300 }],
+              },
+            },
+            pan: {
+              exit: {
+                keyframes: [{ delay: 100, value: 1, duration: 800 }],
+              },
+            },
+            playbackRate: {
+              exit: {
+                keyframes: [{ delay: 300, value: 0.5, duration: 400 }],
+              },
+            },
+          },
+        },
+      ],
+    });
 
     expect(sound.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
       0,
@@ -2652,7 +2740,7 @@ describe("AudioStage graph rendering", () => {
     expect(findSound(stage, "bgm")).toBeUndefined();
   });
 
-  it("crossfades replacement instances with independent inline enter and exit delays", async () => {
+  it("crossfades replacement instances with one effect and independent side delays", async () => {
     const { stage, context } = await setupAudioStage({
       assetMap: new Map([
         ["first", { duration: 20 }],
@@ -2666,13 +2754,6 @@ describe("AudioStage graph rendering", () => {
         src: "first",
         loop: true,
         volume: 80,
-        transition: {
-          exit: {
-            volume: {
-              keyframes: [{ delay: 1000, value: 0, duration: 2000 }],
-            },
-          },
-        },
       },
     ];
     const incomingAudio = [
@@ -2682,14 +2763,6 @@ describe("AudioStage graph rendering", () => {
         src: "second",
         loop: true,
         volume: 80,
-        transition: {
-          enter: {
-            volume: {
-              initialValue: 0,
-              keyframes: [{ delay: 500, value: 80, duration: 1500 }],
-            },
-          },
-        },
       },
     ];
 
@@ -2700,6 +2773,24 @@ describe("AudioStage graph rendering", () => {
     stage.renderGraph({
       prevAudio: outgoingAudio,
       nextAudio: incomingAudio,
+      nextAudioEffects: [
+        {
+          id: "bgm-handoff:visit-1",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            volume: {
+              exit: {
+                keyframes: [{ delay: 1000, value: 0, duration: 2000 }],
+              },
+              enter: {
+                initialValue: 0,
+                keyframes: [{ delay: 500, value: 80, duration: 1500 }],
+              },
+            },
+          },
+        },
+      ],
     });
 
     const incoming = findCurrentSound(stage, "bgm");
@@ -2732,7 +2823,7 @@ describe("AudioStage graph rendering", () => {
     expect(findCurrentSound(stage, "bgm")).toBe(incoming);
   });
 
-  it("starts a delayed sound's inline enter tracks when playback actually starts", async () => {
+  it("starts a delayed sound's enter effect when playback actually starts", async () => {
     const { stage, context, getAsset } = await setupAudioStage();
     stage.renderGraph({
       nextAudio: [
@@ -2742,9 +2833,16 @@ describe("AudioStage graph rendering", () => {
           src: "theme",
           startDelayMs: 1000,
           volume: 100,
-          transition: {
-            enter: {
-              volume: {
+        },
+      ],
+      nextAudioEffects: [
+        {
+          id: "delayed-enter",
+          type: "audio-transition",
+          targetId: "delayed",
+          properties: {
+            volume: {
+              enter: {
                 initialValue: 0,
                 keyframes: [{ value: 100, duration: 1000 }],
               },
@@ -2776,7 +2874,7 @@ describe("AudioStage graph rendering", () => {
     );
   });
 
-  it("does not apply inline enter tracks when declarative source start fails", async () => {
+  it("does not apply enter effects when declarative source start fails", async () => {
     const { stage, context } = await setupAudioStage({
       contextOptions: {
         startImpl: () => {
@@ -2795,17 +2893,28 @@ describe("AudioStage graph rendering", () => {
             volume: 80,
             pan: 0.5,
             playbackRate: 2,
-            transition: {
-              enter: {
-                volume: {
+          },
+        ],
+        nextAudioEffects: [
+          {
+            id: "bgm-enter",
+            type: "audio-transition",
+            targetId: "bgm",
+            properties: {
+              volume: {
+                enter: {
                   initialValue: 0,
                   keyframes: [{ value: 80, duration: 500 }],
                 },
-                pan: {
+              },
+              pan: {
+                enter: {
                   initialValue: -1,
                   keyframes: [{ value: 0.5, duration: 500 }],
                 },
-                playbackRate: {
+              },
+              playbackRate: {
+                enter: {
                   initialValue: 0.5,
                   keyframes: [{ value: 2, duration: 500 }],
                 },
@@ -2825,7 +2934,7 @@ describe("AudioStage graph rendering", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("supersedes only changed pending enter properties before delayed playback", async () => {
+  it("supersedes a pending enter occurrence before delayed playback", async () => {
     const { stage, context } = await setupAudioStage();
     const firstAudio = [
       {
@@ -2836,22 +2945,6 @@ describe("AudioStage graph rendering", () => {
         volume: 80,
         pan: 1,
         playbackRate: 2,
-        transition: {
-          enter: {
-            volume: {
-              initialValue: 0,
-              keyframes: [{ value: 80, duration: 100 }],
-            },
-            pan: {
-              initialValue: -1,
-              keyframes: [{ value: 1, duration: 100 }],
-            },
-            playbackRate: {
-              initialValue: 0,
-              keyframes: [{ value: 2, duration: 100 }],
-            },
-          },
-        },
       },
     ];
     const updatedAudio = [
@@ -2863,20 +2956,59 @@ describe("AudioStage graph rendering", () => {
         volume: 40,
         pan: 1,
         playbackRate: 1,
-        transition: {
-          update: {
-            volume: { keyframes: [{ value: 40, duration: 100 }] },
-            playbackRate: { keyframes: [{ value: 1, duration: 200 }] },
-          },
-        },
       },
     ];
 
-    stage.renderGraph({ nextAudio: firstAudio });
+    stage.renderGraph({
+      nextAudio: firstAudio,
+      nextAudioEffects: [
+        {
+          id: "delayed-enter",
+          type: "audio-transition",
+          targetId: "delayed",
+          properties: {
+            volume: {
+              enter: {
+                initialValue: 0,
+                keyframes: [{ value: 80, duration: 100 }],
+              },
+            },
+            pan: {
+              enter: {
+                initialValue: -1,
+                keyframes: [{ value: 1, duration: 100 }],
+              },
+            },
+            playbackRate: {
+              enter: {
+                initialValue: 0,
+                keyframes: [{ value: 2, duration: 100 }],
+              },
+            },
+          },
+        },
+      ],
+    });
     const delayed = findCurrentSound(stage, "delayed");
     context.currentTime = 10.05;
     vi.advanceTimersByTime(50);
-    stage.renderGraph({ prevAudio: firstAudio, nextAudio: updatedAudio });
+    stage.renderGraph({
+      prevAudio: firstAudio,
+      nextAudio: updatedAudio,
+      nextAudioEffects: [
+        {
+          id: "delayed-update",
+          type: "audio-transition",
+          targetId: "delayed",
+          properties: {
+            volume: { update: { keyframes: [{ value: 40, duration: 100 }] } },
+            playbackRate: {
+              update: { keyframes: [{ value: 1, duration: 200 }] },
+            },
+          },
+        },
+      ],
+    });
 
     expect(delayed.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
       0.4,
@@ -2891,13 +3023,12 @@ describe("AudioStage graph rendering", () => {
       10.1,
     );
     expect(delayed.pannerNode.pan.setValueAtTime).toHaveBeenLastCalledWith(
-      -1,
-      10.1,
-    );
-    expect(delayed.pannerNode.pan.linearRampToValueAtTime).toHaveBeenCalledWith(
       1,
-      10.2,
+      10.05,
     );
+    expect(
+      delayed.pannerNode.pan.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
     expect(source.playbackRate.setValueAtTime.mock.calls.at(-1)[0]).toBeCloseTo(
       1.75,
     );
@@ -2908,7 +3039,7 @@ describe("AudioStage graph rendering", () => {
     );
   });
 
-  it("keeps mute gating independent from active inline volume automation", async () => {
+  it("keeps mute gating independent from active effect automation", async () => {
     const { stage } = await setupAudioStage();
     const mutedAudio = [
       {
@@ -2917,14 +3048,6 @@ describe("AudioStage graph rendering", () => {
         src: "theme",
         volume: 100,
         muted: true,
-        transition: {
-          enter: {
-            volume: {
-              initialValue: 0,
-              keyframes: [{ value: 100, duration: 1000 }],
-            },
-          },
-        },
       },
     ];
     const audibleAudio = [
@@ -2937,7 +3060,25 @@ describe("AudioStage graph rendering", () => {
       },
     ];
 
-    stage.renderGraph({ nextAudio: mutedAudio });
+    const audioEffects = [
+      {
+        id: "bgm-enter",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: {
+            enter: {
+              initialValue: 0,
+              keyframes: [{ value: 100, duration: 1000 }],
+            },
+          },
+        },
+      },
+    ];
+    stage.renderGraph({
+      nextAudio: mutedAudio,
+      nextAudioEffects: audioEffects,
+    });
     const bgm = findCurrentSound(stage, "bgm");
     const volumeCancelCount =
       bgm.gainNode.gain.cancelScheduledValues.mock.calls.length;
@@ -2949,7 +3090,12 @@ describe("AudioStage graph rendering", () => {
       11,
     );
 
-    stage.renderGraph({ prevAudio: mutedAudio, nextAudio: audibleAudio });
+    stage.renderGraph({
+      prevAudio: mutedAudio,
+      nextAudio: audibleAudio,
+      prevAudioEffects: audioEffects,
+      nextAudioEffects: audioEffects,
+    });
 
     expect(bgm.muteGainNode.gain.value).toBe(1);
     expect(bgm.gainNode.gain.cancelScheduledValues).toHaveBeenCalledTimes(
@@ -2977,13 +3123,6 @@ describe("AudioStage graph rendering", () => {
             src: "paused",
             loop: true,
             playbackRate: 0,
-            transition: {
-              exit: {
-                playbackRate: {
-                  keyframes: [{ value: 1, duration: 1000 }],
-                },
-              },
-            },
           },
         ],
       },
@@ -2991,7 +3130,22 @@ describe("AudioStage graph rendering", () => {
 
     stage.renderGraph({ nextAudio: audio });
     const source = context.sources[0];
-    stage.renderGraph({ prevAudio: audio, nextAudio: [] });
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: [
+        {
+          id: "paused-exit",
+          type: "audio-transition",
+          targetId: "paused",
+          properties: {
+            playbackRate: {
+              exit: { keyframes: [{ value: 1, duration: 1000 }] },
+            },
+          },
+        },
+      ],
+    });
 
     expect(source.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(
       1,
@@ -3023,13 +3177,6 @@ describe("AudioStage graph rendering", () => {
             src: "slowing",
             loop: true,
             playbackRate: 1,
-            transition: {
-              exit: {
-                playbackRate: {
-                  keyframes: [{ value: 0, duration: 1000 }],
-                },
-              },
-            },
           },
         ],
       },
@@ -3037,7 +3184,22 @@ describe("AudioStage graph rendering", () => {
 
     stage.renderGraph({ nextAudio: audio });
     const source = context.sources[0];
-    stage.renderGraph({ prevAudio: audio, nextAudio: [] });
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: [
+        {
+          id: "slowing-exit",
+          type: "audio-transition",
+          targetId: "slowing",
+          properties: {
+            playbackRate: {
+              exit: { keyframes: [{ value: 0, duration: 1000 }] },
+            },
+          },
+        },
+      ],
+    });
 
     expect(source.stop).toHaveBeenCalledWith(11);
     expect(findSound(stage, "slowing")).toBeDefined();
@@ -3046,5 +3208,311 @@ describe("AudioStage graph rendering", () => {
     vi.advanceTimersByTime(1);
     expect(findSound(stage, "slowing")).toBeUndefined();
     expect(stage._inspect().channels.has("music")).toBe(false);
+  });
+
+  it("settles an active retained update when its effect is removed", async () => {
+    const { stage, context } = await setupAudioStage({
+      contextOptions: { reflectScheduledAudioParamValue: false },
+    });
+    const initialAudio = [
+      { id: "bgm", type: "sound", src: "theme", volume: 100 },
+    ];
+    const updatedAudio = [
+      { id: "bgm", type: "sound", src: "theme", volume: 20 },
+    ];
+    const audioEffects = [
+      {
+        id: "bgm-update:visit-1",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: { update: keyframePhase(20, 1000) },
+        },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: initialAudio });
+    stage.renderGraph({
+      prevAudio: initialAudio,
+      nextAudio: updatedAudio,
+      nextAudioEffects: audioEffects,
+    });
+    const sound = findCurrentSound(stage, "bgm");
+
+    context.currentTime = 10.25;
+    stage.renderGraph({
+      prevAudio: updatedAudio,
+      nextAudio: updatedAudio,
+      prevAudioEffects: audioEffects,
+    });
+
+    expect(sound.gainNode.gain.cancelScheduledValues).toHaveBeenLastCalledWith(
+      10.25,
+    );
+    expect(sound.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.2,
+      10.25,
+    );
+    expect(stage._inspect().ownedAudioEffects.size).toBe(0);
+  });
+
+  it("continues a completed detached exit without recreating or retaining its instance", async () => {
+    const { stage } = await setupAudioStage();
+    const audio = [{ id: "bgm", type: "sound", src: "theme", volume: 80 }];
+    const audioEffects = [
+      {
+        id: "bgm-exit:visit-1",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: { exit: keyframePhase(0, 100) },
+        },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: audio });
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: audioEffects,
+    });
+    vi.advanceTimersByTime(100);
+
+    const ownership = stage
+      ._inspect()
+      .ownedAudioEffects.get("bgm-exit:visit-1");
+    expect(stage._inspect().sounds.size).toBe(0);
+    expect(ownership.soundInstances.size).toBe(0);
+
+    expect(() =>
+      stage.renderGraph({
+        prevAudio: [],
+        nextAudio: [],
+        prevAudioEffects: audioEffects,
+        nextAudioEffects: audioEffects,
+      }),
+    ).not.toThrow();
+    expect(stage._inspect().sounds.size).toBe(0);
+
+    stage.renderGraph({
+      prevAudio: [],
+      nextAudio: [],
+      prevAudioEffects: audioEffects,
+    });
+    expect(stage._inspect().ownedAudioEffects.size).toBe(0);
+  });
+
+  it("settles both sides of an active handoff when its effect is removed", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([
+        ["first", { duration: 20 }],
+        ["second", { duration: 20 }],
+      ]),
+    });
+    const firstAudio = [{ id: "bgm", type: "sound", src: "first", volume: 80 }];
+    const secondAudio = [
+      { id: "bgm", type: "sound", src: "second", volume: 80 },
+    ];
+    const audioEffects = [
+      {
+        id: "bgm-handoff:visit-1",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: {
+            exit: keyframePhase(0, 1000),
+            enter: keyframePhase(80, 1000, { initialValue: 0 }),
+          },
+        },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: firstAudio });
+    const outgoing = findCurrentSound(stage, "bgm");
+    stage.renderGraph({
+      prevAudio: firstAudio,
+      nextAudio: secondAudio,
+      nextAudioEffects: audioEffects,
+    });
+    const incoming = findCurrentSound(stage, "bgm");
+
+    context.currentTime = 10.25;
+    stage.renderGraph({
+      prevAudio: secondAudio,
+      nextAudio: secondAudio,
+      prevAudioEffects: audioEffects,
+    });
+
+    expect(outgoing.source.stop).toHaveBeenLastCalledWith(10.25);
+    expect(stage._inspect().sounds.has(outgoing.internalId)).toBe(false);
+    expect(incoming.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.8,
+      10.25,
+    );
+    expect(findCurrentSound(stage, "bgm")).toBe(incoming);
+  });
+
+  it("settles a pending delayed enter before its source starts", async () => {
+    const { stage, context } = await setupAudioStage();
+    const audio = [
+      {
+        id: "delayed",
+        type: "sound",
+        src: "theme",
+        volume: 100,
+        startDelayMs: 1000,
+      },
+    ];
+    const audioEffects = [
+      {
+        id: "delayed-enter:visit-1",
+        type: "audio-transition",
+        targetId: "delayed",
+        properties: {
+          volume: {
+            enter: keyframePhase(100, 1000, { initialValue: 0 }),
+          },
+        },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: audio, nextAudioEffects: audioEffects });
+    const delayed = findCurrentSound(stage, "delayed");
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: audio,
+      prevAudioEffects: audioEffects,
+    });
+
+    vi.advanceTimersByTime(1000);
+    expect(context.sources).toHaveLength(1);
+    expect(delayed.pendingEnterTransitions).toBeNull();
+    expect(
+      delayed.gainNode.gain.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
+    expect(delayed.gainNode.gain.value).toBe(1);
+  });
+
+  it("changes a shared channel master without rebasing an active sound fade", async () => {
+    const { stage } = await setupAudioStage();
+    const initialAudio = [
+      {
+        id: "music-master",
+        type: "audio-channel",
+        volume: 60,
+        children: [{ id: "bgm", type: "sound", src: "theme", volume: 80 }],
+      },
+    ];
+    const changedMasterAudio = [
+      {
+        ...initialAudio[0],
+        volume: 30,
+      },
+    ];
+    const audioEffects = [
+      {
+        id: "bgm-enter:visit-1",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: {
+            enter: keyframePhase(80, 1000, { initialValue: 0 }),
+          },
+        },
+      },
+    ];
+
+    stage.renderGraph({
+      nextAudio: initialAudio,
+      nextAudioEffects: audioEffects,
+    });
+    const channel = stage._inspect().channels.get("music-master");
+    const sound = findCurrentSound(stage, "bgm");
+    const soundCancelCount =
+      sound.gainNode.gain.cancelScheduledValues.mock.calls.length;
+    const soundHoldCount =
+      sound.gainNode.gain.cancelAndHoldAtTime.mock.calls.length;
+
+    stage.renderGraph({
+      prevAudio: initialAudio,
+      nextAudio: changedMasterAudio,
+      prevAudioEffects: audioEffects,
+      nextAudioEffects: audioEffects,
+    });
+
+    expect(channel.gainNode.gain.value).toBe(0.3);
+    expect(sound.gainNode.gain.cancelScheduledValues).toHaveBeenCalledTimes(
+      soundCancelCount,
+    );
+    expect(sound.gainNode.gain.cancelAndHoldAtTime).toHaveBeenCalledTimes(
+      soundHoldCount,
+    );
+    expect(sound.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0.8,
+      11,
+    );
+  });
+
+  it("keeps outgoing sound state isolated from incoming replacement state", async () => {
+    const { stage } = await setupAudioStage({
+      assetMap: new Map([
+        ["first", { duration: 20 }],
+        ["second", { duration: 20 }],
+      ]),
+    });
+    const firstAudio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "first",
+        volume: 80,
+        pan: -0.5,
+        muted: true,
+      },
+    ];
+    const secondAudio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "second",
+        volume: 30,
+        pan: 0.5,
+        muted: false,
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: firstAudio });
+    const outgoing = findCurrentSound(stage, "bgm");
+    stage.renderGraph({
+      prevAudio: firstAudio,
+      nextAudio: secondAudio,
+      nextAudioEffects: [
+        {
+          id: "bgm-handoff:visit-1",
+          type: "audio-transition",
+          targetId: "bgm",
+          properties: {
+            volume: {
+              exit: keyframePhase(0, 1000),
+              enter: keyframePhase(30, 1000, { initialValue: 0 }),
+            },
+            pan: {
+              exit: keyframePhase(-1, 1000),
+              enter: keyframePhase(0.5, 1000, { initialValue: 0 }),
+            },
+          },
+        },
+      ],
+    });
+    const incoming = findCurrentSound(stage, "bgm");
+
+    expect(outgoing.volume).toBe(80);
+    expect(outgoing.pan).toBe(-0.5);
+    expect(outgoing.muted).toBe(true);
+    expect(outgoing.muteGainNode.gain.value).toBe(0);
+    expect(incoming.volume).toBe(30);
+    expect(incoming.pan).toBe(0.5);
+    expect(incoming.muted).toBe(false);
+    expect(incoming.muteGainNode.gain.value).toBe(1);
   });
 });

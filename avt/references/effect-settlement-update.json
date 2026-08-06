@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "wavSha256": "9a36405dc7fa9931ed6f92866518e0eb945a24e3d9f997e263550883ffb98b97",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 144000,
+    "durationMs": 3000,
+    "byteLength": 576044,
+    "signal": {
+      "peak": 0.31817626953125,
+      "rms": 0.12906197894246885,
+      "nonZeroSamples": 287520
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "update-settlement-before",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "update-settlement-active",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "update-settlement-removed",
+        "aborted": false
+      }
+    }
+  ]
+}

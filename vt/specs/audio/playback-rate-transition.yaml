@@ -19,9 +19,13 @@ states:
         loop: true
         volume: 80
         playbackRate: 1
-        transition:
-          enter:
-            playbackRate:
+    audioEffects:
+      - id: rate-enter:1
+        type: audio-transition
+        targetId: playback-rate-transition-bgm
+        properties:
+          playbackRate:
+            enter:
               initialValue: 0.5
               keyframes:
                 - { value: 1, duration: 3000, easing: linear }
@@ -33,14 +37,23 @@ states:
         loop: true
         volume: 80
         playbackRate: 1.5
-        transition:
-          update:
-            playbackRate:
+    audioEffects:
+      - id: rate-update:2
+        type: audio-transition
+        targetId: playback-rate-transition-bgm
+        properties:
+          playbackRate:
+            update:
               keyframes:
                 - { value: 1.5, duration: 3000, easing: linear }
-          exit:
-            playbackRate:
-              keyframes:
-                - { value: 0.25, duration: 2000, easing: linear }
   - id: playback-rate-transition-exit
     audio: []
+    audioEffects:
+      - id: rate-exit:3
+        type: audio-transition
+        targetId: playback-rate-transition-bgm
+        properties:
+          playbackRate:
+            exit:
+              keyframes:
+                - { value: 0.25, duration: 2000, easing: linear }

@@ -37,9 +37,6 @@ properties:
     enum: [immediate, loopEnd]
     description: How active channel playback stops when the channel is interrupted.
     default: immediate
-  transition:
-    $ref: "audio-transition.yaml#/definitions/channelInlineTransition"
-    description: Inline lifecycle automation for channel properties
   playback:
     type: object
     description: Optional cursor-preserving channel transport instruction

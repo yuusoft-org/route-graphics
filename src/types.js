@@ -734,7 +734,6 @@
  * @property {number} [startAt=0] - Start offset in seconds
  * @property {number|null} [endAt=null] - Optional end time in seconds
  * @property {SoundPlaybackCommand} [playback] - Optional command-controlled playback instruction
- * @property {InlineAudioTransition} [transition] - Inline lifecycle property automation
  */
 
 /**
@@ -754,36 +753,6 @@
  * @property {'immediate' | 'loopEnd'} [interruption='immediate'] - Whether interruption stops immediately or finishes the active schedule iteration
  * @property {AudioChannelPlaybackCommand} [playback] - Optional cursor-preserving channel transport instruction
  * @property {SoundElement[]} [children=[]] - Sound nodes owned by the channel
- * @property {InlineAudioTransition} [transition] - Inline lifecycle property automation
- */
-
-/**
- * @typedef {Object} InlineAudioTransitionKeyframe
- * @property {number} value - Absolute target value, or delta when relative is true
- * @property {number} duration - Ramp duration in milliseconds
- * @property {number} [delay=0] - Time to hold the preceding value before the ramp
- * @property {string} [easing="linear"] - Animation easing name
- * @property {boolean} [relative=false] - Whether value is relative to the previous value
- */
-
-/**
- * @typedef {Object} InlineAudioTransitionTrack
- * @property {number} [initialValue] - Optional starting value before the first keyframe
- * @property {InlineAudioTransitionKeyframe[]} keyframes - Ordered property keyframes
- */
-
-/**
- * @typedef {Object} InlineAudioTransitionPhase
- * @property {InlineAudioTransitionTrack} [volume] - Volume automation
- * @property {InlineAudioTransitionTrack} [pan] - Stereo-pan automation
- * @property {InlineAudioTransitionTrack} [playbackRate] - Playback-rate automation for sounds
- */
-
-/**
- * @typedef {Object} InlineAudioTransition
- * @property {InlineAudioTransitionPhase} [enter] - Automation for creation or incoming replacement
- * @property {InlineAudioTransitionPhase} [update] - Automation for changed properties
- * @property {InlineAudioTransitionPhase} [exit] - Automation for removal or outgoing replacement
  */
 
 /**
@@ -802,11 +771,25 @@
  */
 
 /**
+ * @typedef {Object} AudioTransitionPropertyLifecycle
+ * @property {AudioTransitionPhase} [enter] - Added or incoming-replacement automation
+ * @property {AudioTransitionPhase} [update] - Retained-property automation
+ * @property {AudioTransitionPhase} [exit] - Removed or outgoing-replacement automation
+ */
+
+/**
+ * @typedef {Object} AudioTransitionProperties
+ * @property {AudioTransitionPropertyLifecycle} [volume] - Volume lifecycle automation
+ * @property {AudioTransitionPropertyLifecycle} [pan] - Stereo-pan lifecycle automation
+ * @property {AudioTransitionPropertyLifecycle} [playbackRate] - Sound playback-rate lifecycle automation
+ */
+
+/**
  * @typedef {Object} AudioTransition
- * @property {string} id - Unique identifier
+ * @property {string} id - Effect occurrence identifier
  * @property {string} type - Should be "audio-transition"
  * @property {string} targetId - Target sound or audio-channel id
- * @property {Object<string, Object<string, AudioTransitionPhase>>} properties - Property lifecycle keyframes
+ * @property {AudioTransitionProperties} properties - Property lifecycle keyframes for the current edge
  */
 
 /**

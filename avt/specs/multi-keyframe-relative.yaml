@@ -32,9 +32,13 @@ states:
           loop: true
           volume: 30
           pan: 0.6
-          transition:
-            update:
-              volume:
+      audioEffects:
+        - id: tone-update:1
+          type: audio-transition
+          targetId: tone
+          properties:
+            volume:
+              update:
                 keyframes:
                   - value: -20
                     relative: true
@@ -44,7 +48,8 @@ states:
                     value: 30
                     duration: 500
                     easing: easeOutQuad
-              pan:
+            pan:
+              update:
                 keyframes:
                   - value: 0
                     duration: 350

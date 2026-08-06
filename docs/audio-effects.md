@@ -1,11 +1,6 @@
 # Audio Channel Design
 
-Last updated: 2026-07-15
-
-> **Design proposal:** [`Inline Audio Transition Interface`](./inline-audio-transitions.md)
-> defines a proposed inline replacement for separately authored
-> `audio-transition` records. It is not implemented. The interface documented
-> below remains the current runtime contract.
+Last updated: 2026-08-06
 
 This document defines the channel-based audio interface for Route Graphics
 render state.
@@ -66,7 +61,7 @@ audio:
         volume: 100
 
 audioEffects:
-  - id: music-volume
+  - id: music-volume-enter:scene-12
     type: audio-transition
     targetId: music
     properties:
@@ -75,9 +70,6 @@ audioEffects:
           initialValue: 0
           keyframes:
             - { value: 80, duration: 1000, easing: linear }
-        exit:
-          keyframes:
-            - { value: 0, duration: 1000, easing: linear }
 ```
 
 For compatibility, flat `sound` nodes remain valid:
@@ -238,7 +230,9 @@ Supported effect item type:
 
 - `audio-transition`
 
-Effects are render-state entries, not resources.
+Effects are render-state entries, not resources. A consumer may compile a
+reusable engine resource into a concrete effect occurrence, but Route Graphics
+only receives the concrete `audioEffects` entry.
 
 ### Validation Rules
 
@@ -247,15 +241,19 @@ Route Graphics should reject invalid audio render state instead of guessing:
 - duplicate IDs across `audio` nodes and `audioEffects`
 - `audio-channel.children` entries whose type is not `sound`
 - nested `audio-channel` nodes in the first implementation
-- `audio-transition.targetId` that cannot be resolved in the state used for its
-  lifecycle
+- `audio-transition.targetId` that cannot be resolved from the previous or next
+  audio graph, or from an active renderer-owned tail
 - an empty `audio-transition.properties` map or empty property lifecycle map
 - transition phases without a non-empty `keyframes` array
 - keyframes missing required `value` or `duration`
 - keyframes that use an unsupported easing name
 - more than one `audio-transition` targeting the same audio node in one render
   state
-- unknown audio node, effect, or automated property types
+- lifecycle phases that do not apply to the current edge
+- `enter` or `update` tracks whose final absolute keyframe does not match the
+  next node's declared property value
+- an `update` track for a property whose declared value did not change
+- unknown audio node, effect, phase, or automated property types
 
 ## Audio Transitions
 
@@ -263,21 +261,14 @@ An `audio-transition` automates property changes on a target.
 
 ```yaml
 audioEffects:
-  - id: music-transitions
+  - id: music-volume-update:scene-13
     type: audio-transition
     targetId: music
     properties:
       volume:
-        enter:
-          initialValue: 0
-          keyframes:
-            - { value: 80, duration: 1000, easing: linear }
         update:
           keyframes:
             - { value: 40, duration: 300, easing: linear }
-        exit:
-          keyframes:
-            - { value: 0, duration: 1000, easing: linear }
       pan:
         update:
           keyframes:
@@ -288,7 +279,7 @@ Fields:
 
 | Field        | Type               | Default  | Description               |
 | ------------ | ------------------ | -------- | ------------------------- |
-| `id`         | string             | required | Stable effect ID          |
+| `id`         | string             | required | Effect occurrence ID      |
 | `type`       | `audio-transition` | required | Effect type               |
 | `targetId`   | string             | required | Audio node ID to automate |
 | `properties` | object             | required | Property automation map   |
@@ -300,16 +291,21 @@ Fields:
 
 `targetId` resolves the target kind directly, so `targetType` is unnecessary.
 Each target may have at most one `audio-transition` in a render state. Authors
-combine all automated properties and lifecycle phases for that target inside
-one `properties` map.
+combine every property automated by the current edge inside one `properties`
+map.
 
 Transition phases:
 
-| Phase    | When it applies                               | Transition source       |
-| -------- | --------------------------------------------- | ----------------------- |
-| `enter`  | Target appears in the next render state       | next `audioEffects`     |
-| `exit`   | Target disappears from the next render state  | previous `audioEffects` |
-| `update` | Target remains but the property value changes | next `audioEffects`     |
+| Phase    | When it applies                                                 |
+| -------- | --------------------------------------------------------------- |
+| `enter`  | Target is added, or is the incoming side of sound replacement   |
+| `exit`   | Target is removed, or is the outgoing side of sound replacement |
+| `update` | Target continues and the declared property value changes        |
+
+The next render state's effect owns the whole edge. On a same-ID sound
+replacement, one next-state effect can contain both `exit` for the outgoing
+instance and `enter` for the incoming instance. A removal state can contain an
+`exit` effect whose target exists only in the previous audio graph.
 
 Every phase uses the same keyframe payload as visual animation transitions:
 
@@ -339,44 +335,35 @@ Keyframe fields:
 | `value`    | number  | required | Absolute target, or a delta when `relative` is `true`    |
 | `duration` | number  | required | Milliseconds to reach this keyframe from the prior value |
 | `easing`   | string  | `linear` | Animation easing applied to the segment reaching it      |
+| `delay`    | number  | `0`      | Milliseconds to hold before this ramp                    |
 | `relative` | boolean | `false`  | Resolve `value` relative to the prior keyframe value     |
 
 The first keyframe starts at `initialValue` when provided; otherwise it starts
 at the current audible value. Each later keyframe starts where the previous one
 ended. When a relative keyframe exceeds a property's range, its clamped audible
 endpoint is the baseline for the next relative keyframe. Total phase duration
-is the sum of its keyframe durations.
+is the sum of every keyframe's delay and duration.
 
 Audio keyframes support the same easing names as visual animation keyframes.
 Resolved volume, pan, and playback-rate values are constrained to their valid
-ranges. For `enter` and `update`, authors should normally finish at the value
-declared on the target audio node so declarative state and audible state agree.
+ranges. `enter` and `update` must finish with an absolute keyframe equal to the
+value declared on the next target audio node.
 
 An omitted phase makes that lifecycle change immediate for the property. If a
-new render interrupts an active transition, the next ramp starts from the
-current audible value after cancelling or holding previously scheduled
-automation. Removed instances remain alive until their longest exit transition
-finishes.
-
-Using the previous state's `audioEffects` for `exit` lets a removed sound fade
-out without keeping a dead target in the next render state.
+new effect occurrence supersedes active automation, claimed properties start
+from their current audible values and unclaimed properties settle to their
+declarative values. Removed instances remain alive until their longest exit
+transition finishes.
 
 Volume transition example:
 
 ```yaml
 audioEffects:
-  - id: music-volume
+  - id: music-volume-exit:scene-14
     type: audio-transition
     targetId: music
     properties:
       volume:
-        enter:
-          initialValue: 0
-          keyframes:
-            - { value: 100, duration: 1000, easing: linear }
-        update:
-          keyframes:
-            - { value: 40, duration: 300, easing: linear }
         exit:
           keyframes:
             - { value: 0, duration: 1000, easing: linear }
@@ -386,7 +373,7 @@ Pan and playback-rate transition example:
 
 ```yaml
 audioEffects:
-  - id: bgm-transitions
+  - id: bgm-controls-update:scene-15
     type: audio-transition
     targetId: bgm
     properties:
@@ -410,6 +397,24 @@ Recommended transitionable properties:
 `muted` and `loop` are immediate boolean switches. `src`, `startAt`, `endAt`,
 and `startDelayMs` define source identity and replace the playback instance when
 changed; they are not transitionable properties.
+
+### Effect occurrence identity
+
+`audio-transition.id` identifies one accepted occurrence, independently of a
+sound playback command's `commandId`.
+
+- A new ID is a new occurrence and runs once on the current audio edge.
+- The same ID with the same canonical payload continues existing automation; it
+  does not restart after an unrelated render such as a master-volume change.
+- The same ID with a changed payload, or a new effect on the same target,
+  supersedes the previous occurrence.
+- Removing an effect settles every active property immediately and releases
+  any outgoing or pending incoming instances it owns.
+
+Object-key order does not change effect identity. Keyframe array order does.
+Consumers should normally generate IDs from a line-entry, action occurrence,
+or visit token. Reusing an authored resource ID as the occurrence ID would
+suppress legitimate revisits.
 
 ## Volume
 
@@ -453,12 +458,13 @@ transition `volume` to `0` when they need a smooth mute.
 
 Route Graphics should keep audio declarative.
 
-- Added audio node or effect: create it and apply `enter` transition if a
-  matching `audio-transition` exists in the next `audioEffects`.
-- Updated audio node or effect: update changed properties and apply `update`
-  transition if a matching `audio-transition` exists in the next `audioEffects`.
-- Removed audio node or effect: keep the internal node alive until `exit`
-  transition from the previous `audioEffects` completes, then stop and clean up.
+- Added audio node: create it and apply `enter` from a newly accepted next-state
+  effect.
+- Updated audio node: apply `update` from a newly accepted next-state effect.
+- Removed audio node: apply `exit` from a newly accepted next-state effect,
+  keep its renderer-owned instance alive for the tail, then stop and clean up.
+- Removed effect: settle its active automation immediately. This is the explicit
+  skip/reset mechanism even when the target node itself is unchanged.
 
 No explicit `op: play` or `op: stop` is needed for the currently implemented
 declarative sound lifecycle.
@@ -500,7 +506,7 @@ If a `sound` keeps the same `id` but changes `src`, `startAt`, `endAt`, or
 Example:
 
 ```yaml
-# previous
+# previous state
 audio:
   - id: music
     type: audio-channel
@@ -509,17 +515,7 @@ audio:
         type: sound
         src: track-a
 
-audioEffects:
-  - id: bgm-volume
-    type: audio-transition
-    targetId: bgm
-    properties:
-      volume:
-        exit:
-          keyframes:
-            - { value: 0, duration: 1000, easing: linear }
-
-# next
+# next state owns both sides of the replacement edge
 audio:
   - id: music
     type: audio-channel
@@ -529,11 +525,14 @@ audio:
         src: track-b
 
 audioEffects:
-  - id: bgm-volume
+  - id: bgm-handoff:scene-16
     type: audio-transition
     targetId: bgm
     properties:
       volume:
+        exit:
+          keyframes:
+            - { value: 0, duration: 1000, easing: linear }
         enter:
           initialValue: 0
           keyframes:
@@ -542,6 +541,9 @@ audioEffects:
 
 The public ID remains `bgm`, but the audio stage needs separate internal
 playback instance IDs so the outgoing and incoming sources can overlap safely.
+The outgoing exit starts at edge acceptance. If the incoming asset is still
+decoding, only its enter waits; outgoing teardown and cleanup do not wait for
+decode readiness.
 
 ## Web Audio Mapping
 
@@ -551,11 +553,21 @@ The intended internal graph for one channel and one child sound is:
 AudioBufferSourceNode
   -> sound GainNode
   -> sound StereoPannerNode
+  -> sound mute GainNode
   -> channel mix
   -> channel GainNode
   -> channel StereoPannerNode
+  -> channel mute GainNode
   -> AudioContext.destination
 ```
+
+Every sound playback instance owns its sound gain, pan, and mute processors.
+During replacement, the outgoing instance keeps its previous node snapshot and
+the incoming instance receives the next snapshot. The shared parent channel is
+the independent master layer, so changing channel volume while a child fade is
+active multiplies the result without cancelling or rebasing that fade. Mute is
+also an independent hard gate; mute/unmute does not destroy scheduled volume or
+pan automation.
 
 Volume, pan, and playback-rate transitions use Web Audio `AudioParam`
 automation. Each keyframe is scheduled after the previous segment:
@@ -580,7 +592,8 @@ transitions. Tracking the scheduled timeline prevents stale `AudioParam.value`
 readback from causing a jump when a later render interrupts an active ramp.
 
 For removed nodes with an exit transition, cleanup happens after the longest
-property phase. A phase duration is the sum of its keyframe durations:
+property phase. A phase duration is the sum of its keyframe delays and
+durations:
 
 ```js
 source.stop(now + longestExitDuration / 1000);
@@ -596,6 +609,10 @@ Implemented:
 - `audio-transition` for `volume` and `pan` on channels and sounds
 - `audio-transition` for `playbackRate` on sounds
 - animation-style multi-keyframe phases with shared easing names
+- occurrence ownership, continuation, supersession, and explicit settlement
 - same-ID source-identity replacement with overlapping internal instances
+- immediate outgoing replacement teardown independent of incoming decode
+- per-instance sound processors with independent channel-master and mute gates
 - validation for duplicate transition targets and cross-state audio node kinds
+- removal of inline sound/channel `transition`; `audioEffects` is the only API
 - removal of the legacy `sound.delay` interface in favor of `startDelayMs`

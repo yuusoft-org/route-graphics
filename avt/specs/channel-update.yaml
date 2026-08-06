@@ -34,21 +34,26 @@ states:
           type: audio-channel
           volume: 45
           pan: 0.65
-          transition:
-            update:
-              volume:
-                keyframes:
-                  - value: 45
-                    duration: 750
-                    easing: linear
-              pan:
-                keyframes:
-                  - value: 0.65
-                    duration: 750
-                    easing: linear
         - id: tone
           type: sound
           src: tone440
           channelId: music
           loop: true
           volume: 80
+      audioEffects:
+        - id: music-update:1
+          type: audio-transition
+          targetId: music
+          properties:
+            volume:
+              update:
+                keyframes:
+                  - value: 45
+                    duration: 750
+                    easing: linear
+            pan:
+              update:
+                keyframes:
+                  - value: 0.65
+                    duration: 750
+                    easing: linear

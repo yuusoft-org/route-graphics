@@ -3,6 +3,7 @@ import { getEasingFunction } from "./util/animationTimeline.js";
 import { normalizeVolume } from "./util/normalizeVolume.js";
 import { normalizeAudioRenderState } from "./util/normalizeAudio.js";
 import { getAudioContext, getAudioRuntime } from "./audioContext.js";
+import { planAudioEffects } from "./plugins/audio/planAudioEffects.js";
 
 const ROOT_CHANNEL_ID = "__route_graphics_audio_root__";
 const DIRECT_CHANNEL_ID = "__route_graphics_audio_direct__";
@@ -178,6 +179,25 @@ const setParamNow = (param, value, context = getAudioContext()) => {
     timeline: [{ time: 0, value: nextValue, easing: "linear" }],
     normalizeValue: (automationValue) => automationValue,
   });
+};
+
+const holdParamNow = (param, context = getAudioContext()) => {
+  if (!param) return null;
+
+  const now = context.currentTime;
+  const currentValue = getCurrentParamValue(param, context);
+  if (typeof param.cancelAndHoldAtTime === "function") {
+    param.cancelAndHoldAtTime(now);
+  } else if (typeof param.cancelScheduledValues === "function") {
+    param.cancelScheduledValues(now);
+  }
+  setParamAtTime(param, currentValue, now);
+  audioParamAutomation.set(param, {
+    startTime: now,
+    timeline: [{ time: 0, value: currentValue, easing: "linear" }],
+    normalizeValue: (value) => value,
+  });
+  return currentValue;
 };
 
 const buildAudioTimeline = ({
@@ -1169,6 +1189,17 @@ export const createAudioStage = () => {
   const sounds = new Map();
   const currentSoundKeyById = new Map();
   const directAudios = new Map();
+  const ownedAudioEffects = new Map();
+  const forgetOwnedSound = (instance) => {
+    for (const ownership of ownedAudioEffects.values()) {
+      ownership.soundInstances.delete(instance);
+    }
+  };
+  const forgetOwnedChannel = (channel) => {
+    for (const ownership of ownedAudioEffects.values()) {
+      ownership.channelInstances.delete(channel);
+    }
+  };
   let soundGeneration = 0;
   let soundEventHandler;
   let destroyed = false;
@@ -2623,6 +2654,7 @@ export const createAudioStage = () => {
 
     stopSource(instance, duration);
     instance.cleanupTimeoutId = schedule(() => {
+      forgetOwnedSound(instance);
       cleanupSound(instance);
       sounds.delete(instance.internalId);
     }, duration);
@@ -2666,6 +2698,7 @@ export const createAudioStage = () => {
       instance.onFinishingSourceStarted = null;
       const finishingCallbacks = [...instance.finishingCallbacks];
       instance.finishingCallbacks.clear();
+      forgetOwnedSound(instance);
       cleanupSound(instance);
       if (sounds.get(instance.internalId) === instance) {
         sounds.delete(instance.internalId);
@@ -2901,6 +2934,171 @@ export const createAudioStage = () => {
     }
   };
 
+  const holdSoundProperty = (instance, property) => {
+    instance.pendingEnterTransitions ??= {};
+    instance.pendingEnterTransitions[property] = null;
+
+    if (property === "volume") {
+      holdParamNow(instance.gainNode?.gain);
+      return;
+    }
+    if (property === "pan") {
+      holdParamNow(instance.pannerNode?.pan);
+      return;
+    }
+    if (property !== "playbackRate") return;
+
+    if (instance.source) {
+      holdParamNow(instance.source.playbackRate);
+      instance.playbackRateAutomation =
+        audioParamAutomation.get(instance.source.playbackRate) ?? null;
+      return;
+    }
+
+    const currentValue = getPlaybackRateAutomationValue(instance);
+    instance.playbackRateAutomation = {
+      startTime: getAudioContext().currentTime,
+      timeline: [{ time: 0, value: currentValue, easing: "linear" }],
+      normalizeValue: normalizePlaybackRateValue,
+    };
+  };
+
+  const settleSoundProperty = (instance, node, property) => {
+    if (instance.pendingEnterTransitions) {
+      instance.pendingEnterTransitions[property] = null;
+    }
+
+    if (property === "volume") {
+      applyVolume({
+        gainNode: instance.gainNode,
+        targetValue: getVolumeValue(node ?? instance),
+        transition: null,
+      });
+      return;
+    }
+    if (property === "pan") {
+      applyPan({
+        pannerNode: instance.pannerNode,
+        targetValue: node?.pan ?? instance.pan,
+        transition: null,
+      });
+      return;
+    }
+    if (property === "playbackRate") {
+      instance.playbackRateAutomation = null;
+      if (instance.source) {
+        applyPlaybackRate({
+          source: instance.source,
+          targetValue: node?.playbackRate ?? instance.playbackRate,
+          transition: null,
+        });
+      }
+    }
+  };
+
+  const holdChannelProperty = (channel, property) => {
+    if (property === "volume") {
+      holdParamNow(channel.gainNode?.gain);
+    } else if (property === "pan") {
+      holdParamNow(channel.pannerNode?.pan);
+    }
+  };
+
+  const settleChannelProperty = (channel, node, property) => {
+    if (property === "volume") {
+      applyVolume({
+        gainNode: channel.gainNode,
+        targetValue: getVolumeValue(node ?? channel),
+        transition: null,
+      });
+    } else if (property === "pan") {
+      applyPan({
+        pannerNode: channel.pannerNode,
+        targetValue: node?.pan ?? channel.pan,
+        transition: null,
+      });
+    }
+  };
+
+  const releaseEffectOwnership = (
+    ownership,
+    { nextNode = null, claimedProperties = new Set() } = {},
+  ) => {
+    if (!ownership) return;
+
+    const properties = new Set(Object.keys(ownership.effect.properties));
+    for (const instance of ownership.soundInstances) {
+      const isCurrent =
+        sounds.get(instance.internalId) === instance &&
+        currentSoundKeyById.get(instance.id) === instance.internalId;
+      if (!isCurrent) {
+        removeSoundInstance(instance, [], 0);
+        continue;
+      }
+
+      for (const property of properties) {
+        if (claimedProperties.has(property)) {
+          holdSoundProperty(instance, property);
+        } else {
+          settleSoundProperty(instance, nextNode, property);
+        }
+      }
+    }
+
+    for (const channel of ownership.channelInstances) {
+      const isCurrent = channels.get(channel.id) === channel;
+      if (!isCurrent) {
+        cleanupChannel(channel);
+        continue;
+      }
+
+      for (const property of properties) {
+        if (claimedProperties.has(property)) {
+          holdChannelProperty(channel, property);
+        } else {
+          settleChannelProperty(channel, nextNode, property);
+        }
+      }
+    }
+  };
+
+  const prepareEffectOwnership = (effectPlan) => {
+    for (const { effect, ownership } of effectPlan.superseded) {
+      const accepted = effectPlan.accepted.find(
+        (entry) => entry.effect.targetId === effect.targetId,
+      );
+      releaseEffectOwnership(ownership, {
+        nextNode: accepted?.nextNode ?? null,
+        claimedProperties: new Set(
+          Object.keys(accepted?.effect.properties ?? {}),
+        ),
+      });
+      ownedAudioEffects.delete(effect.id);
+    }
+
+    for (const { effect, ownership } of effectPlan.settled) {
+      releaseEffectOwnership(ownership, {
+        nextNode: effectPlan.nextNodes.byId.get(effect.targetId) ?? null,
+      });
+      ownedAudioEffects.delete(effect.id);
+    }
+
+    const acceptedByTarget = new Map();
+    for (const entry of effectPlan.accepted) {
+      const ownership = {
+        effect: entry.effect,
+        signature: entry.signature,
+        targetId: entry.effect.targetId,
+        targetType: entry.targetType,
+        soundInstances: new Set(),
+        channelInstances: new Set(),
+      };
+      ownedAudioEffects.set(entry.effect.id, ownership);
+      acceptedByTarget.set(entry.effect.targetId, ownership);
+    }
+    return acceptedByTarget;
+  };
+
   const validateGraphTransition = ({
     prevAudio = [],
     nextAudio = [],
@@ -2914,6 +3112,11 @@ export const createAudioStage = () => {
     const next = normalizeAudioRenderState({
       audio: nextAudio,
       audioEffects: nextAudioEffects,
+    });
+    const effectPlan = planAudioEffects({
+      prevState: prev,
+      nextState: next,
+      ownedAudioEffects,
     });
 
     const prevChannelById = new Map(
@@ -2988,8 +3191,7 @@ export const createAudioStage = () => {
     return {
       prev,
       next,
-      prevTransitions: prev.transitions,
-      nextTransitions: next.transitions,
+      effectPlan,
       prevChannelById,
       nextChannelById,
       prevSoundById,
@@ -3006,8 +3208,7 @@ export const createAudioStage = () => {
   } = {}) => {
     const {
       next,
-      prevTransitions,
-      nextTransitions,
+      effectPlan,
       prevChannelById,
       nextChannelById,
       prevSoundById,
@@ -3021,6 +3222,18 @@ export const createAudioStage = () => {
     soundEventHandler = eventHandler;
 
     ensureRootChannel(ROOT_CHANNEL_ID);
+    const acceptedTransitions = effectPlan.transitions;
+    const acceptedOwnershipByTarget = prepareEffectOwnership(effectPlan);
+    const ownSound = (targetId, instance) => {
+      if (instance) {
+        acceptedOwnershipByTarget.get(targetId)?.soundInstances.add(instance);
+      }
+    };
+    const ownChannel = (targetId, channel) => {
+      if (channel) {
+        acceptedOwnershipByTarget.get(targetId)?.channelInstances.add(channel);
+      }
+    };
 
     const removedChannels = new Map();
     const channelCleanupDurations = new Map();
@@ -3035,6 +3248,7 @@ export const createAudioStage = () => {
         return;
       }
 
+      forgetOwnedChannel(entry.channel);
       cleanupChannel(entry.channel);
       if (channels.get(entry.channel.id) === entry.channel) {
         channels.delete(entry.channel.id);
@@ -3060,7 +3274,8 @@ export const createAudioStage = () => {
     for (const [id, prevChannel] of prevChannelById) {
       if (!nextChannelById.has(id)) {
         const channel = channels.get(id);
-        const duration = removeChannel(channel, prevTransitions);
+        ownChannel(id, channel);
+        const duration = removeChannel(channel, acceptedTransitions);
         channelCleanupDurations.set(id, duration);
         if (prevChannel.interruption === "loopEnd" && channel) {
           channel.loop = false;
@@ -3095,11 +3310,12 @@ export const createAudioStage = () => {
     }
 
     for (const [id, nextChannel] of nextChannelById) {
-      ensureChannel(
+      const channel = ensureChannel(
         nextChannel,
-        nextTransitions,
+        acceptedTransitions,
         prevChannelById.has(id) ? "update" : "enter",
       );
+      ownChannel(id, channel);
     }
 
     for (const [id, prevSound] of prevSoundById) {
@@ -3113,11 +3329,13 @@ export const createAudioStage = () => {
         prevSound.channelId !== null &&
         prevChannelById.get(prevSound.channelId)?.interruption === "loopEnd";
       const finishPreviousSound = () => {
+        ownSound(id, instance);
+        ownSound(prevSound.channelId, instance);
         suppressControlledEvents(instance);
         if (!finishAtLoopEnd) {
           return removeSoundInstance(
             instance,
-            prevTransitions,
+            acceptedTransitions,
             inheritedDuration,
           );
         }
@@ -3127,11 +3345,11 @@ export const createAudioStage = () => {
           finishSoundForDeferredChannel(
             instance,
             deferredCleanup,
-            prevTransitions,
+            acceptedTransitions,
           );
         } else {
           finishSoundInstance(instance, undefined, {
-            effects: prevTransitions,
+            effects: acceptedTransitions,
             waitForPendingPlayback: true,
           });
         }
@@ -3164,23 +3382,25 @@ export const createAudioStage = () => {
             ),
           );
         }
-        addSoundInstance({
+        const incoming = addSoundInstance({
           sound: nextSound,
-          effects: nextTransitions,
+          effects: acceptedTransitions,
           phase: "enter",
           internalId: `render:${id}:${++soundGeneration}`,
         });
+        ownSound(id, incoming);
       }
     }
 
     for (const [id, nextSound] of nextSoundById) {
       if (!prevSoundById.has(id)) {
-        addSoundInstance({
+        const added = addSoundInstance({
           sound: nextSound,
-          effects: nextTransitions,
+          effects: acceptedTransitions,
           phase: "enter",
           internalId: `render:${id}:${++soundGeneration}`,
         });
+        ownSound(id, added);
         continue;
       }
 
@@ -3195,8 +3415,9 @@ export const createAudioStage = () => {
         updateSoundInstance({
           instance,
           sound: nextSound,
-          effects: nextTransitions,
+          effects: acceptedTransitions,
         });
+        ownSound(id, instance);
       }
     }
 
@@ -3209,6 +3430,7 @@ export const createAudioStage = () => {
       if (!channel) continue;
       const duration = channelCleanupDurations.get(id) ?? 0;
       channel.cleanupTimeoutId = schedule(() => {
+        forgetOwnedChannel(channel);
         cleanupChannel(channel);
         if (channels.get(id) === channel) {
           channels.delete(id);
@@ -3350,6 +3572,7 @@ export const createAudioStage = () => {
     currentSoundKeyById.clear();
     channels.clear();
     directAudios.clear();
+    ownedAudioEffects.clear();
   };
 
   return {
@@ -3367,6 +3590,7 @@ export const createAudioStage = () => {
       sounds,
       currentSoundKeyById,
       directAudios,
+      ownedAudioEffects,
     }),
   };
 };

@@ -70,6 +70,15 @@ const playbackSound = ({ commandId, operation, positionMs, ...overrides }) => ({
   },
 });
 
+const audioEffect = (id, properties) => [
+  {
+    id,
+    type: "audio-transition",
+    targetId: "player",
+    properties,
+  },
+];
+
 const setupControlledStage = async ({
   assets = new Map([["track", { duration: 10 }]]),
   pendingAssets = new Map(),
@@ -93,13 +102,17 @@ const setupControlledStage = async ({
   const stage = createAudioStage();
   const eventHandler = vi.fn();
   let currentAudio = [];
-  const render = (nextAudio) => {
+  let currentAudioEffects = [];
+  const render = (nextAudio, nextAudioEffects = currentAudioEffects) => {
     stage.renderGraph({
       prevAudio: currentAudio,
       nextAudio,
+      prevAudioEffects: currentAudioEffects,
+      nextAudioEffects,
       eventHandler,
     });
     currentAudio = nextAudio;
+    currentAudioEffects = nextAudioEffects;
   };
 
   return { context, eventHandler, render, stage };
@@ -1132,31 +1145,33 @@ describe("command-controlled sound playback", () => {
     expect(stage._inspect().sounds.has(currentKey)).toBe(false);
   });
 
-  it("runs inline enter once for same-source transport plays and again for replacement", async () => {
+  it("runs an enter effect once for same-source transport plays and again for a new occurrence", async () => {
     const { context, render, stage } = await setupControlledStage({
       assets: new Map([
         ["track", { duration: 10 }],
         ["next", { duration: 10 }],
       ]),
     });
-    const enter = {
-      enter: {
-        volume: {
+    const enter = audioEffect("player-enter:1", {
+      volume: {
+        enter: {
           initialValue: 0,
           keyframes: [{ value: 80, duration: 500 }],
         },
       },
-    };
+    });
 
-    render([
-      playbackSound({
-        commandId: 1,
-        operation: "play",
-        positionMs: 0,
-        volume: 80,
-        transition: enter,
-      }),
-    ]);
+    render(
+      [
+        playbackSound({
+          commandId: 1,
+          operation: "play",
+          positionMs: 0,
+          volume: 80,
+        }),
+      ],
+      enter,
+    );
     await flushMicrotasks();
     const firstKey = stage._inspect().currentSoundKeyById.get("player");
     const firstInstance = stage._inspect().sounds.get(firstKey);
@@ -1170,7 +1185,6 @@ describe("command-controlled sound playback", () => {
         operation: "play",
         positionMs: 1000,
         volume: 80,
-        transition: enter,
       }),
     ]);
     await flushMicrotasks();
@@ -1181,16 +1195,26 @@ describe("command-controlled sound playback", () => {
       firstInstance.gainNode.gain.linearRampToValueAtTime,
     ).toHaveBeenCalledTimes(1);
 
-    render([
-      playbackSound({
-        commandId: 3,
-        operation: "play",
-        positionMs: 0,
-        src: "next",
-        volume: 80,
-        transition: enter,
-      }),
-    ]);
+    const replacementEnter = audioEffect("player-enter:2", {
+      volume: {
+        enter: {
+          initialValue: 0,
+          keyframes: [{ value: 80, duration: 500 }],
+        },
+      },
+    });
+    render(
+      [
+        playbackSound({
+          commandId: 3,
+          operation: "play",
+          positionMs: 0,
+          src: "next",
+          volume: 80,
+        }),
+      ],
+      replacementEnter,
+    );
     await flushMicrotasks();
 
     const replacementKey = stage._inspect().currentSoundKeyById.get("player");
@@ -1208,24 +1232,26 @@ describe("command-controlled sound playback", () => {
 
   it("carries active playback-rate automation across a same-source transport restart", async () => {
     const { context, render } = await setupControlledStage();
-    const transition = {
-      enter: {
-        playbackRate: {
+    const transition = audioEffect("player-rate-enter:1", {
+      playbackRate: {
+        enter: {
           initialValue: 0.5,
           keyframes: [{ value: 2, duration: 1000 }],
         },
       },
-    };
+    });
 
-    render([
-      playbackSound({
-        commandId: 1,
-        operation: "play",
-        positionMs: 0,
-        playbackRate: 2,
-        transition,
-      }),
-    ]);
+    render(
+      [
+        playbackSound({
+          commandId: 1,
+          operation: "play",
+          positionMs: 0,
+          playbackRate: 2,
+        }),
+      ],
+      transition,
+    );
     await flushMicrotasks();
     context.currentTime = 10.25;
 
@@ -1235,7 +1261,6 @@ describe("command-controlled sound playback", () => {
         operation: "play",
         positionMs: 1000,
         playbackRate: 2,
-        transition,
       }),
     ]);
     await flushMicrotasks();
@@ -1262,22 +1287,26 @@ describe("command-controlled sound playback", () => {
         },
       },
     );
-    const transition = {
-      enter: {
-        volume: {
+    const transition = audioEffect("player-enter:1", {
+      volume: {
+        enter: {
           initialValue: 0,
           keyframes: [{ value: 80, duration: 500 }],
         },
-        pan: {
+      },
+      pan: {
+        enter: {
           initialValue: -1,
           keyframes: [{ value: 0.5, duration: 500 }],
         },
-        playbackRate: {
+      },
+      playbackRate: {
+        enter: {
           initialValue: 0.5,
           keyframes: [{ value: 2, duration: 500 }],
         },
       },
-    };
+    });
     const sound = (commandId) =>
       playbackSound({
         commandId,
@@ -1286,10 +1315,9 @@ describe("command-controlled sound playback", () => {
         volume: 80,
         pan: 0.5,
         playbackRate: 2,
-        transition,
       });
 
-    render([sound(1)]);
+    render([sound(1)], transition);
     await flushMicrotasks();
 
     const currentKey = stage._inspect().currentSoundKeyById.get("player");
@@ -1360,20 +1388,24 @@ describe("command-controlled sound playback", () => {
       volume: 80,
       pan: 0.5,
       playbackRate: 2,
-      transition: {
+    });
+    const initialEffect = audioEffect("player-enter:1", {
+      volume: {
         enter: {
-          volume: {
-            initialValue: 0,
-            keyframes: [{ value: 80, duration: 500 }],
-          },
-          pan: {
-            initialValue: -1,
-            keyframes: [{ value: 0.5, duration: 500 }],
-          },
-          playbackRate: {
-            initialValue: 0.5,
-            keyframes: [{ value: 2, duration: 500 }],
-          },
+          initialValue: 0,
+          keyframes: [{ value: 80, duration: 500 }],
+        },
+      },
+      pan: {
+        enter: {
+          initialValue: -1,
+          keyframes: [{ value: 0.5, duration: 500 }],
+        },
+      },
+      playbackRate: {
+        enter: {
+          initialValue: 0.5,
+          keyframes: [{ value: 2, duration: 500 }],
         },
       },
     });
@@ -1385,22 +1417,26 @@ describe("command-controlled sound playback", () => {
         volume: 40,
         pan: 0,
         playbackRate: 1,
-        transition: {
-          update: {
-            volume: { keyframes: [{ value: 40, duration: 500 }] },
-            pan: { keyframes: [{ value: 0, duration: 500 }] },
-            playbackRate: { keyframes: [{ value: 1, duration: 500 }] },
-          },
-        },
       });
+    const updateEffect = audioEffect("player-update:2", {
+      volume: {
+        update: { keyframes: [{ value: 40, duration: 500 }] },
+      },
+      pan: {
+        update: { keyframes: [{ value: 0, duration: 500 }] },
+      },
+      playbackRate: {
+        update: { keyframes: [{ value: 1, duration: 500 }] },
+      },
+    });
 
-    render([initial]);
+    render([initial], initialEffect);
     await flushMicrotasks();
     const currentKey = stage._inspect().currentSoundKeyById.get("player");
     const instance = stage._inspect().sounds.get(currentKey);
 
     context.currentTime = 10.25;
-    render([updated(1)]);
+    render([updated(1)], updateEffect);
 
     expect(instance.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
       0.8,
@@ -1430,7 +1466,7 @@ describe("command-controlled sound playback", () => {
     ).toHaveBeenLastCalledWith(1, 10.75);
   });
 
-  it("supersedes only changed enter tracks after a failed source start", async () => {
+  it("settles unclaimed enter tracks when a new effect supersedes a failed start", async () => {
     let startAttempts = 0;
     const { context, render, stage } = await setupControlledStage({
       contextOptions: {
@@ -1449,20 +1485,24 @@ describe("command-controlled sound playback", () => {
       volume: 80,
       pan: 0.5,
       playbackRate: 2,
-      transition: {
+    });
+    const initialEffect = audioEffect("player-enter:1", {
+      volume: {
         enter: {
-          volume: {
-            initialValue: 0,
-            keyframes: [{ value: 80, duration: 500 }],
-          },
-          pan: {
-            initialValue: -1,
-            keyframes: [{ value: 0.5, duration: 500 }],
-          },
-          playbackRate: {
-            initialValue: 0.5,
-            keyframes: [{ value: 2, duration: 500 }],
-          },
+          initialValue: 0,
+          keyframes: [{ value: 80, duration: 500 }],
+        },
+      },
+      pan: {
+        enter: {
+          initialValue: -1,
+          keyframes: [{ value: 0.5, duration: 500 }],
+        },
+      },
+      playbackRate: {
+        enter: {
+          initialValue: 0.5,
+          keyframes: [{ value: 2, duration: 500 }],
         },
       },
     });
@@ -1474,25 +1514,25 @@ describe("command-controlled sound playback", () => {
         volume: 40,
         pan: 0.5,
         playbackRate: 2,
-        transition: {
-          update: {
-            volume: { keyframes: [{ value: 40, duration: 500 }] },
-          },
-        },
       });
+    const updateEffect = audioEffect("player-update:2", {
+      volume: {
+        update: { keyframes: [{ value: 40, duration: 500 }] },
+      },
+    });
 
-    render([initial]);
+    render([initial], initialEffect);
     await flushMicrotasks();
     const currentKey = stage._inspect().currentSoundKeyById.get("player");
     const instance = stage._inspect().sounds.get(currentKey);
 
     context.currentTime = 10.25;
-    render([updated(1)]);
+    render([updated(1)], updateEffect);
 
     expect(instance.pendingEnterTransitions).toEqual({
       volume: null,
-      pan: initial.transition.enter.pan,
-      playbackRate: initial.transition.enter.playbackRate,
+      pan: null,
+      playbackRate: null,
     });
     expect(instance.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
       0.8,
@@ -1519,18 +1559,18 @@ describe("command-controlled sound playback", () => {
       instance.gainNode.gain.linearRampToValueAtTime,
     ).toHaveBeenCalledTimes(volumeRampCount);
     expect(instance.pannerNode.pan.setValueAtTime).toHaveBeenLastCalledWith(
-      -1,
-      10.5,
+      0.5,
+      10.25,
     );
     expect(
       instance.pannerNode.pan.linearRampToValueAtTime,
-    ).toHaveBeenLastCalledWith(0.5, 11);
+    ).not.toHaveBeenCalled();
     expect(
       context.sources[1].playbackRate.setValueAtTime,
-    ).toHaveBeenLastCalledWith(0.5, 10.5);
+    ).toHaveBeenLastCalledWith(2, 10.5);
     expect(
       context.sources[1].playbackRate.linearRampToValueAtTime,
-    ).toHaveBeenLastCalledWith(2, 11);
+    ).not.toHaveBeenCalled();
   });
 
   it("starts a replacement enter after pending decode without delaying outgoing exit", async () => {
@@ -1547,13 +1587,6 @@ describe("command-controlled sound playback", () => {
       operation: "play",
       positionMs: 0,
       volume: 80,
-      transition: {
-        exit: {
-          volume: {
-            keyframes: [{ value: 0, duration: 1000 }],
-          },
-        },
-      },
     });
 
     render([outgoing]);
@@ -1562,23 +1595,29 @@ describe("command-controlled sound playback", () => {
     const outgoingInstance = stage._inspect().sounds.get(outgoingKey);
     const outgoingSource = context.sources[0];
 
-    render([
-      playbackSound({
-        commandId: 2,
-        operation: "play",
-        positionMs: 0,
-        src: "next",
-        volume: 80,
-        transition: {
-          enter: {
-            volume: {
-              initialValue: 0,
-              keyframes: [{ value: 80, duration: 500 }],
-            },
-          },
+    const handoffEffect = audioEffect("player-handoff:2", {
+      volume: {
+        exit: {
+          keyframes: [{ value: 0, duration: 1000 }],
         },
-      }),
-    ]);
+        enter: {
+          initialValue: 0,
+          keyframes: [{ value: 80, duration: 500 }],
+        },
+      },
+    });
+    render(
+      [
+        playbackSound({
+          commandId: 2,
+          operation: "play",
+          positionMs: 0,
+          src: "next",
+          volume: 80,
+        }),
+      ],
+      handoffEffect,
+    );
 
     const incomingKey = stage._inspect().currentSoundKeyById.get("player");
     const incomingInstance = stage._inspect().sounds.get(incomingKey);

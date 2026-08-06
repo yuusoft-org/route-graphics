@@ -1,0 +1,82 @@
+title: Mute gate during active automation
+description: Verifies mute and unmute do not cancel or restart an active sound envelope.
+durationMs: 4000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+states:
+  - atMs: 0
+    state:
+      id: active-mute-fade
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 100
+          muted: false
+      audioEffects:
+        - id: tone-enter:1
+          type: audio-transition
+          targetId: tone
+          properties:
+            volume:
+              enter:
+                initialValue: 0
+                keyframes:
+                  - value: 100
+                    duration: 3000
+                    easing: linear
+  - atMs: 1000
+    state:
+      id: active-mute-muted
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 100
+          muted: true
+      audioEffects:
+        - id: tone-enter:1
+          type: audio-transition
+          targetId: tone
+          properties:
+            volume:
+              enter:
+                initialValue: 0
+                keyframes:
+                  - value: 100
+                    duration: 3000
+                    easing: linear
+  - atMs: 1500
+    state:
+      id: active-mute-unmuted
+      elements: []
+      animations: []
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 100
+          muted: false
+      audioEffects:
+        - id: tone-enter:1
+          type: audio-transition
+          targetId: tone
+          properties:
+            volume:
+              enter:
+                initialValue: 0
+                keyframes:
+                  - value: 100
+                    duration: 3000
+                    easing: linear
