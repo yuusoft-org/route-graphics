@@ -121,7 +121,7 @@ describe("negative scale transforms", () => {
     expect(display.pivot).toMatchObject({ x: 12, y: 9 });
   });
 
-  it("keeps the pixel origin stable when a mirrored scale changes", () => {
+  it("keeps the local anchor pivot stable when a mirrored scale animates", () => {
     const display = createDisplay();
     applyElementTransform(display, {
       originX: -20,
@@ -134,8 +134,8 @@ describe("negative scale transforms", () => {
     display.scale.y = 0.5;
     refreshElementPivot(display);
 
-    expect(display.pivot.x * display.scale.x).toBeCloseTo(-20);
-    expect(display.pivot.y * display.scale.y).toBeCloseTo(10);
+    expect(display.pivot.x).toBeCloseTo(20);
+    expect(display.pivot.y).toBeCloseTo(10);
   });
 
   it("mirrors an asymmetric sprite around its center anchor", () => {

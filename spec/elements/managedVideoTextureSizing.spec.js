@@ -76,6 +76,10 @@ describe("managed video texture sizing", () => {
     expect(sprite.x).toBe(120);
     expect(sprite.y).toBe(75);
     expect(sprite.rotation).toBeCloseTo(Math.PI / 6);
+    const pivotBeforeAnimation = {
+      x: sprite.pivot.x,
+      y: sprite.pivot.y,
+    };
 
     const animationBus = createAnimationBus();
     animationBus.dispatch({
@@ -96,7 +100,7 @@ describe("managed video texture sizing", () => {
     animationBus.flush();
     animationBus.tick(100);
 
-    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(element.originX);
-    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(element.originY);
+    expect(sprite.pivot.x).toBeCloseTo(pivotBeforeAnimation.x);
+    expect(sprite.pivot.y).toBeCloseTo(pivotBeforeAnimation.y);
   });
 });
