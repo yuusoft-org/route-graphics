@@ -1125,6 +1125,8 @@ const cleanupChannel = (channel) => {
     cancelTimeout(channel.cleanupTimeoutId);
     channel.cleanupTimeoutId = null;
   }
+  channel.pendingHandoffEnter = null;
+  channel.deferredRemovalToken = null;
   disconnect(channel.gainNode);
   disconnect(channel.pannerNode);
   disconnect(channel.muteGainNode);
@@ -1267,9 +1269,13 @@ export const createAudioStage = () => {
       const existing = audioMasters.get(master.id);
       if (!existing) {
         audioMasters.set(master.id, createAudioMaster(master));
+        const outputNode = audioMasters.get(master.id).gainNode;
         const channel = channels.get(master.id);
         if (channel) {
-          connectChannelOutput(channel, audioMasters.get(master.id).gainNode);
+          connectChannelOutput(channel, outputNode);
+        }
+        for (const entry of detachedHandoffSidesByTarget.get(master.id) ?? []) {
+          connectChannelOutput(entry.channel, outputNode);
         }
         continue;
       }
@@ -2501,7 +2507,7 @@ export const createAudioStage = () => {
         acceptChannelPlaybackCommand(existing, channel.playback);
       }
 
-      if (volumeChanged && volumeTransition) {
+      if (volumeTransition) {
         applyVolume({
           gainNode: existing.gainNode,
           targetValue: nextVolumeValue,
@@ -2515,11 +2521,17 @@ export const createAudioStage = () => {
         });
       }
 
-      if (panChanged) {
+      if (panTransition) {
         applyPan({
           pannerNode: existing.pannerNode,
           targetValue: channel.pan,
           transition: panTransition,
+        });
+      } else if (panChanged) {
+        applyPan({
+          pannerNode: existing.pannerNode,
+          targetValue: channel.pan,
+          transition: null,
         });
       }
       if (mutedChanged) {
@@ -3054,17 +3066,35 @@ export const createAudioStage = () => {
     const channel = channels.get(animation.targetId);
     if (previousRecord.type === "update" && channel) {
       if (previousRecord.targetVolume !== undefined) {
-        holdParamNow(channel.gainNode.gain, context);
+        if (animation.type === "update" && !animation.tween.volume) {
+          applyVolume({
+            gainNode: channel.gainNode,
+            targetValue: normalizeVolume(previousRecord.targetVolume, 100),
+            transition: null,
+          });
+        } else {
+          holdParamNow(channel.gainNode.gain, context);
+        }
       }
       if (previousRecord.targetPan !== undefined) {
-        holdParamNow(channel.pannerNode?.pan, context);
+        if (animation.type === "update" && !animation.tween.pan) {
+          applyPan({
+            pannerNode: channel.pannerNode,
+            targetValue: previousRecord.targetPan,
+            transition: null,
+          });
+        } else {
+          holdParamNow(channel.pannerNode?.pan, context);
+        }
       }
     }
 
     if (previousRecord.type === "transition") {
       settleDetachedHandoffSides(animation.targetId);
-      if (animation.type === "update" && channel) {
+      if (channel) {
         channel.pendingHandoffEnter = null;
+      }
+      if (animation.type === "update" && channel) {
         applyVolume({
           gainNode: channel.handoffGainNode,
           targetValue: 1,
@@ -3463,6 +3493,38 @@ export const createAudioStage = () => {
       (animation) =>
         !acceptedAudioAnimationPayloads.has(animation.occurrenceId),
     );
+    const pendingAudioAnimationTargets = new Set(
+      pendingAudioAnimations.map((animation) => animation.targetId),
+    );
+    for (const [targetId, occurrenceId] of activeAudioAnimationIdByTarget) {
+      if (pendingAudioAnimationTargets.has(targetId)) continue;
+
+      const record = activeAudioAnimations.get(occurrenceId);
+      if (record?.type !== "update") continue;
+
+      const previousChannel = prevChannelById.get(targetId);
+      const nextChannel = nextChannelById.get(targetId);
+      if (!previousChannel || !nextChannel) {
+        deactivateAudioAnimationTarget(targetId);
+        continue;
+      }
+
+      if (
+        record.targetVolume !== undefined &&
+        getVolumeValue(previousChannel) !== getVolumeValue(nextChannel)
+      ) {
+        record.targetVolume = undefined;
+      }
+      if (
+        record.targetPan !== undefined &&
+        (previousChannel.pan ?? 0) !== (nextChannel.pan ?? 0)
+      ) {
+        record.targetPan = undefined;
+      }
+      if (record.targetVolume === undefined && record.targetPan === undefined) {
+        deactivateAudioAnimationTarget(targetId);
+      }
+    }
     const handoffByTarget = new Map(
       pendingAudioAnimations
         .filter(({ type }) => type === "transition")
@@ -3873,8 +3935,17 @@ export const createAudioStage = () => {
     for (const sound of sounds.values()) {
       cleanupSound(sound);
     }
+    const cleanedChannels = new Set();
     for (const channel of channels.values()) {
       cleanupChannel(channel);
+      cleanedChannels.add(channel);
+    }
+    for (const entries of detachedHandoffSidesByTarget.values()) {
+      for (const entry of entries) {
+        if (cleanedChannels.has(entry.channel)) continue;
+        cleanupChannel(entry.channel);
+        cleanedChannels.add(entry.channel);
+      }
     }
     for (const master of audioMasters.values()) {
       disconnect(master.gainNode);

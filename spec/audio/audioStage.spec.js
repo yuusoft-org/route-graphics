@@ -3124,6 +3124,37 @@ describe("AudioStage graph rendering", () => {
       );
     });
 
+    it("reconnects both active handoff sides when a master is introduced", async () => {
+      const { stage, context } = await setupAudioStage();
+      stage.renderGraph({ nextAudio: [previousChannel] });
+      const outgoing = stage._inspect().channels.get("music");
+
+      stage.renderGraph({
+        prevAudio: [previousChannel],
+        nextAudio: [nextChannel],
+        audioAnimations: [createHandoff()],
+      });
+      const incoming = stage._inspect().channels.get("music");
+      expect(outgoing.outputNode).toBe(context.destination);
+      expect(incoming.outputNode).toBe(context.destination);
+
+      stage.renderGraph({
+        prevAudio: [nextChannel],
+        nextAudio: [nextChannel],
+        audioMasters: [master],
+      });
+
+      const runtimeMaster = stage._inspect().audioMasters.get("music");
+      expect(outgoing.outputNode).toBe(runtimeMaster.gainNode);
+      expect(incoming.outputNode).toBe(runtimeMaster.gainNode);
+      expect(outgoing.handoffGainNode.connect).toHaveBeenLastCalledWith(
+        runtimeMaster.gainNode,
+      );
+      expect(incoming.handoffGainNode.connect).toHaveBeenLastCalledWith(
+        runtimeMaster.gainNode,
+      );
+    });
+
     it("accepts an identical duplicate occurrence without restarting automation", async () => {
       const { stage } = await setupAudioStage();
       const handoff = createHandoff();
@@ -3217,6 +3248,74 @@ describe("AudioStage graph rendering", () => {
       expect(
         incoming.handoffGainNode.gain.linearRampToValueAtTime,
       ).toHaveBeenCalled();
+    });
+
+    it("clears a delayed pending enter when another handoff supersedes it", async () => {
+      const delayedNext = {
+        ...nextChannel,
+        interruption: "loopEnd",
+        children: [
+          {
+            ...nextChannel.children[0],
+            loop: true,
+            startDelayMs: 100,
+          },
+        ],
+      };
+      const finalChannel = {
+        ...previousChannel,
+        volume: 60,
+        pan: 0,
+        children: [
+          {
+            ...previousChannel.children[0],
+            src: "final-theme",
+          },
+        ],
+      };
+      const { stage } = await setupAudioStage();
+      stage.renderGraph({ nextAudio: [previousChannel] });
+      stage.renderGraph({
+        prevAudio: [previousChannel],
+        nextAudio: [delayedNext],
+        audioAnimations: [
+          createHandoff({
+            next: {
+              channel: delayedNext,
+              fade: keyframePhase(100, 200, { initialValue: 0 }),
+            },
+          }),
+        ],
+      });
+      const delayedOutgoing = stage._inspect().channels.get("music");
+      expect(delayedOutgoing.pendingHandoffEnter).not.toBeNull();
+
+      stage.renderGraph({
+        prevAudio: [delayedNext],
+        nextAudio: [finalChannel],
+        audioAnimations: [
+          {
+            id: "handoff-2",
+            occurrenceId: "engine-1:g1:l3:bgm2",
+            type: "transition",
+            targetId: "music",
+            prev: {
+              channel: delayedNext,
+              fade: keyframePhase(0, 300),
+            },
+            next: {
+              channel: finalChannel,
+              fade: keyframePhase(100, 50, { initialValue: 0 }),
+            },
+          },
+        ],
+      });
+
+      expect(delayedOutgoing.pendingHandoffEnter).toBeNull();
+      vi.advanceTimersByTime(100);
+      expect(
+        delayedOutgoing.handoffGainNode.gain.linearRampToValueAtTime,
+      ).toHaveBeenLastCalledWith(0, 10.3);
     });
 
     it("cleans up an incoming side that cannot start without restoring the outgoing side", async () => {
@@ -3325,6 +3424,59 @@ describe("AudioStage graph rendering", () => {
       ).toBe(localCancelCount);
     });
 
+    it("runs update tracks whose endpoints match the declared channel state", async () => {
+      const unchanged = {
+        ...previousChannel,
+        volume: 100,
+        pan: 0,
+        muted: false,
+      };
+      const { stage } = await setupAudioStage();
+      stage.renderGraph({ nextAudio: [unchanged] });
+      const channel = stage._inspect().channels.get("music");
+
+      stage.renderGraph({
+        prevAudio: [unchanged],
+        nextAudio: [unchanged],
+        audioAnimations: [
+          {
+            id: "pulse-update",
+            occurrenceId: "engine-1:g1:l2:pulse",
+            type: "update",
+            targetId: "music",
+            tween: {
+              volume: {
+                keyframes: [
+                  { value: 0, duration: 100, easing: "linear" },
+                  { value: 100, duration: 100, easing: "linear" },
+                ],
+              },
+              pan: {
+                keyframes: [
+                  { value: -1, duration: 100, easing: "linear" },
+                  { value: 0, duration: 100, easing: "linear" },
+                ],
+              },
+            },
+          },
+        ],
+      });
+
+      expect(
+        channel.gainNode.gain.linearRampToValueAtTime,
+      ).toHaveBeenNthCalledWith(1, 0, 10.1);
+      expect(
+        channel.gainNode.gain.linearRampToValueAtTime,
+      ).toHaveBeenNthCalledWith(2, 1, 10.2);
+      expect(
+        channel.pannerNode.pan.linearRampToValueAtTime,
+      ).toHaveBeenNthCalledWith(1, -1, 10.1);
+      expect(
+        channel.pannerNode.pan.linearRampToValueAtTime,
+      ).toHaveBeenNthCalledWith(2, 0, 10.2);
+      expect(stage._inspect().activeAudioAnimations.size).toBe(1);
+    });
+
     it("keeps authored mute independent from retained update automation and settles explicitly", async () => {
       const initial = {
         ...previousChannel,
@@ -3366,6 +3518,140 @@ describe("AudioStage graph rendering", () => {
       });
       expect(channel.gainNode.gain.value).toBe(0.2);
       expect(stage._inspect().activeAudioAnimations.size).toBe(0);
+    });
+
+    it("invalidates an active update property after a direct channel override", async () => {
+      const initial = {
+        ...previousChannel,
+        volume: 100,
+        pan: 0,
+        muted: false,
+      };
+      const animated = { ...initial, volume: 20 };
+      const overridden = { ...animated, volume: 50 };
+      const { stage } = await setupAudioStage();
+      stage.renderGraph({ nextAudio: [initial] });
+      stage.renderGraph({
+        prevAudio: [initial],
+        nextAudio: [animated],
+        audioAnimations: [
+          {
+            id: "stale-volume-update",
+            occurrenceId: "engine-1:g1:l3:stale-volume",
+            type: "update",
+            targetId: "music",
+            tween: { volume: keyframePhase(20, 1000) },
+          },
+        ],
+      });
+      const channel = stage._inspect().channels.get("music");
+
+      stage.renderGraph({ prevAudio: [animated], nextAudio: [overridden] });
+      expect(channel.gainNode.gain.value).toBe(0.5);
+      expect(stage._inspect().activeAudioAnimations.size).toBe(0);
+
+      stage.renderGraph({
+        prevAudio: [overridden],
+        nextAudio: [overridden],
+        audioAnimationControl: { commandId: 1, operation: "settle" },
+      });
+      expect(channel.gainNode.gain.value).toBe(0.5);
+    });
+
+    it("invalidates active updates when a target is removed and recreated", async () => {
+      const initial = {
+        ...previousChannel,
+        volume: 100,
+        pan: 0,
+        muted: false,
+      };
+      const animated = { ...initial, volume: 20 };
+      const recreated = { ...initial, volume: 70 };
+      const { stage } = await setupAudioStage();
+      stage.renderGraph({ nextAudio: [initial] });
+      stage.renderGraph({
+        prevAudio: [initial],
+        nextAudio: [animated],
+        audioAnimations: [
+          {
+            id: "removed-target-update",
+            occurrenceId: "engine-1:g1:l3:removed-target",
+            type: "update",
+            targetId: "music",
+            tween: { volume: keyframePhase(20, 1000) },
+          },
+        ],
+      });
+
+      stage.renderGraph({ prevAudio: [animated], nextAudio: [] });
+      expect(stage._inspect().activeAudioAnimations.size).toBe(0);
+      stage.renderGraph({ prevAudio: [], nextAudio: [recreated] });
+      const recreatedChannel = stage._inspect().channels.get("music");
+      stage.renderGraph({
+        prevAudio: [recreated],
+        nextAudio: [recreated],
+        audioAnimationControl: { commandId: 1, operation: "settle" },
+      });
+
+      expect(recreatedChannel.gainNode.gain.value).toBe(0.7);
+    });
+
+    it("settles update properties omitted by a superseding update", async () => {
+      const initial = {
+        ...previousChannel,
+        volume: 100,
+        pan: 0,
+        muted: false,
+      };
+      const volumeUpdated = { ...initial, volume: 20 };
+      const panUpdated = { ...volumeUpdated, pan: 0.75 };
+      const { stage, context } = await setupAudioStage({
+        contextOptions: { reflectScheduledAudioParamValue: false },
+      });
+      stage.renderGraph({ nextAudio: [initial] });
+      stage.renderGraph({
+        prevAudio: [initial],
+        nextAudio: [volumeUpdated],
+        audioAnimations: [
+          {
+            id: "volume-update",
+            occurrenceId: "engine-1:g1:l3:volume",
+            type: "update",
+            targetId: "music",
+            tween: { volume: keyframePhase(20, 1000) },
+          },
+        ],
+      });
+      const channel = stage._inspect().channels.get("music");
+      context.currentTime = 10.25;
+
+      stage.renderGraph({
+        prevAudio: [volumeUpdated],
+        nextAudio: [panUpdated],
+        audioAnimations: [
+          {
+            id: "pan-update",
+            occurrenceId: "engine-1:g1:l4:pan",
+            type: "update",
+            targetId: "music",
+            tween: { pan: keyframePhase(0.75, 500) },
+          },
+        ],
+      });
+
+      expect(channel.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+        0.2,
+        10.25,
+      );
+      stage.renderGraph({
+        prevAudio: [panUpdated],
+        nextAudio: [panUpdated],
+        audioAnimationControl: { commandId: 1, operation: "settle" },
+      });
+      expect(channel.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+        0.2,
+        10.25,
+      );
     });
 
     it("starts a superseding handoff from the renderer-owned value of an active update", async () => {
@@ -3462,6 +3748,39 @@ describe("AudioStage graph rendering", () => {
         incoming.handoffGainNode.gain.cancelScheduledValues.mock.calls.length,
       ).toBe(cancelCount);
       expect(stage._inspect().lastAudioAnimationControlId).toBe(3);
+    });
+
+    it("disconnects detached loop-end handoff channels during destruction", async () => {
+      const loopEndPrevious = {
+        ...previousChannel,
+        interruption: "loopEnd",
+        children: [{ ...previousChannel.children[0], loop: true }],
+      };
+      const { stage } = await setupAudioStage();
+      stage.renderGraph({ nextAudio: [loopEndPrevious] });
+      const outgoing = stage._inspect().channels.get("music");
+      stage.renderGraph({
+        prevAudio: [loopEndPrevious],
+        nextAudio: [nextChannel],
+        audioAnimations: [
+          createHandoff({
+            prev: {
+              channel: loopEndPrevious,
+              fade: keyframePhase(0, 100),
+            },
+          }),
+        ],
+      });
+
+      expect(stage._inspect().detachedHandoffSidesByTarget.size).toBe(1);
+      expect(outgoing.gainNode.disconnect).not.toHaveBeenCalled();
+      stage.destroy();
+
+      expect(outgoing.gainNode.disconnect).toHaveBeenCalledOnce();
+      expect(outgoing.pannerNode.disconnect).toHaveBeenCalledOnce();
+      expect(outgoing.muteGainNode.disconnect).toHaveBeenCalledOnce();
+      expect(outgoing.handoffGainNode.disconnect).toHaveBeenCalledOnce();
+      expect(stage._inspect().detachedHandoffSidesByTarget.size).toBe(0);
     });
   });
 });
