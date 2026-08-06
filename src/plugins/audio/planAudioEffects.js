@@ -1,5 +1,6 @@
 const PHASES_BY_LIFECYCLE = {
   add: new Set(["enter"]),
+  replay: new Set(["enter"]),
   remove: new Set(["exit"]),
   replace: new Set(["enter", "exit"]),
   update: new Set(["update"]),
@@ -45,6 +46,9 @@ const normalizeEffectForSignature = (effect) => ({
               ? {}
               : { initialValue: track.initialValue }),
             keyframes: track.keyframes.map((keyframe) => ({
+              ...(keyframe.startValue === undefined
+                ? {}
+                : { startValue: keyframe.startValue }),
               value: keyframe.value,
               duration: keyframe.duration,
               delay: keyframe.delay ?? 0,
@@ -67,6 +71,13 @@ const hasSameSoundSourceIdentity = (previous, next) =>
   previous.endAt === next.endAt &&
   previous.startDelayMs === next.startDelayMs;
 
+const isSameSourceTransportReplay = (previous, next) =>
+  previous.type === "sound" &&
+  next.type === "sound" &&
+  previous.playback !== undefined &&
+  next.playback?.operation === "play" &&
+  next.playback.commandId > previous.playback.commandId;
+
 const getNodeMaps = (state) => {
   const channels = new Map(state.channels.map((node) => [node.id, node]));
   const sounds = new Map(state.sounds.map((node) => [node.id, node]));
@@ -85,6 +96,9 @@ const getLifecycle = (prevNode, nextNode) => {
     !hasSameSoundSourceIdentity(prevNode, nextNode)
   ) {
     return "replace";
+  }
+  if (isSameSourceTransportReplay(prevNode, nextNode)) {
+    return "replay";
   }
   return "update";
 };

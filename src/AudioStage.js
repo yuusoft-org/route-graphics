@@ -2622,6 +2622,7 @@ export const createAudioStage = () => {
   const removeSoundInstance = (instance, effects, inheritedDuration = 0) => {
     if (!instance) return 0;
 
+    const finishingCallbacks = [...instance.finishingCallbacks];
     instance.finishing = false;
     instance.pendingEnterTransitions = null;
     instance.finishingCallbacks.clear();
@@ -2671,6 +2672,7 @@ export const createAudioStage = () => {
       forgetOwnedSound(instance);
       cleanupSound(instance);
       sounds.delete(instance.internalId);
+      finishingCallbacks.forEach((callback) => callback());
     }, duration);
 
     return duration;
@@ -2805,7 +2807,12 @@ export const createAudioStage = () => {
     finishActiveSource();
   };
 
-  const updateSoundInstance = ({ instance, sound, effects }) => {
+  const updateSoundInstance = ({
+    instance,
+    sound,
+    effects,
+    replay = false,
+  }) => {
     const currentVolumeValue = getVolumeValue(instance);
     const nextVolumeValue = getVolumeValue(sound);
     const volumeChanged = currentVolumeValue !== nextVolumeValue;
@@ -2934,6 +2941,18 @@ export const createAudioStage = () => {
     }
 
     if (instance.control) {
+      if (replay) {
+        instance.pendingEnterTransitions = {
+          volume: getTransitionPhase(effects, sound.id, "volume", "enter"),
+          pan: getTransitionPhase(effects, sound.id, "pan", "enter"),
+          playbackRate: getTransitionPhase(
+            effects,
+            sound.id,
+            "playbackRate",
+            "enter",
+          ),
+        };
+      }
       acceptControlledCommand(instance, sound.playback);
       if (
         loopChanged &&
@@ -3237,6 +3256,11 @@ export const createAudioStage = () => {
 
     ensureRootChannel(ROOT_CHANNEL_ID);
     const acceptedTransitions = effectPlan.transitions;
+    const replayTargets = new Set(
+      effectPlan.accepted
+        .filter(({ lifecycle }) => lifecycle === "replay")
+        .map(({ effect }) => effect.targetId),
+    );
     const acceptedOwnershipByTarget = prepareEffectOwnership(effectPlan);
     const ownSound = (targetId, instance) => {
       if (instance) {
@@ -3430,6 +3454,7 @@ export const createAudioStage = () => {
           instance,
           sound: nextSound,
           effects: acceptedTransitions,
+          replay: replayTargets.has(id),
         });
         ownSound(id, instance);
       }

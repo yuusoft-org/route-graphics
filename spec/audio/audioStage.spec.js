@@ -3384,6 +3384,59 @@ describe("AudioStage graph rendering", () => {
     expect(stage._inspect().channels.has("music")).toBe(false);
   });
 
+  it("releases a removed loop-end channel when its detached exit effect settles", async () => {
+    const { stage } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 20 }]]),
+    });
+    const audio = [
+      {
+        id: "music",
+        type: "audio-channel",
+        interruption: "loopEnd",
+        children: [
+          {
+            id: "bgm",
+            type: "sound",
+            src: "theme",
+            loop: true,
+            volume: 80,
+          },
+        ],
+      },
+    ];
+    const audioEffects = [
+      {
+        id: "bgm-exit:visit-1",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: { exit: keyframePhase(0, 1000) },
+        },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: audio });
+    const sound = findCurrentSound(stage, "bgm");
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: audioEffects,
+    });
+
+    expect(sound.finishing).toBe(true);
+    expect(sound.finishingCallbacks.size).toBe(1);
+    expect(stage._inspect().channels.has("music")).toBe(true);
+
+    stage.renderGraph({
+      prevAudio: [],
+      nextAudio: [],
+      prevAudioEffects: audioEffects,
+    });
+
+    expect(stage._inspect().sounds.has(sound.internalId)).toBe(false);
+    expect(stage._inspect().channels.has("music")).toBe(false);
+  });
+
   it("settles an active retained update when its effect is removed", async () => {
     const { stage, context } = await setupAudioStage({
       contextOptions: { reflectScheduledAudioParamValue: false },

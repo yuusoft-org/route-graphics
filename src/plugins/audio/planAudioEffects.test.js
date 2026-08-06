@@ -146,6 +146,60 @@ describe("planAudioEffects", () => {
     expect(plan.superseded).toEqual([{ effect: first, ownership }]);
   });
 
+  it("treats startValue changes as effect supersession", () => {
+    const first = effect("handoff:1", {
+      volume: {
+        exit: phase(0),
+        enter: phase(80, { startValue: 0 }),
+      },
+    });
+    const changed = effect("handoff:1", {
+      volume: {
+        exit: phase(0),
+        enter: phase(80, { startValue: 20 }),
+      },
+    });
+    const ownership = {
+      effect: first,
+      signature: getAudioEffectSignature(first),
+      targetType: "sound",
+    };
+
+    const plan = planAudioEffects({
+      prevState: state([sound("track-a")], [first]),
+      nextState: state([sound("track-b")], [changed]),
+      ownedAudioEffects: new Map([[first.id, ownership]]),
+    });
+
+    expect(getAudioEffectSignature(changed)).not.toBe(ownership.signature);
+    expect(plan.accepted.map(({ effect: item }) => item)).toEqual([changed]);
+    expect(plan.superseded).toEqual([{ effect: first, ownership }]);
+  });
+
+  it("accepts enter automation for a fresh same-source play occurrence", () => {
+    const replay = effect("replay:2", {
+      volume: { enter: phase(80, { startValue: 0 }) },
+    });
+    const playback = (commandId) => ({
+      commandId,
+      operation: "play",
+      positionMs: 0,
+    });
+
+    const plan = planAudioEffects({
+      prevState: state([sound("track-a", { playback: playback(1) })]),
+      nextState: state([sound("track-a", { playback: playback(2) })], [replay]),
+    });
+
+    expect(plan.accepted).toMatchObject([
+      {
+        effect: replay,
+        lifecycle: "replay",
+        targetType: "sound",
+      },
+    ]);
+  });
+
   it("classifies omission without replacement as settlement", () => {
     const update = effect("update:1", {
       volume: { update: phase(40) },

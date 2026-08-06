@@ -1146,12 +1146,7 @@ describe("command-controlled sound playback", () => {
   });
 
   it("runs an enter effect once for same-source transport plays and again for a new occurrence", async () => {
-    const { context, render, stage } = await setupControlledStage({
-      assets: new Map([
-        ["track", { duration: 10 }],
-        ["next", { duration: 10 }],
-      ]),
-    });
+    const { context, render, stage } = await setupControlledStage();
     const enter = audioEffect("player-enter:1", {
       volume: {
         enter: {
@@ -1195,7 +1190,7 @@ describe("command-controlled sound playback", () => {
       firstInstance.gainNode.gain.linearRampToValueAtTime,
     ).toHaveBeenCalledTimes(1);
 
-    const replacementEnter = audioEffect("player-enter:2", {
+    const replayEnter = audioEffect("player-enter:2", {
       volume: {
         enter: {
           initialValue: 0,
@@ -1209,25 +1204,22 @@ describe("command-controlled sound playback", () => {
           commandId: 3,
           operation: "play",
           positionMs: 0,
-          src: "next",
           volume: 80,
         }),
       ],
-      replacementEnter,
+      replayEnter,
     );
     await flushMicrotasks();
 
-    const replacementKey = stage._inspect().currentSoundKeyById.get("player");
-    const replacement = stage._inspect().sounds.get(replacementKey);
-    expect(replacementKey).not.toBe(firstKey);
+    const replayKey = stage._inspect().currentSoundKeyById.get("player");
+    const replay = stage._inspect().sounds.get(replayKey);
+    expect(replayKey).toBe(firstKey);
     expect(context.sources).toHaveLength(3);
-    expect(replacement.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
-      0,
-      10,
+    expect(replay.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10);
+    expect(replay.gainNode.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0.8,
+      10.5,
     );
-    expect(
-      replacement.gainNode.gain.linearRampToValueAtTime,
-    ).toHaveBeenCalledWith(0.8, 10.5);
   });
 
   it("carries active playback-rate automation across a same-source transport restart", async () => {
