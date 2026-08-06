@@ -806,7 +806,7 @@ describe("animationBus auto tween shorthand", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps a pixel transform origin stable throughout scale tweens", () => {
+  it("keeps the transform pivot fixed in local coordinates during scale tweens", () => {
     const animationBus = createAnimationBus();
     const element = {
       x: 0,
@@ -849,13 +849,13 @@ describe("animationBus auto tween shorthand", () => {
 
     expect(element.scale.x).toBeCloseTo(1);
     expect(element.scale.y).toBeCloseTo(0.5);
-    expect(element.pivot.x * element.scale.x).toBeCloseTo(20);
-    expect(element.pivot.y * element.scale.y).toBeCloseTo(10);
+    expect(element.pivot.x).toBeCloseTo(40);
+    expect(element.pivot.y).toBeCloseTo(40);
 
     animationBus.tick(100);
 
-    expect(element.pivot.x * element.scale.x).toBeCloseTo(20);
-    expect(element.pivot.y * element.scale.y).toBeCloseTo(10);
+    expect(element.pivot.x).toBeCloseTo(40);
+    expect(element.pivot.y).toBeCloseTo(40);
   });
 
   it("applies property path mapping for blur tweens", () => {

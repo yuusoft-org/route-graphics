@@ -2,7 +2,7 @@ export const degreesToRadians = (degrees = 0) => (degrees * Math.PI) / 180;
 
 export const radiansToDegrees = (radians = 0) => (radians * 180) / Math.PI;
 
-const scaleAdjustedPivotValues = new WeakMap();
+const elementPivotValues = new WeakMap();
 
 const getFiniteScale = (scale) =>
   typeof scale === "number" && Number.isFinite(scale) && scale !== 0
@@ -15,16 +15,13 @@ export const getElementTransformPosition = (element) => ({
 });
 
 export const refreshElementPivot = (displayObject) => {
-  const pivotValues = scaleAdjustedPivotValues.get(displayObject);
+  const pivotValues = elementPivotValues.get(displayObject);
 
   if (!pivotValues) {
     return;
   }
 
-  const scaleX = getFiniteScale(displayObject.scale?.x);
-  const scaleY = getFiniteScale(displayObject.scale?.y);
-
-  displayObject.pivot?.set?.(pivotValues.x / scaleX, pivotValues.y / scaleY);
+  displayObject.pivot?.set?.(pivotValues.x, pivotValues.y);
 };
 
 export const applyElementPivot = (
@@ -36,10 +33,12 @@ export const applyElementPivot = (
   const originY = element.originY ?? 0;
   const pivotX = localOriginX ?? originX;
   const pivotY = localOriginY ?? originY;
+  const scaleX = getFiniteScale(displayObject.scale?.x);
+  const scaleY = getFiniteScale(displayObject.scale?.y);
 
-  scaleAdjustedPivotValues.set(displayObject, {
-    x: pivotX,
-    y: pivotY,
+  elementPivotValues.set(displayObject, {
+    x: pivotX / scaleX,
+    y: pivotY / scaleY,
   });
   refreshElementPivot(displayObject);
 };

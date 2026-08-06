@@ -1,4 +1,7 @@
-import { applyElementPivot, applyElementTransform } from "../util/transform.js";
+import {
+  applyElementTransform,
+  refreshElementPivot,
+} from "../util/transform.js";
 
 const animatedSpriteTransformStates = new WeakMap();
 
@@ -14,7 +17,7 @@ const ensureAnimatedSpriteTransformState = (animatedSprite, element) => {
 
     animatedSprite.onFrameChange = (currentFrame) => {
       state.previousFrameChangeHandler?.call(animatedSprite, currentFrame);
-      applyElementPivot(animatedSprite, state.element);
+      refreshElementPivot(animatedSprite);
     };
   } else {
     state.element = element;
@@ -33,9 +36,5 @@ export const applyAnimatedSpriteTransform = (animatedSprite, element) => {
 };
 
 export const refreshAnimatedSpritePivot = (animatedSprite) => {
-  const state = animatedSpriteTransformStates.get(animatedSprite);
-
-  if (state) {
-    applyElementPivot(animatedSprite, state.element);
-  }
+  refreshElementPivot(animatedSprite);
 };

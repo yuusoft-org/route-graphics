@@ -1,0 +1,105 @@
+---
+title: Sprite Anchor Scale Across Persistent Render
+description: |
+  A centered sprite should keep scaling around its anchor when a persistent
+  update tween is selected again by an unrelated render. The colored sprite
+  asset is used intentionally to make its bounds and center visible.
+specs:
+  - the sprite should remain centered on the white crosshair while scaling
+  - the scale tween should continue instead of restarting across the render
+  - the sprite should settle at its authored size without shifting its center
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 300
+  - action: screenshot
+  - action: customEvent
+    name: snapShotKeyFrame
+    detail:
+      deltaMS: 600
+  - action: screenshot
+---
+states:
+  - elements:
+      - &horizontal-guide
+        id: horizontal-guide
+        type: rect
+        x: 360
+        "y": 359
+        width: 560
+        height: 2
+        fill: "#FFFFFF"
+      - &vertical-guide
+        id: vertical-guide
+        type: rect
+        x: 639
+        "y": 80
+        width: 2
+        height: 560
+        fill: "#FFFFFF"
+      - &centered-sprite
+        id: centered-sprite
+        type: sprite
+        src: circle-blue
+        x: 640
+        "y": 360
+        width: 200
+        height: 200
+        anchorX: 0.5
+        anchorY: 0.5
+  - elements:
+      - *horizontal-guide
+      - *vertical-guide
+      - *centered-sprite
+    animations:
+      - id: centered-persistent-scale
+        targetId: centered-sprite
+        type: update
+        playback:
+          continuity: persistent
+        tween:
+          scaleX:
+            initialValue: 2
+            keyframes:
+              - duration: 1200
+                value: 1
+                easing: linear
+          scaleY:
+            initialValue: 2
+            keyframes:
+              - duration: 1200
+                value: 1
+                easing: linear
+  - elements:
+      - *horizontal-guide
+      - *vertical-guide
+      - *centered-sprite
+    animations:
+      - id: centered-persistent-scale
+        targetId: centered-sprite
+        type: update
+        playback:
+          continuity: persistent
+        tween:
+          scaleX:
+            initialValue: 2
+            keyframes:
+              - duration: 1200
+                value: 1
+                easing: linear
+          scaleY:
+            initialValue: 2
+            keyframes:
+              - duration: 1200
+                value: 1
+                easing: linear

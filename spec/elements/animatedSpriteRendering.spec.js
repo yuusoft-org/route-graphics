@@ -92,6 +92,7 @@ vi.mock("../../src/plugins/animations/planAnimations.js", () => ({
 import { addAnimatedSprite } from "../../src/plugins/elements/animated-sprite/addAnimatedSprite.js";
 import { updateAnimatedSprite } from "../../src/plugins/elements/animated-sprite/updateAnimatedSprite.js";
 import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
+import { applyElementTransform } from "../../src/plugins/elements/util/transform.js";
 import {
   cleanupDebugMode,
   setupDebugMode,
@@ -212,8 +213,8 @@ describe("spritesheet animation rendering", () => {
 
     sprite.onFrameChange(1);
 
-    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(20);
-    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(30);
+    expect(sprite.pivot.x).toBeCloseTo(20);
+    expect(sprite.pivot.y).toBeCloseTo(30);
     expect(sprite.x).toBe(333);
     expect(sprite.y).toBe(222);
     expect(sprite.rotation).toBe(1.25);
@@ -237,8 +238,8 @@ describe("spritesheet animation rendering", () => {
     animationBus.flush();
     animationBus.tick(100);
 
-    expect(sprite.pivot.x * sprite.scale.x).toBeCloseTo(20);
-    expect(sprite.pivot.y * sprite.scale.y).toBeCloseTo(30);
+    expect(sprite.pivot.x).toBeCloseTo(20);
+    expect(sprite.pivot.y).toBeCloseTo(30);
 
     const pivotBeforeFrameChange = {
       x: sprite.pivot.x,
@@ -295,6 +296,7 @@ describe("spritesheet animation rendering", () => {
     });
     animatedSpriteElement.x = prevElement.x + prevElement.originX;
     animatedSpriteElement.y = prevElement.y + prevElement.originY;
+    applyElementTransform(animatedSpriteElement, prevElement);
 
     await updateAnimatedSprite({
       app,
@@ -314,12 +316,8 @@ describe("spritesheet animation rendering", () => {
     animatedSpriteElement.scale.y = 0.25;
     animatedSpriteElement.onFrameChange(1);
 
-    expect(
-      animatedSpriteElement.pivot.x * animatedSpriteElement.scale.x,
-    ).toBeCloseTo(10);
-    expect(
-      animatedSpriteElement.pivot.y * animatedSpriteElement.scale.y,
-    ).toBeCloseTo(5);
+    expect(animatedSpriteElement.pivot.x).toBeCloseTo(10);
+    expect(animatedSpriteElement.pivot.y).toBeCloseTo(5);
     expect(animatedSpriteElement.x).toBe(30);
     expect(animatedSpriteElement.y).toBe(35);
 
