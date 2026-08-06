@@ -231,6 +231,12 @@ properties:
   originY:
     type: number
     description: Vertical transform origin in pixels from the text layout box's top edge. Defaults to the anchor-derived Y origin.
+  scaleX:
+    type: number
+    description: Horizontal scale. Negative values mirror the text reveal and zero collapses it.
+  scaleY:
+    type: number
+    description: Vertical scale. Negative values mirror the text reveal and zero collapses it.
   rotation:
     type: number
     description: Rotation in degrees

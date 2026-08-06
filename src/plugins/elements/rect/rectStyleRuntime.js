@@ -355,7 +355,9 @@ const addFillTargetState = (targetState, fill) => {
 };
 
 const removeBakedScale = (dimension, scale) =>
-  typeof scale === "number" && scale !== 0 ? dimension / scale : dimension;
+  typeof scale === "number" && scale !== 0
+    ? dimension / Math.abs(scale)
+    : dimension;
 
 export const getRectStyleTargetState = (
   element,

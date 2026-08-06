@@ -1,0 +1,151 @@
+---
+title: Text Revealing Negative Scale
+description: Asymmetric instant text verifies full scale magnitude, reflection, and centered anchors.
+specs:
+  - positive non-unit scale should enlarge text-revealing content exactly once
+  - negative scale should mirror the entire revealed layout around its anchor
+  - horizontal and vertical reflection signs should compose independently
+  - every anchor marker should remain fixed at the center of its scaled layout
+---
+states:
+  - elements:
+      - id: top-left-guide
+        type: rect
+        x: 310
+        "y": 205
+        width: 360
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#262626"
+      - id: top-right-guide
+        type: rect
+        x: 970
+        "y": 205
+        width: 360
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#262626"
+      - id: bottom-left-guide
+        type: rect
+        x: 310
+        "y": 515
+        width: 270
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#262626"
+      - id: bottom-right-guide
+        type: rect
+        x: 970
+        "y": 515
+        width: 270
+        height: 120
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#262626"
+      - id: positive-scale
+        type: text-revealing
+        x: 310
+        "y": 205
+        width: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: 2
+        scaleY: 1.5
+        revealEffect: none
+        content:
+          - text: "LEFT  →  RIGHT\nTOP  /  bottom"
+            textStyle:
+              fontFamily: Arial
+              fontSize: 24
+              lineHeight: 1.2
+              fill: "#FFFFFF"
+      - id: negative-x
+        type: text-revealing
+        x: 970
+        "y": 205
+        width: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -2
+        scaleY: 1.5
+        revealEffect: none
+        content:
+          - text: "LEFT  →  RIGHT\nTOP  /  bottom"
+            textStyle:
+              fontFamily: Arial
+              fontSize: 24
+              lineHeight: 1.2
+              fill: "#FFFFFF"
+      - id: negative-y
+        type: text-revealing
+        x: 310
+        "y": 515
+        width: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: 1.5
+        scaleY: -1.5
+        revealEffect: none
+        content:
+          - text: "LEFT  →  RIGHT\nTOP  /  bottom"
+            textStyle:
+              fontFamily: Arial
+              fontSize: 24
+              lineHeight: 1.2
+              fill: "#FFFFFF"
+      - id: negative-both
+        type: text-revealing
+        x: 970
+        "y": 515
+        width: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1.5
+        scaleY: -1.5
+        revealEffect: none
+        content:
+          - text: "LEFT  →  RIGHT\nTOP  /  bottom"
+            textStyle:
+              fontFamily: Arial
+              fontSize: 24
+              lineHeight: 1.2
+              fill: "#FFFFFF"
+      - id: top-left-anchor
+        type: rect
+        x: 310
+        "y": 205
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"
+      - id: top-right-anchor
+        type: rect
+        x: 970
+        "y": 205
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"
+      - id: bottom-left-anchor
+        type: rect
+        x: 310
+        "y": 515
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"
+      - id: bottom-right-anchor
+        type: rect
+        x: 970
+        "y": 515
+        width: 8
+        height: 8
+        anchorX: 0.5
+        anchorY: 0.5
+        fill: "#737373"

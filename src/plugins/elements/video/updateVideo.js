@@ -22,6 +22,7 @@ import {
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
 import {
+  hasManagedVideoTextureDimensions,
   registerManagedVideoSprite,
   requestManagedVideoTextureUpdate,
   setManagedVideoSpriteResizeHandler,
@@ -29,9 +30,10 @@ import {
 } from "./managedVideoTextureSizing.js";
 import { setElementRenderState } from "../elementRenderState.js";
 import {
-  applyElementPivot,
+  applyElementScaleAndPivot,
   applyElementTransform,
   getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
 } from "../util/transform.js";
 
 /**
@@ -44,11 +46,11 @@ export const updateVideo = ({
   nextElement,
   animations,
   animationBus,
-  eventHandler,
   completionTracker,
   zIndex,
   deferRenderStateCommit,
   commitRenderState,
+  signal,
 }) => {
   const videoElement = parent.children.find(
     (child) => child.label === prevElement.id,
@@ -58,8 +60,12 @@ export const updateVideo = ({
 
   videoElement.zIndex = zIndex;
   let managedTransformElement = prevElement;
+  let handleManagedTextureResize = () => {};
   setManagedVideoSpriteResizeHandler(videoElement, () => {
-    applyElementPivot(videoElement, managedTransformElement);
+    applyElementScaleAndPivot(videoElement, managedTransformElement, {
+      preserveScaleMagnitude: true,
+    });
+    handleManagedTextureResize();
   });
 
   const { width, height, alpha } = nextElement;
@@ -97,6 +103,11 @@ export const updateVideo = ({
     liveAnimations.some((animation) =>
       Object.prototype.hasOwnProperty.call(animation.tween ?? {}, property),
     );
+  const needsStableAutoScaleTarget = liveAnimations.some(
+    (animation) =>
+      animation.tween?.scaleX?.auto !== undefined ||
+      animation.tween?.scaleY?.auto !== undefined,
+  );
 
   const syncVideoResource = () => {
     let activeVideo = videoElement.texture.source.resource;
@@ -116,7 +127,9 @@ export const updateVideo = ({
 
       const newTexture = Texture.from(nextElement.src);
       videoElement.texture = newTexture;
-      applyElementPivot(videoElement, managedTransformElement);
+      applyElementScaleAndPivot(videoElement, managedTransformElement, {
+        preserveScaleMagnitude: true,
+      });
       unregisterManagedVideoSprite(videoElement, oldSource);
       registerManagedVideoSprite(videoElement);
       activeVideo = newTexture.source.resource;
@@ -149,7 +162,9 @@ export const updateVideo = ({
     if (!isDeepEqual(prevElement, nextElement)) {
       videoElement.width = Math.round(width);
       videoElement.height = Math.round(height);
-      applyElementTransform(videoElement, nextElement);
+      applyElementTransform(videoElement, nextElement, {
+        preserveScaleMagnitude: true,
+      });
       videoElement.alpha = alpha ?? 1;
       syncBlurEffect(videoElement, nextElement.blur, {
         force: shouldForceBlur,
@@ -181,30 +196,113 @@ export const updateVideo = ({
     videoElement.height = Math.round(
       hasLiveAnimationTween("height") ? currentHeight : height,
     );
-    applyElementPivot(videoElement, managedTransformElement);
+    applyElementScaleAndPivot(videoElement, managedTransformElement, {
+      preserveScaleMagnitude: true,
+    });
     didSyncResourceBeforeAnimation = true;
   }
 
-  const dispatched = dispatchLiveAnimations({
-    animations,
-    targetId: prevElement.id,
-    animationBus,
-    completionTracker,
-    element: videoElement,
-    targetState: {
-      ...getElementTransformTargetState(nextElement),
+  const targetState = {
+    ...getElementTransformTargetState(nextElement),
+    ...getTextureBackedScaleTargetState(videoElement, nextElement, {
       width,
       height,
-      alpha: alpha ?? 1,
-      ...getBlurTargetState(nextElement, {
-        force: shouldForceBlur,
+    }),
+    width,
+    height,
+    alpha: alpha ?? 1,
+    ...getBlurTargetState(nextElement, {
+      force: shouldForceBlur,
+    }),
+    ...getShaderFilterTargetState(nextElement, {
+      force: shouldForceShaderProgress,
+    }),
+  };
+  let waitingForTextureDimensions = false;
+  let textureWaitVersion;
+  const activeVideo = videoElement.texture?.source?.resource;
+
+  const refreshScaleTargetState = () => {
+    Object.assign(
+      targetState,
+      getTextureBackedScaleTargetState(videoElement, nextElement, {
+        width,
+        height,
       }),
-      ...getShaderFilterTargetState(nextElement, {
-        force: shouldForceShaderProgress,
-      }),
-    },
-    onComplete: updateElement,
-  });
+    );
+  };
+
+  const releaseTextureWait = () => {
+    if (!waitingForTextureDimensions) return;
+    waitingForTextureDimensions = false;
+    signal?.removeEventListener?.("abort", cancelTextureWait);
+    activeVideo?.removeEventListener?.("error", failTextureWait);
+    completionTracker?.complete?.(textureWaitVersion);
+  };
+
+  const cancelTextureWait = () => {
+    releaseTextureWait();
+  };
+
+  const failTextureWait = () => {
+    try {
+      if (!signal?.aborted && !videoElement.destroyed) {
+        updateElement();
+      }
+    } finally {
+      releaseTextureWait();
+    }
+  };
+
+  const dispatchAnimations = () => {
+    if (signal?.aborted || videoElement.destroyed) {
+      releaseTextureWait();
+      return false;
+    }
+
+    refreshScaleTargetState();
+    try {
+      return dispatchLiveAnimations({
+        animations,
+        targetId: prevElement.id,
+        animationBus,
+        completionTracker,
+        element: videoElement,
+        targetState,
+        onComplete: updateElement,
+      });
+    } finally {
+      releaseTextureWait();
+    }
+  };
+
+  handleManagedTextureResize = () => {
+    refreshScaleTargetState();
+    if (
+      waitingForTextureDimensions &&
+      hasManagedVideoTextureDimensions(videoElement)
+    ) {
+      dispatchAnimations();
+    }
+  };
+
+  requestManagedVideoTextureUpdate(videoElement);
+
+  if (
+    needsStableAutoScaleTarget &&
+    !hasManagedVideoTextureDimensions(videoElement)
+  ) {
+    waitingForTextureDimensions = true;
+    textureWaitVersion = completionTracker?.getVersion?.();
+    completionTracker?.track?.(textureWaitVersion);
+    signal?.addEventListener?.("abort", cancelTextureWait, { once: true });
+    activeVideo?.addEventListener?.("error", failTextureWait, { once: true });
+    videoElement.once?.("destroyed", cancelTextureWait);
+    deferRenderStateCommit?.();
+    return;
+  }
+
+  const dispatched = dispatchAnimations();
 
   if (!dispatched) {
     // No animations, update immediately

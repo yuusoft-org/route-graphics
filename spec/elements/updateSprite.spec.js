@@ -293,6 +293,76 @@ describe("updateSprite", () => {
     );
   });
 
+  it("dispatches auto scale tweens to the signed post-sizing display scale", () => {
+    const spriteElement = {
+      label: "sprite-1",
+      texture: { orig: { width: 50, height: 25 } },
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 50,
+      scale: { x: -2, y: 2 },
+      alpha: 1,
+      zIndex: 0,
+      removeAllListeners: vi.fn(),
+      on: vi.fn(),
+    };
+    const animationBus = { dispatch: vi.fn() };
+    const prevElement = {
+      id: "sprite-1",
+      type: "sprite",
+      src: "sprite",
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 50,
+      scaleX: -1,
+      alpha: 1,
+    };
+    const nextElement = {
+      ...prevElement,
+      width: 200,
+      height: 100,
+    };
+
+    updateSprite({
+      app: { audioStage: { add: vi.fn() } },
+      parent: { children: [spriteElement] },
+      prevElement,
+      nextElement,
+      animations: [
+        {
+          id: "sprite-scale-auto",
+          targetId: "sprite-1",
+          type: "update",
+          tween: {
+            scaleX: { auto: { duration: 300 } },
+            scaleY: { auto: { duration: 300 } },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      eventHandler: vi.fn(),
+      zIndex: 4,
+    });
+
+    expect(animationBus.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          targetState: expect.objectContaining({
+            scaleX: -4,
+            scaleY: 4,
+          }),
+        }),
+      }),
+    );
+  });
+
   it("uses explicit origin independently from anchor when applying rotation", () => {
     const spriteElement = {
       label: "sprite-1",

@@ -29,6 +29,40 @@ const createSharedParams = () => ({
 });
 
 describe("text rich content", () => {
+  it("renders rich text with the full authored scale and unscaled layout box", () => {
+    const parent = new Container();
+    const element = parseText({
+      state: {
+        id: "scaled-rich-text",
+        type: "text",
+        x: 200,
+        y: 100,
+        width: 160,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        scaleX: -2,
+        scaleY: 1.5,
+        content: [{ text: "Scaled" }, { text: " rich text" }],
+      },
+    });
+
+    addText({
+      ...createSharedParams(),
+      parent,
+      element,
+      zIndex: 0,
+    });
+
+    const text = parent.getChildByLabel("scaled-rich-text");
+
+    expect(element.width).toBe(320);
+    expect(text.scale.x).toBe(-2);
+    expect(text.scale.y).toBe(1.5);
+    expect(text.hitArea.width).toBe(160);
+    expect(text.pivot.x * text.scale.x).toBeCloseTo(element.originX);
+    expect(text.pivot.y * text.scale.y).toBeCloseTo(element.originY);
+  });
+
   it("resyncs an existing split-text container after source layout updates", () => {
     const parent = new Container();
     const shared = createSharedParams();

@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 import { addRect } from "../../src/plugins/elements/rect/addRect.js";
 import { updateRect } from "../../src/plugins/elements/rect/updateRect.js";
+import { rectPlugin } from "../../src/plugins/elements/rect/index.js";
 import { parseRect } from "../../src/plugins/elements/rect/parseRect.js";
 import { getRectStyleAnimationValue } from "../../src/plugins/elements/rect/rectStyleRuntime.js";
+import { renderElements } from "../../src/plugins/elements/renderElements.js";
 import { normalizeAnimations } from "../../src/util/normalizeAnimations.js";
 
 const app = {
@@ -331,6 +333,87 @@ describe("rect style animation", () => {
     expect(rect.scale.x).toBe(1);
     expect(rect.scale.y).toBe(1);
   });
+
+  it.each([1, -1])(
+    "restores authored reflection signs and baked geometry after a transient scale tween ending at %s",
+    (transientScale) => {
+      const parent = new Container();
+      const animationBus = createAnimationBus();
+      const element = createRect({
+        width: 100,
+        height: 80,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        scaleX: -2,
+        scaleY: -0.5,
+      });
+      const rect = mountRect(parent, element, animationBus);
+      const animations = normalizeAnimations([
+        {
+          id: "transient-sign",
+          targetId: "panel",
+          type: "update",
+          tween: {
+            scaleX: {
+              initialValue: -2,
+              keyframes: [
+                { duration: 100, value: transientScale, easing: "linear" },
+              ],
+            },
+            scaleY: {
+              initialValue: -0.5,
+              keyframes: [
+                { duration: 100, value: transientScale, easing: "linear" },
+              ],
+            },
+          },
+        },
+      ]);
+
+      updateRect({
+        app,
+        parent,
+        prevElement: element,
+        nextElement: element,
+        animations,
+        animationBus,
+        completionTracker,
+        eventHandler: vi.fn(),
+        zIndex: 0,
+      });
+      animationBus.flush();
+      animationBus.tick(100);
+
+      expect(rect.scale.x).toBe(transientScale);
+      expect(rect.scale.y).toBe(transientScale);
+      expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(100);
+      expect(getRectStyleAnimationValue(rect, "rect.height")).toBe(80);
+
+      renderElements({
+        app,
+        parent,
+        prevComputedTree: [element],
+        nextComputedTree: [element],
+        animations: [],
+        animationBus,
+        completionTracker,
+        eventHandler: vi.fn(),
+        elementPlugins: [rectPlugin],
+        signal: new AbortController().signal,
+      });
+
+      expect(rect.scale.x).toBe(-1);
+      expect(rect.scale.y).toBe(-1);
+      expect(getRectStyleAnimationValue(rect, "rect.width")).toBe(
+        element.width,
+      );
+      expect(getRectStyleAnimationValue(rect, "rect.height")).toBe(
+        element.height,
+      );
+      expect(rect.pivot.x * rect.scale.x).toBeCloseTo(element.originX);
+      expect(rect.pivot.y * rect.scale.y).toBeCloseTo(element.originY);
+    },
+  );
 
   it("reveals an authored zero-width border without losing its styling", () => {
     const parent = new Container();

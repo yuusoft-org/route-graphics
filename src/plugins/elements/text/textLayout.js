@@ -17,6 +17,9 @@ const getAnchorRatio = (size, origin) => {
 
 const getTextAlign = (style) => style?.align ?? DEFAULT_TEXT_STYLE.align;
 
+const getAuthoredLayoutWidth = (textComputedNode) =>
+  textComputedNode.__layoutWidth ?? textComputedNode.width;
+
 const getLayoutWidth = (textElement) => {
   const layoutState = textElement[TEXT_LAYOUT_STATE];
 
@@ -53,9 +56,15 @@ const getRuntimeTextLayout = (textElement, style) => {
     return measureTextLayout(textElement.text, style);
   }
 
+  const scaleX = Math.abs(textElement.scale?.x);
+  const scaleY = Math.abs(textElement.scale?.y);
+  if (!(scaleX > 0) || !(scaleY > 0)) {
+    return measureTextLayout(textElement.text, style);
+  }
+
   return {
-    width: textElement.width,
-    height: textElement.height,
+    width: Math.abs(textElement.width) / scaleX,
+    height: Math.abs(textElement.height) / scaleY,
   };
 };
 
@@ -93,7 +102,9 @@ const setTextLayoutState = (textElement, textComputedNode, measurements) => {
 
   textElement[TEXT_LAYOUT_STATE] = {
     fixedWidth,
-    layoutWidth: fixedWidth ? textComputedNode.width : measuredWidth,
+    layoutWidth: fixedWidth
+      ? getAuthoredLayoutWidth(textComputedNode)
+      : measuredWidth,
     measuredWidth,
     measuredHeight,
   };
@@ -144,6 +155,7 @@ const applyTextElementTransform = (
   applyElementTransform(textElement, transformedElement, {
     localOriginX: originX - offsetX,
     localOriginY: originY,
+    scaleMode: "full",
   });
 
   textElement[TEXT_TRANSFORM_STATE] = {
@@ -194,8 +206,9 @@ export const syncTextAnchorRatios = (textElement, textComputedNode) => {
     textComputedNode.textStyle,
   );
   const width =
-    textComputedNode.__fixedWidth && typeof textComputedNode.width === "number"
-      ? textComputedNode.width
+    textComputedNode.__fixedWidth &&
+    typeof getAuthoredLayoutWidth(textComputedNode) === "number"
+      ? getAuthoredLayoutWidth(textComputedNode)
       : measurements.width;
   const height = measurements.height;
   const anchorXRatio =
@@ -315,8 +328,8 @@ export const positionTextInLayoutBox = (textElement, textComputedNode) => {
   applyTextElementTransform(textElement, textComputedNode, {
     layoutWidth:
       textComputedNode.__fixedWidth &&
-      typeof textComputedNode.width === "number"
-        ? textComputedNode.width
+      typeof getAuthoredLayoutWidth(textComputedNode) === "number"
+        ? getAuthoredLayoutWidth(textComputedNode)
         : measuredWidth,
     measuredWidth,
     measuredHeight: getMeasuredHeight(textElement),

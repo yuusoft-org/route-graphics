@@ -4,9 +4,9 @@ import {
   getLiveAnimations,
 } from "../../animations/planAnimations.js";
 import {
+  applyElementPivot,
   applyElementTransform,
   getElementTransformTargetState,
-  refreshElementPivot,
 } from "../util/transform.js";
 import {
   getBlurTargetState,
@@ -24,10 +24,31 @@ import { setElementRenderState } from "../elementRenderState.js";
 import { drawRectVisual } from "./rectDrawing.js";
 import { bindRectInteractions } from "./rectInteractions.js";
 import {
+  RECT_STYLE_STATE_KEY,
   getRectStyleTargetState,
   installRectStyleRuntime,
   syncRectStyleRuntime,
 } from "./rectStyleRuntime.js";
+
+export const shouldRestoreStaticRectTransform = ({ parent, nextElement }) => {
+  const rectElement = parent.children.find(
+    (child) => child.label === nextElement.id,
+  );
+
+  if (!rectElement) {
+    return false;
+  }
+
+  const styleRuntime = rectElement[RECT_STYLE_STATE_KEY];
+
+  return (
+    rectElement.scale.x !== Math.sign(nextElement.scaleX ?? 1) ||
+    rectElement.scale.y !== Math.sign(nextElement.scaleY ?? 1) ||
+    (styleRuntime !== undefined &&
+      (styleRuntime.state.width !== nextElement.width ||
+        styleRuntime.state.height !== nextElement.height))
+  );
+};
 
 /**
  * Update rectangle element (synchronous)
@@ -119,40 +140,55 @@ export const updateRect = ({
     liveScaleX,
     liveScaleY,
   });
-  const hasBakedWidth =
+  const authoredScaleX = prevElement.scaleX ?? 1;
+  const authoredScaleY = prevElement.scaleY ?? 1;
+  const staticScaleX = Math.sign(authoredScaleX);
+  const staticScaleY = Math.sign(authoredScaleY);
+  const shouldUnbakeWidth =
     liveScaleX &&
-    rectElement.scale.x === 1 &&
-    rectStyleRuntime.state.width === prevElement.width;
-  const hasBakedHeight =
+    Math.abs(authoredScaleX) > 0 &&
+    rectStyleRuntime.state.width === prevElement.width &&
+    rectStyleRuntime.state.width !== rectStyleStartState["rect.width"];
+  const shouldUnbakeHeight =
     liveScaleY &&
-    rectElement.scale.y === 1 &&
-    rectStyleRuntime.state.height === prevElement.height;
-  const shouldFlattenWidth = !liveScaleX && rectElement.scale.x !== 1;
-  const shouldFlattenHeight = !liveScaleY && rectElement.scale.y !== 1;
+    Math.abs(authoredScaleY) > 0 &&
+    rectStyleRuntime.state.height === prevElement.height &&
+    rectStyleRuntime.state.height !== rectStyleStartState["rect.height"];
+  const shouldBakeWidth =
+    !liveScaleX &&
+    (rectStyleRuntime.state.width !== prevElement.width ||
+      rectElement.scale.x !== staticScaleX);
+  const shouldBakeHeight =
+    !liveScaleY &&
+    (rectStyleRuntime.state.height !== prevElement.height ||
+      rectElement.scale.y !== staticScaleY);
 
   if (
-    hasBakedWidth ||
-    hasBakedHeight ||
-    shouldFlattenWidth ||
-    shouldFlattenHeight
+    shouldUnbakeWidth ||
+    shouldUnbakeHeight ||
+    shouldBakeWidth ||
+    shouldBakeHeight
   ) {
     rectStyleRuntime.beginBatch();
-    if (shouldFlattenWidth) {
-      rectElement.scale.x = 1;
+    if (shouldBakeWidth) {
+      rectElement.scale.x = staticScaleX;
       rectStyleRuntime["rect.width"] = prevElement.width;
-    } else if (hasBakedWidth) {
-      rectElement.scale.x = prevElement.scaleX ?? 1;
+    } else if (shouldUnbakeWidth) {
+      rectElement.scale.x *= Math.abs(authoredScaleX);
       rectStyleRuntime["rect.width"] = rectStyleStartState["rect.width"];
     }
-    if (shouldFlattenHeight) {
-      rectElement.scale.y = 1;
+    if (shouldBakeHeight) {
+      rectElement.scale.y = staticScaleY;
       rectStyleRuntime["rect.height"] = prevElement.height;
-    } else if (hasBakedHeight) {
-      rectElement.scale.y = prevElement.scaleY ?? 1;
+    } else if (shouldUnbakeHeight) {
+      rectElement.scale.y *= Math.abs(authoredScaleY);
       rectStyleRuntime["rect.height"] = rectStyleStartState["rect.height"];
     }
-    refreshElementPivot(rectElement);
     rectStyleRuntime.endBatch();
+    applyElementPivot(rectElement, prevElement, {
+      baseScaleX: liveScaleX ? authoredScaleX : staticScaleX,
+      baseScaleY: liveScaleY ? authoredScaleY : staticScaleY,
+    });
   }
   const targetState = getElementTransformTargetState(nextElement, { alpha });
 

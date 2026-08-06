@@ -51,6 +51,8 @@ out:
   "y": 200
   originX: 48
   originY: 40
+  scaleX: 1.2
+  scaleY: 0.8
   alpha: 0.8
   rotation: 45
   blur:
@@ -125,6 +127,8 @@ out:
   "y": 200
   originX: 48
   originY: 40
+  scaleX: 1.2
+  scaleY: 0.8
   alpha: 1
   rotation: 0
   src: ""

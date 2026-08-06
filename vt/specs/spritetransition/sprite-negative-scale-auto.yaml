@@ -1,0 +1,78 @@
+---
+title: Sprite Negative Scale Auto Transition
+description: An asymmetric texture verifies that auto scale targets retain authored dimensions and signs.
+specs:
+  - the mirrored sprite should grow from 160 by 90 to 320 by 270
+  - the halfway frame should remain centered and measure approximately 240 by 180
+  - the final frame should preserve the authored negative horizontal sign
+  - auto scale should not settle at the texture's 1280 by 720 native size
+steps:
+  - action: keypress
+    key: "n"
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+  - action: customEvent
+    name: "snapShotKeyFrame"
+    detail:
+      deltaMS: 500
+  - action: screenshot
+---
+states:
+  - elements:
+      - &horizontal-guide
+        id: horizontal-guide
+        type: rect
+        x: 430
+        "y": 359
+        width: 420
+        height: 2
+        fill: "#FFFFFF"
+      - &vertical-guide
+        id: vertical-guide
+        type: rect
+        x: 639
+        "y": 190
+        width: 2
+        height: 340
+        fill: "#FFFFFF"
+      - id: mirrored-sprite
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 640
+        "y": 360
+        width: 320
+        height: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -0.5
+        scaleY: 0.5
+  - elements:
+      - *horizontal-guide
+      - *vertical-guide
+      - id: mirrored-sprite
+        type: sprite
+        src: sprite-mask-asym-incoming
+        x: 640
+        "y": 360
+        width: 320
+        height: 180
+        anchorX: 0.5
+        anchorY: 0.5
+        scaleX: -1
+        scaleY: 1.5
+    animations:
+      - id: signed-auto-scale
+        targetId: mirrored-sprite
+        type: update
+        tween:
+          scaleX:
+            auto:
+              duration: 1000
+              easing: linear
+          scaleY:
+            auto:
+              duration: 1000
+              easing: linear

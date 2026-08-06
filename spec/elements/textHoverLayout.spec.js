@@ -1,6 +1,9 @@
 import { Container } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
-import { addText } from "../../src/plugins/elements/text/addText.js";
+import {
+  addText,
+  getTextAnimationTargetState,
+} from "../../src/plugins/elements/text/addText.js";
 import { parseText } from "../../src/plugins/elements/text/parseText.js";
 import { getTextLayoutPosition } from "../../src/plugins/elements/text/textLayout.js";
 import { updateText } from "../../src/plugins/elements/text/updateText.js";
@@ -31,6 +34,44 @@ const getWorldPivotPosition = (displayObject) =>
   getWorldPosition(displayObject, displayObject.pivot);
 
 describe("text hover layout", () => {
+  it("renders the full authored scale magnitude around the text anchor", () => {
+    const parent = new Container();
+    const element = parseText({
+      state: {
+        id: "scaled-text",
+        type: "text",
+        x: 240,
+        y: 120,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        scaleX: -2,
+        scaleY: 1.5,
+        content: "Scaled text",
+        textStyle: { fontFamily: "Arial", fontSize: 24 },
+      },
+    });
+
+    addText({
+      ...createSharedParams(),
+      parent,
+      zIndex: 0,
+      element,
+    });
+
+    const text = parent.getChildByLabel("scaled-text");
+
+    expect(text.scale.x).toBe(-2);
+    expect(text.scale.y).toBe(1.5);
+    expect(Math.abs(text.width - element.width)).toBeLessThan(1);
+    expect(Math.abs(text.height - element.height)).toBeLessThan(1);
+    expect(text.pivot.x * text.scale.x).toBeCloseTo(element.originX);
+    expect(text.pivot.y * text.scale.y).toBeCloseTo(element.originY);
+    expect(getTextAnimationTargetState(element)).toMatchObject({
+      scaleX: -2,
+      scaleY: 1.5,
+    });
+  });
+
   it("applies degree rotation around an explicit text origin", () => {
     const parent = new Container();
     const element = parseText({

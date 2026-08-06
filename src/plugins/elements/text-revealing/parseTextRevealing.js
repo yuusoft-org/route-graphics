@@ -689,7 +689,8 @@ export const parseTextRevealing = ({ state }) => {
       ),
     }),
     ...(revealSound && { revealSound }),
-    ...(state.width !== undefined && { width: state.width }),
+    ...(state.scaleX !== undefined && { scaleX: state.scaleX }),
+    ...(state.scaleY !== undefined && { scaleY: state.scaleY }),
     ...(state.complete && { complete: state.complete }),
   };
 };

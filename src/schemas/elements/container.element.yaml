@@ -40,6 +40,12 @@ properties:
   originY:
     type: number
     description: Vertical transform origin in pixels from the container's top edge. Defaults to the anchor-derived Y origin.
+  scaleX:
+    type: number
+    description: Horizontal scale for the container subtree. Negative values mirror the group and zero collapses it.
+  scaleY:
+    type: number
+    description: Vertical scale for the container subtree. Negative values mirror the group and zero collapses it.
   alpha:
     type: number
     description: Opacity/transparency of the container (0-1)
