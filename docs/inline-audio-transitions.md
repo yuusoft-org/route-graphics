@@ -2,7 +2,7 @@
 
 Status: implemented
 
-Last updated: 2026-08-02
+Last updated: 2026-08-06
 
 ## Purpose
 
@@ -10,6 +10,11 @@ This document defines the canonical inline transition interface on `sound` and
 `audio-channel` nodes. Separately authored `audio-transition` records remain
 accepted as a legacy compatibility interface documented in
 [`audio-effects.md`](./audio-effects.md).
+
+> **Accepted future extension:** [`Keyframe Start Value Design`](./keyframe-start-value-design.md)
+> defines optional keyframe-level `startValue` semantics shared with compact
+> visual tweens. It is not implemented; the current audio schema and runtime
+> continue to accept only the endpoint-style keyframes described below.
 
 ## Goals
 

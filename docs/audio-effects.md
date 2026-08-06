@@ -1,11 +1,15 @@
 # Audio Channel Design
 
-Last updated: 2026-07-15
+Last updated: 2026-08-06
 
 > **Design proposal:** [`Inline Audio Transition Interface`](./inline-audio-transitions.md)
 > defines a proposed inline replacement for separately authored
 > `audio-transition` records. It is not implemented. The interface documented
 > below remains the current runtime contract.
+
+> **Accepted future extension:** [`Keyframe Start Value Design`](./keyframe-start-value-design.md)
+> defines optional keyframe-level `startValue` semantics for both canonical
+> inline transitions and the legacy interface below. It is not implemented.
 
 This document defines the channel-based audio interface for Route Graphics
 render state.

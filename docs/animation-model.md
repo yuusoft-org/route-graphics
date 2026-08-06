@@ -1,11 +1,12 @@
 # Animation Model
 
-Last updated: 2026-08-01
+Last updated: 2026-08-06
 
 See also:
 
 - `docs/animation-type-semantics.md`
 - `docs/animation-implementation-plan.md`
+- `docs/keyframe-start-value-design.md`
 - `docs/portable-gsap-timelines.md`
 - `docs/shader-interface.md`
 
@@ -183,6 +184,11 @@ Use it for:
 The missing side is treated as transparent.
 
 ## Tween Payload
+
+> **Accepted future extension:** `docs/keyframe-start-value-design.md` defines
+> optional keyframe-level `startValue` semantics for an explicit segment start.
+> It is not implemented; the current schema and runtime continue to accept only
+> the endpoint-style keyframes described below.
 
 The existing keyframe format stays the standard:
 
