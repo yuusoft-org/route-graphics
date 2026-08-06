@@ -282,6 +282,8 @@ const createRouteGraphics = () => {
     animations: [],
     audio: [],
     audioEffects: [],
+    audioAnimations: [],
+    audioMasters: [],
   };
 
   /**
@@ -1220,6 +1222,9 @@ const createRouteGraphics = () => {
       nextAudio: nextState.audio,
       prevAudioEffects: state.audioEffects,
       nextAudioEffects: nextState.audioEffects,
+      audioAnimations: nextState.audioAnimations,
+      audioMasters: nextState.audioMasters,
+      audioAnimationControl: nextState.audioAnimationControl,
     });
 
     const continuityPlan = buildAnimationContinuityPlan({
@@ -1275,6 +1280,9 @@ const createRouteGraphics = () => {
       nextAudioTree: nextState.audio,
       prevAudioEffects: state.audioEffects,
       nextAudioEffects: nextState.audioEffects,
+      audioAnimations: nextState.audioAnimations,
+      audioMasters: nextState.audioMasters,
+      audioAnimationControl: nextState.audioAnimationControl,
       audioPlugins: plugins.audio,
       eventHandler: handler,
     });

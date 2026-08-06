@@ -268,3 +268,116 @@ describe("inline audio transition normalization", () => {
     ).toThrow('is not supported for node type "audio-channel"');
   });
 });
+
+describe("next-render audio animation normalization", () => {
+  const previousChannel = {
+    id: "music",
+    type: "audio-channel",
+    volume: 40,
+    pan: -0.5,
+    children: [{ id: "bgm", type: "sound", src: "old-theme" }],
+  };
+  const nextChannel = {
+    id: "music",
+    type: "audio-channel",
+    volume: 80,
+    pan: 0.5,
+    children: [{ id: "bgm", type: "sound", src: "new-theme" }],
+  };
+  const transition = {
+    id: "handoff-7",
+    occurrenceId: "engine-1:g2:l4:bgm7",
+    type: "transition",
+    targetId: "music",
+    prev: { channel: previousChannel, fade: track(0) },
+    next: {
+      channel: nextChannel,
+      fade: { initialValue: 0, ...track(100) },
+    },
+  };
+
+  it("normalizes immutable handoff snapshots, runtime masters, and settlement", () => {
+    const normalized = normalizeAudioRenderState({
+      audio: [nextChannel],
+      audioAnimations: [transition],
+      audioMasters: [{ id: "music", volume: 55, muted: true }],
+      audioAnimationControl: { commandId: 8, operation: "settle" },
+    });
+
+    expect(normalized.audioAnimations[0]).toMatchObject({
+      id: "handoff-7",
+      occurrenceId: "engine-1:g2:l4:bgm7",
+      type: "transition",
+      targetId: "music",
+    });
+    expect(
+      normalized.audioAnimations[0].prev.channel.children[0],
+    ).toMatchObject({ id: "bgm", src: "old-theme", volume: 100 });
+    expect(normalized.audioMasters).toEqual([
+      { id: "music", volume: 55, muted: true },
+    ]);
+    expect(normalized.audioAnimationControl).toEqual({
+      commandId: 8,
+      operation: "settle",
+    });
+  });
+
+  it("normalizes retained updates and requires the declared endpoint", () => {
+    const normalized = normalizeAudioRenderState({
+      audio: [{ ...previousChannel, volume: 20 }],
+      audioAnimations: [
+        {
+          id: "update-2",
+          occurrenceId: "engine-1:g2:l5:bgm8",
+          type: "update",
+          targetId: "music",
+          tween: { volume: track(20) },
+        },
+      ],
+    });
+
+    expect(normalized.audioAnimations[0].tween.volume).toEqual(track(20));
+    expect(() =>
+      normalizeAudioRenderState({
+        audio: [{ ...previousChannel, volume: 20 }],
+        audioAnimations: [
+          {
+            id: "update-3",
+            occurrenceId: "engine-1:g2:l5:bgm9",
+            type: "update",
+            targetId: "music",
+            tween: { volume: track(10) },
+          },
+        ],
+      }),
+    ).toThrow("must end at the node's declared volume value 20");
+  });
+
+  it.each([
+    [
+      "a next snapshot that differs from the render graph",
+      { ...transition, next: { ...transition.next, channel: previousChannel } },
+      "next render-state channel snapshot",
+    ],
+    [
+      "a previous fade that does not end at silence",
+      { ...transition, prev: { ...transition.prev, fade: track(10) } },
+      "prev.fade must end at 0",
+    ],
+    [
+      "an incoming fade without an explicit silent start",
+      {
+        ...transition,
+        next: { ...transition.next, fade: track(100) },
+      },
+      "next.fade.initialValue must be 0",
+    ],
+  ])("rejects %s", (_name, audioAnimation, message) => {
+    expect(() =>
+      normalizeAudioRenderState({
+        audio: [nextChannel],
+        audioAnimations: [audioAnimation],
+      }),
+    ).toThrow(message);
+  });
+});

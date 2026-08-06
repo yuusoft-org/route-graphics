@@ -97,6 +97,46 @@ describe("renderAudio", () => {
     });
   });
 
+  it("forwards next-render animations, masters, and settlement controls", () => {
+    const app = { audioStage: { renderGraph: vi.fn() } };
+    const channel = {
+      id: "music",
+      type: "audio-channel",
+      children: [{ id: "bgm", type: "sound", src: "theme" }],
+    };
+    const audioAnimations = [
+      {
+        id: "fade-in",
+        occurrenceId: "engine:g1:l1:bgm1",
+        type: "transition",
+        targetId: "music",
+        next: { channel },
+      },
+    ];
+    const audioMasters = [{ id: "music", volume: 40, muted: true }];
+    const audioAnimationControl = { commandId: 9, operation: "settle" };
+
+    renderAudio({
+      app,
+      prevAudioTree: [],
+      nextAudioTree: [channel],
+      audioAnimations,
+      audioMasters,
+      audioAnimationControl,
+      audioPlugins: [],
+    });
+
+    expect(app.audioStage.renderGraph).toHaveBeenCalledWith({
+      prevAudio: [],
+      nextAudio: [channel],
+      prevAudioEffects: [],
+      nextAudioEffects: [],
+      audioAnimations,
+      audioMasters,
+      audioAnimationControl,
+    });
+  });
+
   it("validates audio state before rendering", () => {
     const app = {
       audioStage: {

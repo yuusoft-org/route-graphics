@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "wavSha256": "aa18ed1a7b5fd276221773d6b9ecfb7b1a3dca35326d4e3b038fef7536471154",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 120000,
+    "durationMs": 2500,
+    "byteLength": 480044,
+    "signal": {
+      "peak": 0.1478271484375,
+      "rms": 0.051705381897872736,
+      "nonZeroSamples": 215432
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "old-theme",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "new-theme-handoff",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "runtime-muted",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "runtime-unmuted",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "settled",
+        "aborted": false
+      }
+    }
+  ]
+}

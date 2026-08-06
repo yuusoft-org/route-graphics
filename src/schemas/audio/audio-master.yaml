@@ -1,0 +1,19 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: Audio Master
+description: Persistent runtime gain and mute controls shared by channel handoff sides
+type: object
+required:
+  - id
+  - volume
+properties:
+  id:
+    type: string
+    minLength: 1
+  volume:
+    type: number
+    minimum: 0
+    maximum: 100
+  muted:
+    type: boolean
+    default: false
+additionalProperties: false

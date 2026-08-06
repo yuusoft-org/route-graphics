@@ -35,6 +35,20 @@ const AUDIO_TRANSITION_KEYFRAME_KEYS = new Set([
   "easing",
   "relative",
 ]);
+const AUDIO_ANIMATION_TYPES = new Set(["transition", "update"]);
+const AUDIO_ANIMATION_KEYS = new Set([
+  "id",
+  "occurrenceId",
+  "type",
+  "targetId",
+  "prev",
+  "next",
+  "tween",
+]);
+const AUDIO_HANDOFF_SIDE_KEYS = new Set(["channel", "fade"]);
+const AUDIO_UPDATE_PROPERTIES = new Set(["volume", "pan"]);
+const AUDIO_MASTER_KEYS = new Set(["id", "volume", "muted"]);
+const AUDIO_ANIMATION_CONTROL_KEYS = new Set(["commandId", "operation"]);
 
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -55,6 +69,14 @@ const assertNonEmptyRecord = (value, path) => {
 const assertNonEmptyString = (value, path) => {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Input error: ${path} must be a non-empty string.`);
+  }
+};
+
+const assertOnlyKeys = (value, allowedKeys, path) => {
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`Input error: unsupported field "${key}" at ${path}.`);
+    }
   }
 };
 
@@ -618,6 +640,252 @@ const validateAudioEffects = (audioEffects, ids, nodeTypes) => {
   return transitions;
 };
 
+const withoutChannelId = ({ channelId: _channelId, ...sound }) => sound;
+
+const toChannelSnapshot = (channel, sounds) => ({
+  ...channel,
+  children: sounds
+    .filter((sound) => sound.channelId === channel.id)
+    .map(withoutChannelId),
+});
+
+const normalizeChannelSnapshot = (value, path) => {
+  assertRecord(value, path);
+  if (value.type !== "audio-channel") {
+    throw new Error(`Input error: ${path}.type must be "audio-channel".`);
+  }
+
+  const normalized = validateAudioNodes([value], new Set());
+  if (normalized.channels.length !== 1) {
+    throw new Error(`Input error: ${path} must contain one audio channel.`);
+  }
+  return toChannelSnapshot(normalized.channels[0], normalized.sounds);
+};
+
+const getChannelSnapshot = (normalizedAudio, targetId) => {
+  const channel = normalizedAudio.channels.find(({ id }) => id === targetId);
+  return channel
+    ? toChannelSnapshot(channel, normalizedAudio.sounds)
+    : undefined;
+};
+
+const stableValueKey = (value) => JSON.stringify(value);
+
+const validateHandoffSide = (side, path, expectedChannel, phaseName) => {
+  assertNonEmptyRecord(side, path);
+  assertOnlyKeys(side, AUDIO_HANDOFF_SIDE_KEYS, path);
+  if (side.channel === undefined) {
+    throw new Error(`Input error: ${path}.channel is required.`);
+  }
+
+  const channel = normalizeChannelSnapshot(side.channel, `${path}.channel`);
+  if (stableValueKey(channel) !== stableValueKey(expectedChannel)) {
+    throw new Error(
+      `Input error: ${path}.channel must match the ${phaseName} render-state channel snapshot.`,
+    );
+  }
+
+  if (side.fade !== undefined) {
+    validateTransitionPhase(side.fade, `${path}.fade`, "volume");
+    const finalKeyframe = side.fade.keyframes.at(-1);
+    const requiredFinalValue = phaseName === "previous" ? 0 : 100;
+    if (
+      finalKeyframe.relative === true ||
+      finalKeyframe.value !== requiredFinalValue
+    ) {
+      throw new Error(
+        `Input error: ${path}.fade must end at ${requiredFinalValue}.`,
+      );
+    }
+    if (phaseName === "next" && side.fade.initialValue !== 0) {
+      throw new Error(`Input error: ${path}.fade.initialValue must be 0.`);
+    }
+  }
+
+  return {
+    channel,
+    ...(side.fade === undefined ? {} : { fade: structuredClone(side.fade) }),
+  };
+};
+
+const hasSameSourceTopology = (previous, next) => {
+  if (!previous || !next || previous.children.length !== next.children.length) {
+    return false;
+  }
+  return previous.children.every((sound, index) => {
+    const nextSound = next.children[index];
+    return (
+      sound.id === nextSound.id &&
+      sound.src === nextSound.src &&
+      sound.startAt === nextSound.startAt &&
+      sound.endAt === nextSound.endAt &&
+      sound.startDelayMs === nextSound.startDelayMs
+    );
+  });
+};
+
+const normalizeAudioAnimations = ({
+  audioAnimations,
+  nextAudio,
+  occupiedTransitionTargetIds,
+}) => {
+  if (!Array.isArray(audioAnimations)) {
+    throw new Error("Input error: `audioAnimations` must be an array.");
+  }
+
+  const ids = new Set();
+  const occurrenceIds = new Set();
+  const targetIds = new Set();
+  return audioAnimations.map((animation, index) => {
+    const path = `audioAnimations[${index}]`;
+    assertNonEmptyRecord(animation, path);
+    assertOnlyKeys(animation, AUDIO_ANIMATION_KEYS, path);
+    assertNonEmptyString(animation.id, `${path}.id`);
+    assertUniqueId(ids, animation.id, `${path}.id`);
+    assertNonEmptyString(animation.occurrenceId, `${path}.occurrenceId`);
+    assertUniqueId(
+      occurrenceIds,
+      animation.occurrenceId,
+      `${path}.occurrenceId`,
+    );
+    if (!AUDIO_ANIMATION_TYPES.has(animation.type)) {
+      throw new Error(
+        `Input error: ${path}.type must be one of transition, update.`,
+      );
+    }
+    assertNonEmptyString(animation.targetId, `${path}.targetId`);
+    if (targetIds.has(animation.targetId)) {
+      throw new Error(
+        `Input error: duplicate audio animation targetId "${animation.targetId}" at ${path}.targetId.`,
+      );
+    }
+    targetIds.add(animation.targetId);
+    if (occupiedTransitionTargetIds.has(animation.targetId)) {
+      throw new Error(
+        `Input error: audio animation target "${animation.targetId}" cannot also define inline or legacy audio transitions.`,
+      );
+    }
+
+    const nextChannel = getChannelSnapshot(nextAudio, animation.targetId);
+    const normalized = {
+      id: animation.id,
+      occurrenceId: animation.occurrenceId,
+      type: animation.type,
+      targetId: animation.targetId,
+    };
+
+    if (animation.type === "transition") {
+      if (animation.tween !== undefined) {
+        throw new Error(
+          `Input error: ${path}.tween is not valid for transition audio animations.`,
+        );
+      }
+      if (animation.prev === undefined && animation.next === undefined) {
+        throw new Error(
+          `Input error: ${path} requires prev or next for a transition.`,
+        );
+      }
+      if ((animation.next === undefined) !== (nextChannel === undefined)) {
+        throw new Error(
+          `Input error: ${path}.next must match next target presence.`,
+        );
+      }
+      if (animation.prev !== undefined) {
+        const previousChannel = normalizeChannelSnapshot(
+          animation.prev.channel,
+          `${path}.prev.channel`,
+        );
+        normalized.prev = validateHandoffSide(
+          animation.prev,
+          `${path}.prev`,
+          previousChannel,
+          "previous",
+        );
+      }
+      if (animation.next !== undefined) {
+        normalized.next = validateHandoffSide(
+          animation.next,
+          `${path}.next`,
+          nextChannel,
+          "next",
+        );
+      }
+      if (
+        normalized.prev?.channel &&
+        nextChannel &&
+        hasSameSourceTopology(normalized.prev.channel, nextChannel)
+      ) {
+        throw new Error(
+          `Input error: ${path} transition requires a source or topology change.`,
+        );
+      }
+      return normalized;
+    }
+
+    if (animation.prev !== undefined || animation.next !== undefined) {
+      throw new Error(
+        `Input error: ${path}.prev and ${path}.next are not valid for update audio animations.`,
+      );
+    }
+    if (!nextChannel) {
+      throw new Error(
+        `Input error: ${path} update requires a retained audio channel.`,
+      );
+    }
+    assertNonEmptyRecord(animation.tween, `${path}.tween`);
+    const tween = {};
+    for (const [propertyName, phase] of Object.entries(animation.tween)) {
+      if (!AUDIO_UPDATE_PROPERTIES.has(propertyName)) {
+        throw new Error(
+          `Input error: unsupported audio update property "${propertyName}" at ${path}.tween.`,
+        );
+      }
+      validateTransitionPhase(
+        phase,
+        `${path}.tween.${propertyName}`,
+        propertyName,
+        { finalValue: nextChannel[propertyName] },
+      );
+      tween[propertyName] = structuredClone(phase);
+    }
+    normalized.tween = tween;
+    return normalized;
+  });
+};
+
+const normalizeAudioMasters = (audioMasters = []) => {
+  if (!Array.isArray(audioMasters)) {
+    throw new Error("Input error: `audioMasters` must be an array.");
+  }
+  const ids = new Set();
+  return audioMasters.map((master, index) => {
+    const path = `audioMasters[${index}]`;
+    assertNonEmptyRecord(master, path);
+    assertOnlyKeys(master, AUDIO_MASTER_KEYS, path);
+    assertNonEmptyString(master.id, `${path}.id`);
+    assertUniqueId(ids, master.id, `${path}.id`);
+    const volume = normalizeVolumeValue(master.volume, `${path}.volume`);
+    assertOptionalBoolean(master.muted, `${path}.muted`);
+    return { id: master.id, volume, muted: master.muted ?? false };
+  });
+};
+
+const normalizeAudioAnimationControl = (control) => {
+  if (control === undefined) return undefined;
+  const path = "audioAnimationControl";
+  assertNonEmptyRecord(control, path);
+  assertOnlyKeys(control, AUDIO_ANIMATION_CONTROL_KEYS, path);
+  if (!Number.isSafeInteger(control.commandId) || control.commandId < 0) {
+    throw new Error(
+      `Input error: ${path}.commandId must be a non-negative safe integer.`,
+    );
+  }
+  if (control.operation !== "settle") {
+    throw new Error(`Input error: ${path}.operation must be "settle".`);
+  }
+  return { commandId: control.commandId, operation: control.operation };
+};
+
 export const flattenAudioNodes = (audio = []) => {
   const ids = new Set();
   return validateAudioNodes(audio, ids);
@@ -626,6 +894,9 @@ export const flattenAudioNodes = (audio = []) => {
 export const normalizeAudioRenderState = ({
   audio = [],
   audioEffects = [],
+  audioAnimations = [],
+  audioMasters = [],
+  audioAnimationControl,
 } = {}) => {
   const ids = new Set();
   const flattened = validateAudioNodes(audio, ids);
@@ -644,9 +915,20 @@ export const normalizeAudioRenderState = ({
     transitions.set(targetId, properties);
   }
 
+  const normalizedAnimations = normalizeAudioAnimations({
+    audioAnimations,
+    nextAudio: flattened,
+    occupiedTransitionTargetIds: new Set(transitions.keys()),
+  });
+
   return {
     audio,
     audioEffects,
+    audioAnimations: normalizedAnimations,
+    audioMasters: normalizeAudioMasters(audioMasters),
+    audioAnimationControl: normalizeAudioAnimationControl(
+      audioAnimationControl,
+    ),
     channels: flattened.channels,
     sounds: flattened.sounds,
     transitions,

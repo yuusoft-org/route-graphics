@@ -65,6 +65,9 @@ const renderPluginDiff = ({
  * @param {import('../types.js').SoundElement[]} params.nextAudioTree - Next audio tree
  * @param {Object[]} [params.prevAudioEffects] - Previous audio effects
  * @param {Object[]} [params.nextAudioEffects] - Next audio effects
+ * @param {Object[]} [params.audioAnimations] - Next-render-owned audio animations
+ * @param {Object[]} [params.audioMasters] - Persistent runtime master controls
+ * @param {Object} [params.audioAnimationControl] - Monotonic animation control
  * @param {import("./audio/audioPlugin.js").AudioPlugin[]} params.audioPlugins - Array of audio plugins
  * @param {Function} [params.eventHandler] - Route Graphics event handler
  */
@@ -74,6 +77,9 @@ export const renderAudio = ({
   nextAudioTree,
   prevAudioEffects = [],
   nextAudioEffects = [],
+  audioAnimations = [],
+  audioMasters = [],
+  audioAnimationControl,
   audioPlugins,
   eventHandler,
 }) => {
@@ -92,7 +98,10 @@ export const renderAudio = ({
       nextAudio: filterGraphAudio(nextAudioTree),
       prevAudioEffects,
       nextAudioEffects,
-      eventHandler,
+      ...(audioAnimations.length > 0 ? { audioAnimations } : {}),
+      ...(audioMasters.length > 0 ? { audioMasters } : {}),
+      ...(audioAnimationControl ? { audioAnimationControl } : {}),
+      ...(eventHandler ? { eventHandler } : {}),
     });
     renderPluginDiff({
       app,

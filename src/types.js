@@ -997,6 +997,9 @@ export const DEFAULT_TEXT_STYLE = {
  * @property {T[]} animations - Array of animations
  * @property {(SoundElement|AudioChannelElement)[]} audio - Array of audio nodes
  * @property {AudioTransition[]} audioEffects - Array of audio effects
+ * @property {Object[]} audioAnimations - Next-render-owned audio handoffs and retained updates
+ * @property {Object[]} audioMasters - Persistent runtime audio master controls
+ * @property {{commandId: number, operation: "settle"}} [audioAnimationControl] - Monotonic automation control command
  * @property {GlobalConfiguration} [global] - Global configuration options
  */
 

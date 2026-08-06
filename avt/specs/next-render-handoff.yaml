@@ -1,0 +1,170 @@
+title: Next-render BGM handoff layering
+description: Verifies delayed incoming fade, immediate outgoing fade, shared master/mute, and explicit settlement.
+durationMs: 2500
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  tone440:
+    generator: tone
+    frequency: 440
+    durationMs: 1000
+  tone880:
+    generator: tone
+    frequency: 880
+    durationMs: 1000
+states:
+  - atMs: 0
+    state:
+      id: old-theme
+      elements: []
+      animations: []
+      audioMasters:
+        - id: music
+          volume: 70
+          muted: false
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 60
+          pan: -0.25
+          muted: false
+          children:
+            - id: bgm
+              type: sound
+              src: tone440
+              loop: true
+              volume: 80
+  - atMs: 500
+    state:
+      id: new-theme-handoff
+      elements: []
+      animations: []
+      audioMasters:
+        - id: music
+          volume: 50
+          muted: false
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 90
+          pan: 0.25
+          muted: false
+          children:
+            - id: bgm
+              type: sound
+              src: tone880
+              loop: true
+              volume: 70
+              startDelayMs: 300
+      audioAnimations:
+        - id: handoff-1
+          occurrenceId: engine:g1:l2:bgm1
+          type: transition
+          targetId: music
+          prev:
+            channel:
+              id: music
+              type: audio-channel
+              volume: 60
+              pan: -0.25
+              muted: false
+              children:
+                - id: bgm
+                  type: sound
+                  src: tone440
+                  loop: true
+                  volume: 80
+            fade:
+              keyframes:
+                - value: 0
+                  duration: 800
+                  easing: linear
+          next:
+            channel:
+              id: music
+              type: audio-channel
+              volume: 90
+              pan: 0.25
+              muted: false
+              children:
+                - id: bgm
+                  type: sound
+                  src: tone880
+                  loop: true
+                  volume: 70
+                  startDelayMs: 300
+            fade:
+              initialValue: 0
+              keyframes:
+                - value: 100
+                  duration: 800
+                  easing: linear
+  - atMs: 650
+    state:
+      id: runtime-muted
+      elements: []
+      animations: []
+      audioMasters:
+        - id: music
+          volume: 50
+          muted: true
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 90
+          pan: 0.25
+          muted: false
+          children:
+            - id: bgm
+              type: sound
+              src: tone880
+              loop: true
+              volume: 70
+              startDelayMs: 300
+  - atMs: 900
+    state:
+      id: runtime-unmuted
+      elements: []
+      animations: []
+      audioMasters:
+        - id: music
+          volume: 25
+          muted: false
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 90
+          pan: 0.25
+          muted: false
+          children:
+            - id: bgm
+              type: sound
+              src: tone880
+              loop: true
+              volume: 70
+              startDelayMs: 300
+  - atMs: 1300
+    state:
+      id: settled
+      elements: []
+      animations: []
+      audioMasters:
+        - id: music
+          volume: 25
+          muted: false
+      audioAnimationControl:
+        commandId: 1
+        operation: settle
+      audio:
+        - id: music
+          type: audio-channel
+          volume: 90
+          pan: 0.25
+          muted: false
+          children:
+            - id: bgm
+              type: sound
+              src: tone880
+              loop: true
+              volume: 70
+              startDelayMs: 300

@@ -1,0 +1,82 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: Audio Animation
+description: Next-render-owned channel handoff or retained-property automation
+oneOf:
+  - $ref: "#/definitions/transition"
+  - $ref: "#/definitions/update"
+definitions:
+  easing:
+    $ref: "audio-transition.yaml#/definitions/easing"
+  volumePhase:
+    $ref: "audio-transition.yaml#/definitions/volumePhase"
+  panPhase:
+    $ref: "audio-transition.yaml#/definitions/panPhase"
+  side:
+    type: object
+    required:
+      - channel
+    properties:
+      channel:
+        $ref: "audio-channel.yaml"
+      fade:
+        $ref: "#/definitions/volumePhase"
+    additionalProperties: false
+  base:
+    type: object
+    required:
+      - id
+      - occurrenceId
+      - type
+      - targetId
+    properties:
+      id:
+        type: string
+        minLength: 1
+      occurrenceId:
+        type: string
+        minLength: 1
+      type:
+        enum: [transition, update]
+      targetId:
+        type: string
+        minLength: 1
+  transition:
+    allOf:
+      - $ref: "#/definitions/base"
+      - type: object
+        properties:
+          id: {}
+          occurrenceId: {}
+          type:
+            const: transition
+          targetId: {}
+          prev:
+            $ref: "#/definitions/side"
+          next:
+            $ref: "#/definitions/side"
+        anyOf:
+          - required: [prev]
+          - required: [next]
+        additionalProperties: false
+  update:
+    allOf:
+      - $ref: "#/definitions/base"
+      - type: object
+        required:
+          - tween
+        properties:
+          id: {}
+          occurrenceId: {}
+          type:
+            const: update
+          targetId: {}
+          tween:
+            type: object
+            minProperties: 1
+            properties:
+              volume:
+                $ref: "#/definitions/volumePhase"
+              pan:
+                $ref: "#/definitions/panPhase"
+            additionalProperties: false
+        additionalProperties: false

@@ -25,6 +25,12 @@ export const normalizeRenderState = (state = {}) => {
     animations: state.animations ?? [],
     audio: state.audio ?? [],
     audioEffects: state.audioEffects ?? [],
+    ...(state.audioAnimations === undefined
+      ? {}
+      : { audioAnimations: state.audioAnimations }),
+    ...(state.audioMasters === undefined
+      ? {}
+      : { audioMasters: state.audioMasters }),
   };
 
   if (!Array.isArray(normalizedState.elements)) {
@@ -43,11 +49,40 @@ export const normalizeRenderState = (state = {}) => {
     throw new Error("Input error: `audioEffects` must be an array.");
   }
 
+  if (
+    normalizedState.audioAnimations !== undefined &&
+    !Array.isArray(normalizedState.audioAnimations)
+  ) {
+    throw new Error("Input error: `audioAnimations` must be an array.");
+  }
+
+  if (
+    normalizedState.audioMasters !== undefined &&
+    !Array.isArray(normalizedState.audioMasters)
+  ) {
+    throw new Error("Input error: `audioMasters` must be an array.");
+  }
+
   normalizedState.animations = normalizeAnimations(normalizedState.animations);
-  normalizeAudioRenderState({
+  const normalizedAudio = normalizeAudioRenderState({
     audio: normalizedState.audio,
     audioEffects: normalizedState.audioEffects,
+    audioAnimations: normalizedState.audioAnimations ?? [],
+    audioMasters: normalizedState.audioMasters ?? [],
+    audioAnimationControl: normalizedState.audioAnimationControl,
   });
+  if (state.audioAnimations !== undefined) {
+    normalizedState.audioAnimations = normalizedAudio.audioAnimations;
+  }
+  if (state.audioMasters !== undefined) {
+    normalizedState.audioMasters = normalizedAudio.audioMasters;
+  }
+  if (normalizedAudio.audioAnimationControl) {
+    normalizedState.audioAnimationControl =
+      normalizedAudio.audioAnimationControl;
+  } else {
+    delete normalizedState.audioAnimationControl;
+  }
 
   return normalizedState;
 };

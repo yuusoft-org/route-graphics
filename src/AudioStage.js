@@ -180,6 +180,24 @@ const setParamNow = (param, value, context = getAudioContext()) => {
   });
 };
 
+const holdParamNow = (param, context = getAudioContext()) => {
+  if (!param) return;
+
+  const now = context.currentTime;
+  const currentValue = getCurrentParamValue(param, context);
+  if (typeof param.cancelAndHoldAtTime === "function") {
+    param.cancelAndHoldAtTime(now);
+  } else if (typeof param.cancelScheduledValues === "function") {
+    param.cancelScheduledValues(now);
+  }
+  setParamAtTime(param, currentValue, now);
+  audioParamAutomation.set(param, {
+    startTime: now,
+    timeline: [{ time: 0, value: currentValue, easing: "linear" }],
+    normalizeValue: (automationValue) => automationValue,
+  });
+};
+
 const buildAudioTimeline = ({
   transition,
   currentValue,
@@ -707,6 +725,24 @@ const applySoundPlaybackRateTransition = ({
   });
 };
 
+const startPendingChannelHandoffEnter = (channel) => {
+  const pending = channel?.pendingHandoffEnter;
+  if (!pending) return 0;
+
+  channel.pendingHandoffEnter = null;
+  const duration = applyVolume({
+    gainNode: channel.handoffGainNode,
+    targetValue: 1,
+    transition: pending.transition,
+  });
+  pending.onStarted?.(duration);
+  return duration;
+};
+
+const notifyPendingChannelHandoffFailure = (channel) => {
+  channel?.pendingHandoffEnter?.onFailed?.();
+};
+
 const applyPendingSoundEnterTransitions = (sound, source) => {
   const transitions = sound.pendingEnterTransitions;
   if (transitions) {
@@ -760,16 +796,19 @@ const createChannelInstance = (channel, outputNode) => {
   const gainNode = createGainNode(getVolumeValue(channel));
   const pannerNode = createPannerNode(channel.pan ?? 0);
   const muteGainNode = createGainNode(getMuteValue(channel));
+  const handoffGainNode = createGainNode(1);
 
   connect(gainNode, pannerNode ?? muteGainNode);
   if (pannerNode) connect(pannerNode, muteGainNode);
-  connect(muteGainNode, outputNode);
+  connect(muteGainNode, handoffGainNode);
+  connect(handoffGainNode, outputNode);
 
   return {
     id: channel.id,
     gainNode,
     pannerNode,
     muteGainNode,
+    handoffGainNode,
     volume: channel.volume ?? 100,
     muted: channel.muted ?? false,
     pan: channel.pan ?? 0,
@@ -783,12 +822,18 @@ const createChannelInstance = (channel, outputNode) => {
         }
       : null,
     outputNode,
+    pendingHandoffEnter: null,
     cleanupTimeoutId: null,
     deferredRemovalToken: null,
   };
 };
 
-const createSoundInstance = ({ sound, channelNode, internalId }) => {
+const createSoundInstance = ({
+  sound,
+  channelNode,
+  channelInstance = null,
+  internalId,
+}) => {
   const gainNode = createGainNode(getVolumeValue(sound));
   const pannerNode = createPannerNode(sound.pan ?? 0);
   const muteGainNode = createGainNode(getMuteValue(sound));
@@ -812,6 +857,7 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     endAt: sound.endAt ?? null,
     channelId: sound.channelId ?? null,
     channelNode,
+    channelInstance,
     gainNode,
     pannerNode,
     muteGainNode,
@@ -912,6 +958,7 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   } else {
     source.start(startTime, offset);
   }
+  startPendingChannelHandoffEnter(sound.channelInstance);
   const pendingEnterTransitions = applyPendingSoundEnterTransitions(
     sound,
     source,
@@ -972,9 +1019,19 @@ const playSound = (
     sound.delayDeadlineMs = null;
     sound.pendingDelayMs = 0;
     const previousSource = sound.source;
-    sound.source = createSourceForSound(sound, startOffset);
+    try {
+      sound.source = createSourceForSound(sound, startOffset);
+    } catch (error) {
+      sound.playbackPending = false;
+      sound.pendingStartOffset = null;
+      notifyPendingChannelHandoffFailure(sound.channelInstance);
+      throw error;
+    }
     sound.playbackPending = false;
     sound.pendingStartOffset = null;
+    if (!sound.source) {
+      notifyPendingChannelHandoffFailure(sound.channelInstance);
+    }
     if (previousSource && previousSource !== sound.source) {
       disconnect(previousSource);
     }
@@ -1071,6 +1128,7 @@ const cleanupChannel = (channel) => {
   disconnect(channel.gainNode);
   disconnect(channel.pannerNode);
   disconnect(channel.muteGainNode);
+  disconnect(channel.handoffGainNode);
 };
 
 const schedule = (callback, delayMs) => {
@@ -1106,6 +1164,7 @@ export const createAudioPlayer = (id, options) => {
   const instance = createSoundInstance({
     sound,
     channelNode: channel.gainNode,
+    channelInstance: channel,
     internalId: id,
   });
 
@@ -1169,9 +1228,62 @@ export const createAudioStage = () => {
   const sounds = new Map();
   const currentSoundKeyById = new Map();
   const directAudios = new Map();
+  const audioMasters = new Map();
+  const acceptedAudioAnimationPayloads = new Map();
+  const activeAudioAnimations = new Map();
+  const activeAudioAnimationIdByTarget = new Map();
+  const detachedHandoffSidesByTarget = new Map();
+  let lastAudioAnimationControlId = -1;
   let soundGeneration = 0;
   let soundEventHandler;
   let destroyed = false;
+
+  const createAudioMaster = (master) => {
+    const gainNode = createGainNode(getVolumeValue(master));
+    const muteGainNode = createGainNode(getMuteValue(master));
+    connect(gainNode, muteGainNode);
+    connect(muteGainNode, getAudioContext().destination);
+    return {
+      id: master.id,
+      volume: master.volume,
+      muted: master.muted,
+      gainNode,
+      muteGainNode,
+    };
+  };
+
+  const getChannelOutputNode = (channelId) =>
+    audioMasters.get(channelId)?.gainNode ?? getAudioContext().destination;
+
+  const connectChannelOutput = (channel, outputNode) => {
+    if (!channel || channel.outputNode === outputNode) return;
+    disconnect(channel.handoffGainNode);
+    connect(channel.handoffGainNode, outputNode);
+    channel.outputNode = outputNode;
+  };
+
+  const reconcileAudioMasters = (nextMasters = []) => {
+    for (const master of nextMasters) {
+      const existing = audioMasters.get(master.id);
+      if (!existing) {
+        audioMasters.set(master.id, createAudioMaster(master));
+        const channel = channels.get(master.id);
+        if (channel) {
+          connectChannelOutput(channel, audioMasters.get(master.id).gainNode);
+        }
+        continue;
+      }
+
+      if (existing.volume !== master.volume) {
+        existing.volume = master.volume;
+        setParamNow(existing.gainNode.gain, getVolumeValue(master));
+      }
+      if (existing.muted !== master.muted) {
+        existing.muted = master.muted;
+        setParamNow(existing.muteGainNode.gain, getMuteValue(master));
+      }
+    }
+  };
 
   const isCurrentControlledInstance = (instance) =>
     !destroyed &&
@@ -1554,6 +1666,7 @@ export const createAudioStage = () => {
       disconnect(source);
       throw error;
     }
+    startPendingChannelHandoffEnter(instance.channelInstance);
     const pendingEnterTransitions = applyPendingSoundEnterTransitions(
       instance,
       source,
@@ -1572,6 +1685,7 @@ export const createAudioStage = () => {
     control.pendingPosition = null;
     control.pausedCursorRetained = false;
     control.remainingDelayMs = 0;
+    notifyPendingChannelHandoffFailure(instance.channelInstance);
     queueControlledError(instance, errorCode);
     if (instance.finishing) {
       instance.sourceEnded = true;
@@ -2346,7 +2460,7 @@ export const createAudioStage = () => {
     ) {
       const created = createChannelInstance(
         channel,
-        getAudioContext().destination,
+        getChannelOutputNode(channel.id),
       );
       channels.set(channel.id, created);
       applyVolume({
@@ -2416,7 +2530,7 @@ export const createAudioStage = () => {
 
     const created = createChannelInstance(
       channel,
-      getAudioContext().destination,
+      getChannelOutputNode(channel.id),
     );
     channels.set(channel.id, created);
     applyVolume({
@@ -2450,7 +2564,8 @@ export const createAudioStage = () => {
     return parentChannel;
   };
 
-  const connectSoundToChannel = (instance, channelNode) => {
+  const connectSoundToChannel = (instance, channel) => {
+    const channelNode = channel.gainNode;
     disconnect(instance.gainNode);
     disconnect(instance.pannerNode);
     disconnect(instance.muteGainNode);
@@ -2460,9 +2575,10 @@ export const createAudioStage = () => {
     }
     connect(instance.muteGainNode, channelNode);
     instance.channelNode = channelNode;
+    instance.channelInstance = channel;
   };
 
-  const removeChannel = (channel, effects) => {
+  const removeChannel = (channel, effects, handoffFade) => {
     if (
       !channel ||
       channel.id === ROOT_CHANNEL_ID ||
@@ -2471,27 +2587,25 @@ export const createAudioStage = () => {
       return 0;
     }
 
-    const volumeTransition = getTransitionPhase(
-      effects,
-      channel.id,
-      "volume",
-      "exit",
-    );
-    const panTransition = getTransitionPhase(
-      effects,
-      channel.id,
-      "pan",
-      "exit",
-    );
+    if (handoffFade !== undefined) {
+      return handoffFade
+        ? applyVolume({
+            gainNode: channel.handoffGainNode,
+            targetValue: 0,
+            transition: handoffFade,
+          })
+        : 0;
+    }
+
     const volumeDuration = applyVolume({
       gainNode: channel.gainNode,
       targetValue: getVolumeValue(channel),
-      transition: volumeTransition,
+      transition: getTransitionPhase(effects, channel.id, "volume", "exit"),
     });
     const panDuration = applyPan({
       pannerNode: channel.pannerNode,
       targetValue: channel.pan,
-      transition: panTransition,
+      transition: getTransitionPhase(effects, channel.id, "pan", "exit"),
     });
 
     return Math.max(volumeDuration, panDuration);
@@ -2503,6 +2617,7 @@ export const createAudioStage = () => {
     const instance = createSoundInstance({
       sound,
       channelNode: parentChannel.gainNode,
+      channelInstance: parentChannel,
       internalId,
     });
     sounds.set(internalId, instance);
@@ -2801,7 +2916,7 @@ export const createAudioStage = () => {
 
     if (instance.channelId !== sound.channelId) {
       const parentChannel = getParentChannelForSound(sound);
-      connectSoundToChannel(instance, parentChannel.gainNode);
+      connectSoundToChannel(instance, parentChannel);
     }
 
     instance.loop = sound.loop;
@@ -2901,11 +3016,221 @@ export const createAudioStage = () => {
     }
   };
 
+  const removeAcceptedAnimationHistoryOverflow = () => {
+    while (acceptedAudioAnimationPayloads.size > 512) {
+      const oldestKey = acceptedAudioAnimationPayloads.keys().next().value;
+      acceptedAudioAnimationPayloads.delete(oldestKey);
+    }
+  };
+
+  const deactivateAudioAnimationTarget = (targetId) => {
+    const previousId = activeAudioAnimationIdByTarget.get(targetId);
+    if (previousId !== undefined) {
+      activeAudioAnimations.delete(previousId);
+      activeAudioAnimationIdByTarget.delete(targetId);
+    }
+  };
+
+  const getAnimationDuration = (animation) =>
+    Math.max(
+      0,
+      ...Object.values(animation.tween ?? {}).map((phase) =>
+        phase.keyframes.reduce(
+          (duration, keyframe) =>
+            duration + (keyframe.delay ?? 0) + keyframe.duration,
+          0,
+        ),
+      ),
+    );
+
+  const supersedeActiveAudioAnimationTarget = (animation) => {
+    const previousId = activeAudioAnimationIdByTarget.get(animation.targetId);
+    const previousRecord = previousId
+      ? activeAudioAnimations.get(previousId)
+      : null;
+    if (!previousRecord) return;
+
+    const context = getAudioContext();
+    const channel = channels.get(animation.targetId);
+    if (previousRecord.type === "update" && channel) {
+      if (previousRecord.targetVolume !== undefined) {
+        holdParamNow(channel.gainNode.gain, context);
+      }
+      if (previousRecord.targetPan !== undefined) {
+        holdParamNow(channel.pannerNode?.pan, context);
+      }
+    }
+
+    if (previousRecord.type === "transition") {
+      settleDetachedHandoffSides(animation.targetId);
+      if (animation.type === "update" && channel) {
+        channel.pendingHandoffEnter = null;
+        applyVolume({
+          gainNode: channel.handoffGainNode,
+          targetValue: 1,
+          transition: {
+            keyframes: [
+              {
+                value: 100,
+                duration: getAnimationDuration(animation),
+                easing: "linear",
+              },
+            ],
+          },
+        });
+      }
+    }
+  };
+
+  const registerActiveAudioAnimation = (record, animation) => {
+    supersedeActiveAudioAnimationTarget(animation);
+    deactivateAudioAnimationTarget(record.targetId);
+    activeAudioAnimations.set(record.id, record);
+    activeAudioAnimationIdByTarget.set(record.targetId, record.id);
+  };
+
+  const trackDetachedHandoffSide = (targetId, channel) => {
+    const entries = detachedHandoffSidesByTarget.get(targetId) ?? new Set();
+    const entry = { channel, soundInternalIds: new Set() };
+    entries.add(entry);
+    detachedHandoffSidesByTarget.set(targetId, entries);
+    return entry;
+  };
+
+  const releaseDetachedHandoffSide = (targetId, channel) => {
+    const entries = detachedHandoffSidesByTarget.get(targetId);
+    if (!entries) return;
+
+    for (const entry of entries) {
+      if (entry.channel === channel) {
+        entries.delete(entry);
+        break;
+      }
+    }
+    if (entries.size === 0) {
+      detachedHandoffSidesByTarget.delete(targetId);
+    }
+  };
+
+  const settleDetachedHandoffSides = (targetId) => {
+    const entries = detachedHandoffSidesByTarget.get(targetId);
+    if (!entries) return;
+
+    for (const entry of entries) {
+      for (const internalId of entry.soundInternalIds) {
+        const sound = sounds.get(internalId);
+        if (!sound) continue;
+        cleanupSound(sound);
+        sounds.delete(internalId);
+      }
+      cleanupChannel(entry.channel);
+      if (channels.get(targetId) === entry.channel) {
+        channels.delete(targetId);
+      }
+    }
+    detachedHandoffSidesByTarget.delete(targetId);
+  };
+
+  const settleActiveAudioAnimations = () => {
+    for (const record of activeAudioAnimations.values()) {
+      const channel = channels.get(record.targetId);
+      if (record.type === "update" && channel) {
+        if (record.targetVolume !== undefined) {
+          applyVolume({
+            gainNode: channel.gainNode,
+            targetValue: normalizeVolume(record.targetVolume, 100),
+            transition: null,
+          });
+        }
+        if (record.targetPan !== undefined) {
+          applyPan({
+            pannerNode: channel.pannerNode,
+            targetValue: record.targetPan,
+            transition: null,
+          });
+        }
+      }
+      if (record.type === "transition" && channel) {
+        channel.pendingHandoffEnter = null;
+        applyVolume({
+          gainNode: channel.handoffGainNode,
+          targetValue: 1,
+          transition: null,
+        });
+      }
+      settleDetachedHandoffSides(record.targetId);
+    }
+    activeAudioAnimations.clear();
+    activeAudioAnimationIdByTarget.clear();
+  };
+
+  const acceptAudioAnimationControl = (control) => {
+    if (!control || control.commandId <= lastAudioAnimationControlId) {
+      return false;
+    }
+    lastAudioAnimationControlId = control.commandId;
+    settleActiveAudioAnimations();
+    return true;
+  };
+
+  const prepareChannelHandoffEnter = (channel, fade) => {
+    if (!channel) return;
+    if (fade) {
+      setParamNow(channel.handoffGainNode.gain, 0);
+    } else {
+      applyVolume({
+        gainNode: channel.handoffGainNode,
+        targetValue: 1,
+        transition: null,
+      });
+    }
+
+    const pending = {
+      transition: fade,
+      onFailed: () => {
+        scheduleMicrotask(() => {
+          if (channel.pendingHandoffEnter !== pending) return;
+
+          const channelSounds = [...sounds.values()].filter(
+            (sound) => sound.channelInstance === channel && !sound.finishing,
+          );
+          const canStillStart = channelSounds.some(
+            (sound) =>
+              sound.source ||
+              sound.playbackPending ||
+              sound.pendingTimeoutId !== null ||
+              sound.channelPauseState?.kind === "pending" ||
+              sound.control?.decodePending,
+          );
+          if (canStillStart) return;
+
+          channel.pendingHandoffEnter = null;
+          for (const sound of channelSounds) {
+            cleanupSound(sound);
+            sounds.delete(sound.internalId);
+            if (currentSoundKeyById.get(sound.id) === sound.internalId) {
+              currentSoundKeyById.delete(sound.id);
+            }
+          }
+          cleanupChannel(channel);
+          if (channels.get(channel.id) === channel) {
+            channels.delete(channel.id);
+          }
+          deactivateAudioAnimationTarget(channel.id);
+        });
+      },
+    };
+    channel.pendingHandoffEnter = pending;
+  };
+
   const validateGraphTransition = ({
     prevAudio = [],
     nextAudio = [],
     prevAudioEffects = [],
     nextAudioEffects = [],
+    audioAnimations = [],
+    audioMasters = [],
+    audioAnimationControl,
   } = {}) => {
     const prev = normalizeAudioRenderState({
       audio: prevAudio,
@@ -2914,6 +3239,9 @@ export const createAudioStage = () => {
     const next = normalizeAudioRenderState({
       audio: nextAudio,
       audioEffects: nextAudioEffects,
+      audioAnimations,
+      audioMasters,
+      audioAnimationControl,
     });
 
     const prevChannelById = new Map(
@@ -2928,6 +3256,102 @@ export const createAudioStage = () => {
     const nextSoundById = new Map(
       next.sounds.map((sound) => [sound.id, sound]),
     );
+
+    if (next.audioAnimationControl && next.audioAnimations.length > 0) {
+      throw new Error(
+        "Input error: audioAnimationControl cannot be combined with audioAnimations in one render state.",
+      );
+    }
+
+    for (const animation of next.audioAnimations) {
+      if (animation.prev && prev.transitions.has(animation.targetId)) {
+        throw new Error(
+          `Input error: audio animation target "${animation.targetId}" cannot also define a previous-side inline or legacy audio transition.`,
+        );
+      }
+    }
+
+    const toSnapshot = (channel, soundById) => ({
+      ...channel,
+      children: [...soundById.values()]
+        .filter((sound) => sound.channelId === channel.id)
+        .map(({ channelId: _channelId, ...sound }) => sound),
+    });
+    const sameSnapshot = (left, right) =>
+      JSON.stringify(left) === JSON.stringify(right);
+    const sameTopology = (left, right) => {
+      if (!left || !right || left.children.length !== right.children.length) {
+        return false;
+      }
+      return left.children.every((sound, index) => {
+        const nextSound = right.children[index];
+        return (
+          sound.id === nextSound.id &&
+          hasSameSoundSourceIdentity(sound, nextSound)
+        );
+      });
+    };
+
+    for (const animation of next.audioAnimations) {
+      const payloadKey = JSON.stringify(animation);
+      const acceptedPayload = acceptedAudioAnimationPayloads.get(
+        animation.occurrenceId,
+      );
+      if (acceptedPayload !== undefined) {
+        if (acceptedPayload !== payloadKey) {
+          throw new Error(
+            `Input error: audio animation occurrence "${animation.occurrenceId}" was already accepted with different content.`,
+          );
+        }
+        continue;
+      }
+
+      const previousChannel = prevChannelById.get(animation.targetId);
+      const nextChannel = nextChannelById.get(animation.targetId);
+      const previousSnapshot = previousChannel
+        ? toSnapshot(previousChannel, prevSoundById)
+        : undefined;
+      const nextSnapshot = nextChannel
+        ? toSnapshot(nextChannel, nextSoundById)
+        : undefined;
+      if (animation.type === "transition") {
+        if (
+          (animation.prev === undefined) !==
+          (previousSnapshot === undefined)
+        ) {
+          throw new Error(
+            `Input error: audio animation "${animation.id}" prev side does not match the previous render state.`,
+          );
+        }
+        if (
+          animation.prev &&
+          !sameSnapshot(animation.prev.channel, previousSnapshot)
+        ) {
+          throw new Error(
+            `Input error: audio animation "${animation.id}" prev channel snapshot does not match the previous render state.`,
+          );
+        }
+        if (
+          animation.next &&
+          !sameSnapshot(animation.next.channel, nextSnapshot)
+        ) {
+          throw new Error(
+            `Input error: audio animation "${animation.id}" next channel snapshot does not match the next render state.`,
+          );
+        }
+      } else {
+        if (!previousSnapshot || !nextSnapshot) {
+          throw new Error(
+            `Input error: audio animation "${animation.id}" update requires a retained channel.`,
+          );
+        }
+        if (!sameTopology(previousSnapshot, nextSnapshot)) {
+          throw new Error(
+            `Input error: audio animation "${animation.id}" update cannot change source identity or topology.`,
+          );
+        }
+      }
+    }
 
     for (const id of prevChannelById.keys()) {
       if (nextSoundById.has(id)) {
@@ -2990,6 +3414,9 @@ export const createAudioStage = () => {
       next,
       prevTransitions: prev.transitions,
       nextTransitions: next.transitions,
+      audioAnimations: next.audioAnimations,
+      audioMasters: next.audioMasters,
+      audioAnimationControl: next.audioAnimationControl,
       prevChannelById,
       nextChannelById,
       prevSoundById,
@@ -3002,12 +3429,18 @@ export const createAudioStage = () => {
     nextAudio = [],
     prevAudioEffects = [],
     nextAudioEffects = [],
+    audioAnimations = [],
+    audioMasters = [],
+    audioAnimationControl,
     eventHandler = soundEventHandler,
   } = {}) => {
     const {
       next,
       prevTransitions,
-      nextTransitions,
+      nextTransitions: normalizedNextTransitions,
+      audioAnimations: normalizedAudioAnimations,
+      audioMasters: normalizedAudioMasters,
+      audioAnimationControl: normalizedAudioAnimationControl,
       prevChannelById,
       nextChannelById,
       prevSoundById,
@@ -3017,14 +3450,76 @@ export const createAudioStage = () => {
       nextAudio,
       prevAudioEffects,
       nextAudioEffects,
+      audioAnimations,
+      audioMasters,
+      audioAnimationControl,
     });
     soundEventHandler = eventHandler;
 
+    reconcileAudioMasters(normalizedAudioMasters);
+    acceptAudioAnimationControl(normalizedAudioAnimationControl);
+
+    const pendingAudioAnimations = normalizedAudioAnimations.filter(
+      (animation) =>
+        !acceptedAudioAnimationPayloads.has(animation.occurrenceId),
+    );
+    const handoffByTarget = new Map(
+      pendingAudioAnimations
+        .filter(({ type }) => type === "transition")
+        .map((animation) => [animation.targetId, animation]),
+    );
+    const nextTransitions = new Map(normalizedNextTransitions);
+    for (const animation of pendingAudioAnimations) {
+      if (animation.type === "update") {
+        nextTransitions.set(
+          animation.targetId,
+          Object.fromEntries(
+            Object.entries(animation.tween).map(([propertyName, phase]) => [
+              propertyName,
+              { update: phase },
+            ]),
+          ),
+        );
+        const nextChannel = nextChannelById.get(animation.targetId);
+        registerActiveAudioAnimation(
+          {
+            id: animation.occurrenceId,
+            type: animation.type,
+            targetId: animation.targetId,
+            targetVolume: animation.tween.volume
+              ? nextChannel?.volume
+              : undefined,
+            targetPan: animation.tween.pan ? nextChannel?.pan : undefined,
+          },
+          animation,
+        );
+      } else {
+        registerActiveAudioAnimation(
+          {
+            id: animation.occurrenceId,
+            type: animation.type,
+            targetId: animation.targetId,
+          },
+          animation,
+        );
+      }
+    }
+
     ensureRootChannel(ROOT_CHANNEL_ID);
+
+    const detachedPreviousChannelByTarget = new Map();
+    for (const animation of handoffByTarget.values()) {
+      if (!animation.prev || !animation.next) continue;
+      const previousChannel = channels.get(animation.targetId);
+      if (!previousChannel) continue;
+      channels.delete(animation.targetId);
+      detachedPreviousChannelByTarget.set(animation.targetId, previousChannel);
+    }
 
     const removedChannels = new Map();
     const channelCleanupDurations = new Map();
     const deferredChannelCleanup = new Map();
+    const detachedEntryByTarget = new Map();
     const tryCleanupDeferredChannel = (entry) => {
       if (
         entry.registeringSounds ||
@@ -3036,6 +3531,7 @@ export const createAudioStage = () => {
       }
 
       cleanupChannel(entry.channel);
+      releaseDetachedHandoffSide(entry.channel.id, entry.channel);
       if (channels.get(entry.channel.id) === entry.channel) {
         channels.delete(entry.channel.id);
       }
@@ -3058,10 +3554,19 @@ export const createAudioStage = () => {
     };
 
     for (const [id, prevChannel] of prevChannelById) {
-      if (!nextChannelById.has(id)) {
-        const channel = channels.get(id);
-        const duration = removeChannel(channel, prevTransitions);
+      const handoff = handoffByTarget.get(id);
+      if (!nextChannelById.has(id) || handoff?.prev) {
+        const channel =
+          detachedPreviousChannelByTarget.get(id) ?? channels.get(id);
+        const duration = removeChannel(
+          channel,
+          prevTransitions,
+          handoff ? (handoff.prev?.fade ?? null) : undefined,
+        );
         channelCleanupDurations.set(id, duration);
+        if (handoff && channel) {
+          detachedEntryByTarget.set(id, trackDetachedHandoffSide(id, channel));
+        }
         if (prevChannel.interruption === "loopEnd" && channel) {
           channel.loop = false;
           const token = {};
@@ -3095,17 +3600,31 @@ export const createAudioStage = () => {
     }
 
     for (const [id, nextChannel] of nextChannelById) {
-      ensureChannel(
+      const channel = ensureChannel(
         nextChannel,
         nextTransitions,
-        prevChannelById.has(id) ? "update" : "enter",
+        prevChannelById.has(id) && !handoffByTarget.has(id)
+          ? "update"
+          : "enter",
       );
+      const handoff = handoffByTarget.get(id);
+      if (handoff?.next) {
+        prepareChannelHandoffEnter(channel, handoff.next.fade);
+      }
     }
 
     for (const [id, prevSound] of prevSoundById) {
-      const nextSound = nextSoundById.get(id);
+      const handoff = prevSound.channelId
+        ? handoffByTarget.get(prevSound.channelId)
+        : undefined;
+      const nextSound = handoff ? undefined : nextSoundById.get(id);
       const currentKey = currentSoundKeyById.get(id);
       const instance = currentKey ? sounds.get(currentKey) : null;
+      if (handoff && instance) {
+        detachedEntryByTarget
+          .get(prevSound.channelId)
+          ?.soundInternalIds.add(instance.internalId);
+      }
       const inheritedDuration = prevSound.channelId
         ? (channelCleanupDurations.get(prevSound.channelId) ?? 0)
         : 0;
@@ -3174,7 +3693,10 @@ export const createAudioStage = () => {
     }
 
     for (const [id, nextSound] of nextSoundById) {
-      if (!prevSoundById.has(id)) {
+      const handoff = nextSound.channelId
+        ? handoffByTarget.get(nextSound.channelId)
+        : undefined;
+      if (handoff || !prevSoundById.has(id)) {
         addSoundInstance({
           sound: nextSound,
           effects: nextTransitions,
@@ -3210,6 +3732,7 @@ export const createAudioStage = () => {
       const duration = channelCleanupDurations.get(id) ?? 0;
       channel.cleanupTimeoutId = schedule(() => {
         cleanupChannel(channel);
+        releaseDetachedHandoffSide(id, channel);
         if (channels.get(id) === channel) {
           channels.delete(id);
         }
@@ -3219,6 +3742,14 @@ export const createAudioStage = () => {
     for (const channel of next.channels) {
       restartLoopingChannelIfComplete(channel.id);
     }
+
+    for (const animation of pendingAudioAnimations) {
+      acceptedAudioAnimationPayloads.set(
+        animation.occurrenceId,
+        JSON.stringify(animation),
+      );
+    }
+    removeAcceptedAnimationHistoryOverflow();
   };
 
   const add = (element) => {
@@ -3345,11 +3876,20 @@ export const createAudioStage = () => {
     for (const channel of channels.values()) {
       cleanupChannel(channel);
     }
+    for (const master of audioMasters.values()) {
+      disconnect(master.gainNode);
+      disconnect(master.muteGainNode);
+    }
 
     sounds.clear();
     currentSoundKeyById.clear();
     channels.clear();
     directAudios.clear();
+    audioMasters.clear();
+    acceptedAudioAnimationPayloads.clear();
+    activeAudioAnimations.clear();
+    activeAudioAnimationIdByTarget.clear();
+    detachedHandoffSidesByTarget.clear();
   };
 
   return {
@@ -3367,6 +3907,11 @@ export const createAudioStage = () => {
       sounds,
       currentSoundKeyById,
       directAudios,
+      audioMasters,
+      acceptedAudioAnimationPayloads,
+      activeAudioAnimations,
+      detachedHandoffSidesByTarget,
+      lastAudioAnimationControlId,
     }),
   };
 };
