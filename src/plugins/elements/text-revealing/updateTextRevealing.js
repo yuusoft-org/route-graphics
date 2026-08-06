@@ -75,7 +75,9 @@ export const updateTextRevealing = async ({
   };
 
   const updateElement = async () => {
-    applyElementTransform(textRevealingElement, element);
+    applyElementTransform(textRevealingElement, element, {
+      scaleMode: "full",
+    });
     if (element.alpha !== undefined) {
       textRevealingElement.alpha = element.alpha;
     }
@@ -156,6 +158,8 @@ export const updateTextRevealing = async ({
     element: textRevealingElement,
     targetState: getElementTransformTargetState(element, {
       alpha: element.alpha ?? textRevealingElement.alpha,
+      ...(element.scaleX !== undefined && { scaleX: element.scaleX }),
+      ...(element.scaleY !== undefined && { scaleY: element.scaleY }),
     }),
     onComplete: () => {
       void updateElement();

@@ -21,6 +21,7 @@ import { setupScrollInteraction } from "../util/setupScrollInteraction.js";
 import {
   applyElementTransform,
   getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
 } from "../util/transform.js";
 
 /**
@@ -240,6 +241,7 @@ export const addSprite = ({
     element: sprite,
     targetState: {
       ...getElementTransformTargetState(element),
+      ...getTextureBackedScaleTargetState(sprite, element, { width, height }),
       width,
       height,
       alpha,

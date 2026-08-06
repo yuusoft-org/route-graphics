@@ -26,6 +26,11 @@ vi.mock("pixi.js", () => ({
 }));
 
 import { updateVideo } from "../../src/plugins/elements/video/updateVideo.js";
+import {
+  captureManagedVideoSpriteSizes,
+  registerManagedVideoSprite,
+  restoreManagedVideoSpriteSizes,
+} from "../../src/plugins/elements/video/managedVideoTextureSizing.js";
 
 const createMockVideo = () => ({
   addEventListener: vi.fn(),
@@ -636,6 +641,206 @@ describe("updateVideo", () => {
     expect(videoElement.texture.source.resource).toBe(nextVideo);
     expect(videoElement.width).toBe(100);
     expect(videoElement.height).toBe(80);
+  });
+
+  it("dispatches auto scale tweens to the signed post-sizing display scale", () => {
+    const currentVideo = createMockVideo();
+    const videoElement = {
+      label: "video-1",
+      texture: {
+        source: {
+          width: 640,
+          height: 360,
+          resource: currentVideo,
+        },
+      },
+      scale: { x: -0.25, y: 0.25 },
+      zIndex: 0,
+      x: 10,
+      y: 20,
+      width: 160,
+      height: 90,
+      alpha: 1,
+    };
+    const animationBus = { dispatch: vi.fn() };
+    const prevElement = {
+      id: "video-1",
+      src: "video.mp4",
+      loop: true,
+      volume: 50,
+      x: 10,
+      y: 20,
+      width: 160,
+      height: 90,
+      scaleX: -1,
+      alpha: 1,
+    };
+    const nextElement = {
+      ...prevElement,
+      width: 320,
+      height: 180,
+    };
+
+    updateVideo({
+      parent: { children: [videoElement] },
+      prevElement,
+      nextElement,
+      animations: [
+        {
+          id: "video-scale-auto",
+          targetId: "video-1",
+          type: "update",
+          tween: {
+            scaleX: { auto: { duration: 300 } },
+            scaleY: { auto: { duration: 300 } },
+          },
+        },
+      ],
+      animationBus,
+      eventHandler: vi.fn(),
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 3,
+    });
+
+    expect(animationBus.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          targetState: expect.objectContaining({
+            scaleX: -0.5,
+            scaleY: 0.5,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("defers auto scale updates until asynchronous texture sizing settles", () => {
+    const currentVideo = {
+      ...createMockVideo(),
+      videoWidth: 0,
+      videoHeight: 0,
+    };
+    const source = {
+      width: 1,
+      height: 1,
+      resource: currentVideo,
+      __routeGraphicsVideoTextureRuntime: {
+        requestUpdate: vi.fn().mockReturnValue(false),
+      },
+    };
+    const videoElement = {
+      label: "video-1",
+      texture: { source },
+      scale: { x: 1, y: 1 },
+      pivot: {
+        set(x, y) {
+          this.x = x;
+          this.y = y;
+        },
+      },
+      once: vi.fn(),
+      zIndex: 0,
+      x: 0,
+      y: 0,
+      alpha: 1,
+    };
+    Object.defineProperties(videoElement, {
+      width: {
+        get() {
+          return Math.abs(this.scale.x) * this.texture.source.width;
+        },
+        set(value) {
+          const sign = Math.sign(this.scale.x) || 1;
+          this.scale.x = (sign * value) / this.texture.source.width;
+        },
+      },
+      height: {
+        get() {
+          return Math.abs(this.scale.y) * this.texture.source.height;
+        },
+        set(value) {
+          const sign = Math.sign(this.scale.y) || 1;
+          this.scale.y = (sign * value) / this.texture.source.height;
+        },
+      },
+    });
+    videoElement.width = 160;
+    videoElement.height = 90;
+    registerManagedVideoSprite(videoElement);
+    const prevElement = {
+      id: "video-1",
+      src: "video.mp4",
+      loop: true,
+      volume: 50,
+      x: 0,
+      y: 0,
+      width: 160,
+      height: 90,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 1,
+    };
+    const nextElement = {
+      ...prevElement,
+      width: 320,
+      height: 180,
+    };
+    const animationBus = { dispatch: vi.fn() };
+    const completionTracker = {
+      getVersion: vi.fn().mockReturnValue(4),
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const deferRenderStateCommit = vi.fn();
+
+    updateVideo({
+      parent: { children: [videoElement] },
+      prevElement,
+      nextElement,
+      animations: [
+        {
+          id: "video-scale-auto",
+          targetId: "video-1",
+          type: "update",
+          tween: {
+            scaleX: { auto: { duration: 300 } },
+            scaleY: { auto: { duration: 300 } },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker,
+      deferRenderStateCommit,
+      commitRenderState: vi.fn(),
+      signal: new AbortController().signal,
+      zIndex: 0,
+    });
+
+    expect(animationBus.dispatch).not.toHaveBeenCalled();
+    expect(deferRenderStateCommit).toHaveBeenCalledOnce();
+
+    const sizes = captureManagedVideoSpriteSizes(source);
+    currentVideo.videoWidth = 640;
+    currentVideo.videoHeight = 360;
+    source.width = 640;
+    source.height = 360;
+    restoreManagedVideoSpriteSizes(sizes);
+
+    expect(animationBus.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          targetState: expect.objectContaining({
+            scaleX: 0.5,
+            scaleY: 0.5,
+          }),
+        }),
+      }),
+    );
+    expect(completionTracker.complete).toHaveBeenCalledWith(4);
   });
 
   it("does not re-track pre-synced non-looping video playback on animation completion", () => {

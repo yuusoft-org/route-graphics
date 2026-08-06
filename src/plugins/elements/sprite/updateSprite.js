@@ -30,6 +30,7 @@ import { setupScrollInteraction } from "../util/setupScrollInteraction.js";
 import {
   applyElementTransform,
   getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
 } from "../util/transform.js";
 import { setElementRenderState } from "../elementRenderState.js";
 
@@ -336,6 +337,10 @@ export const updateSprite = ({
     element: spriteElement,
     targetState: {
       ...getElementTransformTargetState(nextElement),
+      ...getTextureBackedScaleTargetState(spriteElement, nextElement, {
+        width,
+        height,
+      }),
       width,
       height,
       alpha,

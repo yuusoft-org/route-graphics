@@ -58,6 +58,26 @@ const applyElementScale = (
   });
 };
 
+export const applyElementScaleAndPivot = (
+  displayObject,
+  element,
+  {
+    localOriginX,
+    localOriginY,
+    scaleMode = "sign",
+    preserveScaleMagnitude = false,
+  } = {},
+) => {
+  applyElementScale(displayObject, element, {
+    scaleMode,
+    preserveScaleMagnitude,
+  });
+  applyElementPivot(displayObject, element, {
+    localOriginX,
+    localOriginY,
+  });
+};
+
 export const getElementTransformPosition = (element) => ({
   x: Math.round((element.x ?? 0) + (element.originX ?? 0)),
   y: Math.round((element.y ?? 0) + (element.originY ?? 0)),
@@ -104,17 +124,78 @@ export const applyElementTransform = (
 ) => {
   const position = getElementTransformPosition(element);
 
-  applyElementScale(displayObject, element, {
-    scaleMode,
-    preserveScaleMagnitude,
-  });
-  applyElementPivot(displayObject, element, {
+  applyElementScaleAndPivot(displayObject, element, {
     localOriginX,
     localOriginY,
+    scaleMode,
+    preserveScaleMagnitude,
   });
   displayObject.x = position.x;
   displayObject.y = position.y;
   displayObject.rotation = degreesToRadians(element.rotation ?? 0);
+};
+
+const getTextureDimension = (displayObject, axis) => {
+  const dimension = axis === "x" ? "width" : "height";
+  const textureDimension =
+    displayObject.texture?.orig?.[dimension] ??
+    displayObject.texture?.source?.[dimension];
+
+  if (Number.isFinite(textureDimension) && textureDimension > 0) {
+    return textureDimension;
+  }
+
+  const renderedDimension = Math.abs(displayObject[dimension]);
+  const currentScale = Math.abs(displayObject.scale?.[axis]);
+  const inferredDimension = renderedDimension / currentScale;
+
+  return Number.isFinite(inferredDimension) && inferredDimension > 0
+    ? inferredDimension
+    : undefined;
+};
+
+const getTextureBackedAxisTarget = (
+  displayObject,
+  element,
+  axis,
+  dimension,
+) => {
+  const authoredScale = getAuthoredScale(
+    axis === "x" ? element.scaleX : element.scaleY,
+  );
+  const scaleSign = Math.sign(authoredScale);
+
+  if (scaleSign === 0) {
+    return 0;
+  }
+
+  const textureDimension = getTextureDimension(displayObject, axis);
+  const targetDimension = Math.abs(dimension);
+
+  if (
+    Number.isFinite(targetDimension) &&
+    Number.isFinite(textureDimension) &&
+    textureDimension > 0
+  ) {
+    return (scaleSign * targetDimension) / textureDimension;
+  }
+
+  const currentMagnitude = Math.abs(displayObject.scale?.[axis]);
+  return scaleSign * (Number.isFinite(currentMagnitude) ? currentMagnitude : 1);
+};
+
+export const getTextureBackedScaleTargetState = (
+  displayObject,
+  element,
+  dimensions = {},
+) => {
+  const width = dimensions.width ?? element.width ?? displayObject.width;
+  const height = dimensions.height ?? element.height ?? displayObject.height;
+
+  return {
+    scaleX: getTextureBackedAxisTarget(displayObject, element, "x", width),
+    scaleY: getTextureBackedAxisTarget(displayObject, element, "y", height),
+  };
 };
 
 export const getElementTransformTargetState = (element, extra = {}) => {

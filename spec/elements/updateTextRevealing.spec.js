@@ -59,6 +59,50 @@ describe("updateTextRevealing", () => {
     });
   });
 
+  it("uses full authored scales as auto tween targets", async () => {
+    const parent = new Container();
+    const child = new Container();
+    child.label = "line-1";
+    parent.addChild(child);
+    const previous = createElement({ scaleX: -1, scaleY: 1 });
+    const next = createElement({ scaleX: -2, scaleY: 1.5 });
+    const animationBus = { dispatch: vi.fn() };
+
+    await updateTextRevealing({
+      parent,
+      prevElement: previous,
+      nextElement: next,
+      animations: [
+        {
+          id: "line-scale",
+          targetId: "line-1",
+          type: "update",
+          tween: {
+            scaleX: { auto: { duration: 300 } },
+            scaleY: { auto: { duration: 300 } },
+          },
+        },
+      ],
+      animationBus,
+      renderContext: createRenderContext(),
+      completionTracker: createCompletionTracker(),
+      zIndex: 0,
+      signal: new AbortController().signal,
+    });
+
+    expect(animationBus.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "START",
+        payload: expect.objectContaining({
+          targetState: expect.objectContaining({
+            scaleX: -2,
+            scaleY: 1.5,
+          }),
+        }),
+      }),
+    );
+  });
+
   it("restarts reveal when position or alpha changes", async () => {
     const parent = new Container();
     const child = new Container();

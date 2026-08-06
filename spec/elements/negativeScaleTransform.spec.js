@@ -1,9 +1,11 @@
 import { Container, Sprite, Texture } from "pixi.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { addSprite } from "../../src/plugins/elements/sprite/addSprite.js";
 import { parseSprite } from "../../src/plugins/elements/sprite/parseSprite.js";
 import {
   applyElementTransform,
   getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
   refreshElementPivot,
 } from "../../src/plugins/elements/util/transform.js";
 import { hitTestElementBounds } from "../../src/util/hitTestElementBounds.js";
@@ -84,6 +86,115 @@ describe("negative scale transforms", () => {
     );
 
     expect(display.scale).toEqual({ x: -3, y: 4 });
+  });
+
+  it("targets the signed display scale implied by texture-backed dimensions", () => {
+    const display = {
+      ...createDisplay({ x: -2, y: 3 }),
+      width: 200,
+      height: 90,
+      texture: {
+        orig: { width: 50, height: 30 },
+      },
+    };
+
+    expect(
+      getTextureBackedScaleTargetState(
+        display,
+        { scaleX: -1.5, scaleY: 2 },
+        { width: 240, height: 120 },
+      ),
+    ).toEqual({ scaleX: -4.8, scaleY: 4 });
+  });
+
+  it("uses the mounted sprite display scale as its auto tween destination", () => {
+    const parent = new Container();
+    const animationBus = { dispatch: vi.fn() };
+    const element = parseSprite({
+      state: {
+        id: "mounted-sprite",
+        type: "sprite",
+        src: "",
+        x: 100,
+        y: 80,
+        width: 90,
+        height: 40,
+        scaleX: -1.5,
+      },
+    });
+
+    addSprite({
+      app: {},
+      parent,
+      element,
+      animations: [
+        {
+          id: "mounted-scale-auto",
+          targetId: "mounted-sprite",
+          type: "update",
+          tween: {
+            scaleX: { auto: { duration: 300 } },
+            scaleY: { auto: { duration: 300 } },
+          },
+        },
+      ],
+      animationBus,
+      completionTracker: {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+      },
+      zIndex: 0,
+    });
+
+    const sprite = parent.getChildByLabel("mounted-sprite");
+    const targetState =
+      animationBus.dispatch.mock.calls[0][0].payload.targetState;
+
+    expect(targetState.scaleX).toBe(sprite.scale.x);
+    expect(targetState.scaleY).toBe(sprite.scale.y);
+    expect(targetState.scaleX).toBeLessThan(-1);
+  });
+
+  it("falls back to source and inferred texture dimensions", () => {
+    expect(
+      getTextureBackedScaleTargetState(
+        {
+          ...createDisplay({ x: -4, y: 2 }),
+          width: 320,
+          height: 180,
+          texture: { source: { width: 640, height: 360 } },
+        },
+        { scaleX: -1 },
+      ),
+    ).toEqual({ scaleX: -0.5, scaleY: 0.5 });
+
+    expect(
+      getTextureBackedScaleTargetState(
+        {
+          ...createDisplay({ x: -4, y: 2 }),
+          width: 320,
+          height: 180,
+          texture: {},
+        },
+        { scaleX: -1 },
+        { width: 160, height: 270 },
+      ),
+    ).toEqual({ scaleX: -2, scaleY: 3 });
+  });
+
+  it("keeps zero authored texture scale collapsed", () => {
+    expect(
+      getTextureBackedScaleTargetState(
+        {
+          ...createDisplay(),
+          width: 100,
+          height: 50,
+          texture: { orig: { width: 25, height: 10 } },
+        },
+        { scaleX: 0, scaleY: 0 },
+      ),
+    ).toEqual({ scaleX: 0, scaleY: 0 });
   });
 
   it("does not overwrite unrelated existing Pixi scale", () => {

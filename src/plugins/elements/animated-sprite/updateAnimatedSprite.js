@@ -25,7 +25,10 @@ import {
   resolveAnimatedSpriteFrameTextures,
 } from "./animatedSpriteConfig.js";
 import { setElementRenderState } from "../elementRenderState.js";
-import { getElementTransformTargetState } from "../util/transform.js";
+import {
+  getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
+} from "../util/transform.js";
 import {
   applyAnimatedSpriteTransform,
   refreshAnimatedSpritePivot,
@@ -276,6 +279,10 @@ export const updateAnimatedSprite = async ({
     element: animatedSpriteElement,
     targetState: {
       ...getElementTransformTargetState(nextElement),
+      ...getTextureBackedScaleTargetState(animatedSpriteElement, nextElement, {
+        width,
+        height,
+      }),
       width,
       height,
       alpha,

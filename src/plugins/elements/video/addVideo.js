@@ -2,7 +2,10 @@ import { Texture, Sprite } from "pixi.js";
 import { syncVideoPlaybackTracking } from "./playbackTracking.js";
 import { queueDeferredVideoPlay } from "../renderContext.js";
 import { normalizeVolume } from "../../../util/normalizeVolume.js";
-import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
+import {
+  dispatchLiveAnimations,
+  getLiveAnimations,
+} from "../../animations/planAnimations.js";
 import {
   getBlurTargetState,
   hasBlurUpdateAnimation,
@@ -14,13 +17,16 @@ import {
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
 import {
+  hasManagedVideoTextureDimensions,
   registerManagedVideoSprite,
   requestManagedVideoTextureUpdate,
   setManagedVideoSpriteResizeHandler,
 } from "./managedVideoTextureSizing.js";
 import {
+  applyElementScaleAndPivot,
   applyElementTransform,
   getElementTransformTargetState,
+  getTextureBackedScaleTargetState,
 } from "../util/transform.js";
 
 /**
@@ -35,6 +41,7 @@ export const addVideo = ({
   renderContext,
   completionTracker,
   zIndex,
+  signal,
 }) => {
   const { id, width, height, src, volume, loop, alpha } = element;
 
@@ -57,8 +64,76 @@ export const addVideo = ({
   sprite.width = Math.round(width);
   sprite.height = Math.round(height);
   applyElementTransform(sprite, element, { preserveScaleMagnitude: true });
+  const targetState = {
+    ...getElementTransformTargetState(element),
+    ...getTextureBackedScaleTargetState(sprite, element, { width, height }),
+    width,
+    height,
+    alpha: alpha ?? 1,
+  };
+  let waitingForTextureDimensions = false;
+  let textureWaitVersion;
+
+  const refreshScaleTargetState = () => {
+    Object.assign(
+      targetState,
+      getTextureBackedScaleTargetState(sprite, element, { width, height }),
+    );
+  };
+
+  const releaseTextureWait = () => {
+    if (!waitingForTextureDimensions) return;
+    waitingForTextureDimensions = false;
+    signal?.removeEventListener?.("abort", cancelTextureWait);
+    video.removeEventListener?.("error", cancelTextureWait);
+    completionTracker?.complete?.(textureWaitVersion);
+  };
+
+  const cancelTextureWait = () => {
+    releaseTextureWait();
+  };
+
+  const dispatchAnimations = () => {
+    if (signal?.aborted || sprite.destroyed) {
+      releaseTextureWait();
+      return false;
+    }
+
+    refreshScaleTargetState();
+    Object.assign(
+      targetState,
+      getBlurTargetState(element, { force: shouldForceBlur }),
+      getShaderFilterTargetState(element, {
+        force: shouldForceShaderProgress,
+      }),
+    );
+    try {
+      return dispatchLiveAnimations({
+        animations,
+        targetId: id,
+        animationBus,
+        completionTracker,
+        element: sprite,
+        targetState,
+        renderContext,
+      });
+    } finally {
+      releaseTextureWait();
+    }
+  };
+
   setManagedVideoSpriteResizeHandler(sprite, () => {
-    applyElementTransform(sprite, element, { preserveScaleMagnitude: true });
+    applyElementScaleAndPivot(sprite, element, {
+      preserveScaleMagnitude: true,
+    });
+    refreshScaleTargetState();
+
+    if (
+      waitingForTextureDimensions &&
+      hasManagedVideoTextureDimensions(sprite)
+    ) {
+      dispatchAnimations();
+    }
   });
   registerManagedVideoSprite(sprite);
   sprite.alpha = alpha ?? 1;
@@ -85,22 +160,21 @@ export const addVideo = ({
   requestManagedVideoTextureUpdate(sprite);
   queueDeferredVideoPlay(renderContext, video);
 
-  dispatchLiveAnimations({
-    animations,
-    targetId: id,
-    animationBus,
-    completionTracker,
-    element: sprite,
-    targetState: {
-      ...getElementTransformTargetState(element),
-      width,
-      height,
-      alpha: alpha ?? 1,
-      ...getBlurTargetState(element, { force: shouldForceBlur }),
-      ...getShaderFilterTargetState(element, {
-        force: shouldForceShaderProgress,
-      }),
-    },
-    renderContext,
-  });
+  const needsStableAutoScaleTarget = getLiveAnimations(animations, id).some(
+    (animation) =>
+      animation.tween?.scaleX?.auto !== undefined ||
+      animation.tween?.scaleY?.auto !== undefined,
+  );
+
+  if (needsStableAutoScaleTarget && !hasManagedVideoTextureDimensions(sprite)) {
+    waitingForTextureDimensions = true;
+    textureWaitVersion = completionTracker?.getVersion?.();
+    completionTracker?.track?.(textureWaitVersion);
+    signal?.addEventListener?.("abort", cancelTextureWait, { once: true });
+    video.addEventListener?.("error", cancelTextureWait, { once: true });
+    sprite.once?.("destroyed", cancelTextureWait);
+    return;
+  }
+
+  dispatchAnimations();
 };
