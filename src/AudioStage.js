@@ -819,6 +819,8 @@ const createChannelInstance = (channel, outputNode) => {
     outputNode,
     cleanupTimeoutId: null,
     deferredRemovalToken: null,
+    detached: false,
+    cleanedUp: false,
   };
 };
 
@@ -866,6 +868,8 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     delayDeadlineMs: null,
     channelPauseState: null,
     cleanupTimeoutId: null,
+    cleanupDeadlineTime: null,
+    ownExitDeadlineTime: null,
     playRequestId: 0,
     playback: sound.playback ?? null,
     control: sound.playback
@@ -1089,6 +1093,8 @@ const cleanupSound = (sound) => {
     cancelTimeout(sound.cleanupTimeoutId);
     sound.cleanupTimeoutId = null;
   }
+  sound.cleanupDeadlineTime = null;
+  sound.ownExitDeadlineTime = null;
 
   stopSource(sound);
   disconnect(sound.source);
@@ -1098,10 +1104,14 @@ const cleanupSound = (sound) => {
 };
 
 const cleanupChannel = (channel) => {
+  if (channel.cleanedUp) return;
+
   if (channel.cleanupTimeoutId !== null) {
     cancelTimeout(channel.cleanupTimeoutId);
     channel.cleanupTimeoutId = null;
   }
+  channel.deferredRemovalToken = null;
+  channel.cleanedUp = true;
   disconnect(channel.gainNode);
   disconnect(channel.pannerNode);
   disconnect(channel.muteGainNode);
@@ -2412,6 +2422,7 @@ export const createAudioStage = () => {
 
     if (existing) {
       existing.deferredRemovalToken = null;
+      existing.detached = false;
       const currentVolumeValue = getVolumeValue(existing);
       const nextVolumeValue = getVolumeValue(channel);
       const volumeChanged = currentVolumeValue !== nextVolumeValue;
@@ -2619,13 +2630,33 @@ export const createAudioStage = () => {
     return Math.max(volumeDuration, panDuration, playbackRateDuration);
   };
 
+  const completeRemovedSoundInstance = (instance) => {
+    const finishingCallbacks = [...instance.finishingCallbacks];
+    instance.finishingCallbacks.clear();
+    forgetOwnedSound(instance);
+    cleanupSound(instance);
+    sounds.delete(instance.internalId);
+    finishingCallbacks.forEach((callback) => callback());
+  };
+
+  const scheduleRemovedSoundCleanup = (instance, duration) => {
+    if (instance.cleanupTimeoutId !== null) {
+      cancelTimeout(instance.cleanupTimeoutId);
+    }
+    instance.cleanupDeadlineTime =
+      getAudioContext().currentTime + duration / 1000;
+    stopSource(instance, duration);
+    instance.cleanupTimeoutId = schedule(
+      () => completeRemovedSoundInstance(instance),
+      duration,
+    );
+  };
+
   const removeSoundInstance = (instance, effects, inheritedDuration = 0) => {
     if (!instance) return 0;
 
-    const finishingCallbacks = [...instance.finishingCallbacks];
     instance.finishing = false;
     instance.pendingEnterTransitions = null;
-    instance.finishingCallbacks.clear();
     instance.onSourceEnded = null;
 
     const volumeTransition = getTransitionPhase(
@@ -2667,15 +2698,27 @@ export const createAudioStage = () => {
     );
     const duration = Math.max(ownDuration, inheritedDuration);
 
-    stopSource(instance, duration);
-    instance.cleanupTimeoutId = schedule(() => {
-      forgetOwnedSound(instance);
-      cleanupSound(instance);
-      sounds.delete(instance.internalId);
-      finishingCallbacks.forEach((callback) => callback());
-    }, duration);
+    instance.ownExitDeadlineTime =
+      getAudioContext().currentTime + ownDuration / 1000;
+    scheduleRemovedSoundCleanup(instance, duration);
 
     return duration;
+  };
+
+  const releaseInheritedSoundTail = (instance) => {
+    if (
+      instance.cleanupTimeoutId === null ||
+      instance.ownExitDeadlineTime === null ||
+      instance.cleanupDeadlineTime <= instance.ownExitDeadlineTime
+    ) {
+      return;
+    }
+
+    const remainingOwnDuration = Math.max(
+      0,
+      (instance.ownExitDeadlineTime - getAudioContext().currentTime) * 1000,
+    );
+    scheduleRemovedSoundCleanup(instance, remainingOwnDuration);
   };
 
   const finishSoundInstance = (
@@ -2941,7 +2984,9 @@ export const createAudioStage = () => {
     }
 
     if (instance.control) {
-      if (replay) {
+      const commandWillBeAccepted =
+        sound.playback.commandId > instance.control.commandId;
+      if (replay && commandWillBeAccepted) {
         instance.pendingEnterTransitions = {
           volume: getTransitionPhase(effects, sound.id, "volume", "enter"),
           pan: getTransitionPhase(effects, sound.id, "pan", "enter"),
@@ -3060,12 +3105,22 @@ export const createAudioStage = () => {
     if (!ownership) return;
 
     const properties = new Set(Object.keys(ownership.effect.properties));
+    const isOwnedByAnotherEffect = (instance) =>
+      [...ownedAudioEffects.values()].some(
+        (candidate) =>
+          candidate !== ownership && candidate.soundInstances.has(instance),
+      );
+    const sharedTailInstances = new Set();
     for (const instance of ownership.soundInstances) {
       const isCurrent =
         sounds.get(instance.internalId) === instance &&
         currentSoundKeyById.get(instance.id) === instance.internalId;
       if (!isCurrent) {
-        removeSoundInstance(instance, [], 0);
+        if (isOwnedByAnotherEffect(instance)) {
+          sharedTailInstances.add(instance);
+        } else {
+          removeSoundInstance(instance, [], 0);
+        }
         continue;
       }
 
@@ -3079,6 +3134,36 @@ export const createAudioStage = () => {
     }
 
     for (const channel of ownership.channelInstances) {
+      if (channel.detached) {
+        for (const property of properties) {
+          if (claimedProperties.has(property)) {
+            holdChannelProperty(channel, property);
+          } else {
+            settleChannelProperty(channel, settlementNode, property);
+          }
+        }
+
+        const releaseWhenSharedTailsFinish = () => {
+          if (channel.cleanedUp) return;
+          const hasSharedTail = [...sharedTailInstances].some(
+            (instance) => sounds.get(instance.internalId) === instance,
+          );
+          if (hasSharedTail) return;
+
+          forgetOwnedChannel(channel);
+          cleanupChannel(channel);
+          if (channels.get(channel.id) === channel) {
+            channels.delete(channel.id);
+          }
+        };
+        for (const instance of sharedTailInstances) {
+          instance.finishingCallbacks.add(releaseWhenSharedTailsFinish);
+          releaseInheritedSoundTail(instance);
+        }
+        releaseWhenSharedTailsFinish();
+        continue;
+      }
+
       const isCurrent = channels.get(channel.id) === channel;
       if (!isCurrent) {
         cleanupChannel(channel);
@@ -3315,6 +3400,9 @@ export const createAudioStage = () => {
     for (const [id, prevChannel] of prevChannelById) {
       if (!nextChannelById.has(id)) {
         const channel = channels.get(id);
+        if (channel) {
+          channel.detached = true;
+        }
         ownChannel(id, channel);
         const duration = removeChannel(channel, acceptedTransitions);
         channelCleanupDurations.set(id, duration);

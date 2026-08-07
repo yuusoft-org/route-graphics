@@ -1222,6 +1222,73 @@ describe("command-controlled sound playback", () => {
     );
   });
 
+  it("does not arm a replay effect for a command the renderer already accepted", async () => {
+    const { context, render, stage } = await setupControlledStage();
+    render([
+      playbackSound({
+        commandId: 3,
+        operation: "play",
+        positionMs: 0,
+        volume: 80,
+      }),
+    ]);
+    await flushMicrotasks();
+
+    render([
+      playbackSound({
+        commandId: 2,
+        operation: "play",
+        positionMs: 0,
+        volume: 80,
+      }),
+    ]);
+
+    const replayEnter = audioEffect("player-enter:3", {
+      volume: {
+        enter: {
+          initialValue: 0,
+          keyframes: [{ value: 80, duration: 500 }],
+        },
+      },
+    });
+    render(
+      [
+        playbackSound({
+          commandId: 3,
+          operation: "play",
+          positionMs: 1000,
+          volume: 80,
+        }),
+      ],
+      replayEnter,
+    );
+
+    const currentKey = stage._inspect().currentSoundKeyById.get("player");
+    const instance = stage._inspect().sounds.get(currentKey);
+    expect(instance.control.commandId).toBe(3);
+    expect(instance.pendingEnterTransitions).toBeNull();
+    expect(
+      instance.gainNode.gain.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
+    expect(context.sources).toHaveLength(1);
+
+    render([
+      playbackSound({
+        commandId: 4,
+        operation: "play",
+        positionMs: 2000,
+        volume: 80,
+      }),
+    ]);
+    await flushMicrotasks();
+
+    expect(context.sources).toHaveLength(2);
+    expect(instance.control.commandId).toBe(4);
+    expect(
+      instance.gainNode.gain.linearRampToValueAtTime,
+    ).not.toHaveBeenCalled();
+  });
+
   it("carries active playback-rate automation across a same-source transport restart", async () => {
     const { context, render } = await setupControlledStage();
     const transition = audioEffect("player-rate-enter:1", {

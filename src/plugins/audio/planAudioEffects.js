@@ -196,6 +196,9 @@ export const planAudioEffects = ({
   const prevEffects = prevState.audioEffects ?? [];
   const nextEffects = nextState.audioEffects ?? [];
   const prevById = new Map(prevEffects.map((effect) => [effect.id, effect]));
+  const prevIndexById = new Map(
+    prevEffects.map((effect, index) => [effect.id, index]),
+  );
   const nextIndexById = new Map(
     nextEffects.map((effect, index) => [effect.id, index]),
   );
@@ -284,9 +287,25 @@ export const planAudioEffects = ({
   for (const effect of previousOccurrences.values()) {
     if (continuedIds.has(effect.id)) continue;
 
+    const ownership = ownedAudioEffects.get(effect.id) ?? null;
+    if (!ownership) {
+      const prevNode = prevNodes.byId.get(effect.targetId);
+      const path = `previous audioEffects[${prevIndexById.get(effect.id)}]`;
+      if (!prevNode) {
+        throw new Error(
+          `Input error: ${path}.targetId "${effect.targetId}" does not resolve to an audio node or renderer ownership record.`,
+        );
+      }
+      validatePropertiesForTarget({
+        effect,
+        targetType: prevNode.type,
+        path,
+      });
+    }
+
     const entry = {
       effect,
-      ownership: ownedAudioEffects.get(effect.id) ?? null,
+      ownership,
     };
     if (acceptedTargets.has(effect.targetId)) {
       superseded.push(entry);

@@ -3501,6 +3501,121 @@ describe("AudioStage graph rendering", () => {
     expect(stage._inspect().channels.has("music")).toBe(false);
   });
 
+  it("releases a detached channel as soon as its exit effect settles", async () => {
+    const { stage } = await setupAudioStage();
+    const audio = [
+      {
+        id: "music",
+        type: "audio-channel",
+        volume: 100,
+        children: [],
+      },
+    ];
+    const channelEffect = {
+      id: "music-exit:visit-1",
+      type: "audio-transition",
+      targetId: "music",
+      properties: {
+        volume: { exit: keyframePhase(0, 5000) },
+      },
+    };
+
+    stage.renderGraph({ nextAudio: audio });
+    const channel = stage._inspect().channels.get("music");
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: [channelEffect],
+    });
+
+    expect(channel.detached).toBe(true);
+    expect(channel.cleanupTimeoutId).not.toBeNull();
+    expect(stage._inspect().channels.get("music")).toBe(channel);
+
+    stage.renderGraph({
+      prevAudio: [],
+      nextAudio: [],
+      prevAudioEffects: [channelEffect],
+    });
+
+    expect(channel.gainNode.disconnect).toHaveBeenCalledTimes(1);
+    expect(stage._inspect().channels.has("music")).toBe(false);
+  });
+
+  it("preserves a shared child exit tail when its detached channel effect settles", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 20 }]]),
+    });
+    const audio = [
+      {
+        id: "music",
+        type: "audio-channel",
+        volume: 100,
+        children: [
+          {
+            id: "bgm",
+            type: "sound",
+            src: "theme",
+            volume: 100,
+          },
+        ],
+      },
+    ];
+    const channelEffect = {
+      id: "music-exit:visit-1",
+      type: "audio-transition",
+      targetId: "music",
+      properties: {
+        volume: { exit: keyframePhase(0, 5000) },
+      },
+    };
+    const soundEffect = {
+      id: "bgm-exit:visit-1",
+      type: "audio-transition",
+      targetId: "bgm",
+      properties: {
+        volume: { exit: keyframePhase(0, 1000) },
+      },
+    };
+
+    stage.renderGraph({ nextAudio: audio });
+    const sound = findCurrentSound(stage, "bgm");
+    const channel = stage._inspect().channels.get("music");
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: [channelEffect, soundEffect],
+    });
+
+    expect(
+      stage._inspect().ownedAudioEffects.get(channelEffect.id).soundInstances,
+    ).toContain(sound);
+    expect(
+      stage._inspect().ownedAudioEffects.get(soundEffect.id).soundInstances,
+    ).toContain(sound);
+    expect(sound.source.stop).toHaveBeenLastCalledWith(15);
+
+    context.currentTime = 10.25;
+    vi.advanceTimersByTime(250);
+    stage.renderGraph({
+      prevAudio: [],
+      nextAudio: [],
+      prevAudioEffects: [channelEffect, soundEffect],
+      nextAudioEffects: [soundEffect],
+    });
+
+    expect(stage._inspect().sounds.get(sound.internalId)).toBe(sound);
+    expect(stage._inspect().channels.get("music")).toBe(channel);
+    expect(sound.source.stop).toHaveBeenLastCalledWith(11);
+
+    vi.advanceTimersByTime(749);
+    expect(stage._inspect().sounds.get(sound.internalId)).toBe(sound);
+    expect(stage._inspect().channels.get("music")).toBe(channel);
+    vi.advanceTimersByTime(1);
+    expect(stage._inspect().sounds.has(sound.internalId)).toBe(false);
+    expect(stage._inspect().channels.has("music")).toBe(false);
+  });
+
   it("keeps a child handoff tail alive when a retained channel effect settles", async () => {
     const { stage, context } = await setupAudioStage({
       assetMap: new Map([

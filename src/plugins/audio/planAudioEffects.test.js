@@ -241,6 +241,39 @@ describe("planAudioEffects", () => {
     ]);
   });
 
+  it("rejects an unowned orphan effect from the previous state", () => {
+    const orphan = effect("orphan:1", {
+      volume: { exit: phase(0) },
+    });
+
+    expect(() =>
+      planAudioEffects({
+        prevState: state([], [orphan]),
+        nextState: state(),
+      }),
+    ).toThrow(
+      'previous audioEffects[0].targetId "bgm" does not resolve to an audio node or renderer ownership record',
+    );
+  });
+
+  it("validates properties on unowned previous effects before settlement", () => {
+    const invalid = effect("invalid-channel-exit:1", {
+      playbackRate: { exit: phase(0) },
+    });
+
+    expect(() =>
+      planAudioEffects({
+        prevState: state(
+          [{ id: "bgm", type: "audio-channel", children: [] }],
+          [invalid],
+        ),
+        nextState: state(),
+      }),
+    ).toThrow(
+      'audio transition property "playbackRate" is not supported for target type "audio-channel"',
+    );
+  });
+
   it("rejects phases that do not apply to the current edge", () => {
     const invalid = effect("bad-enter", {
       volume: { enter: phase(80) },
