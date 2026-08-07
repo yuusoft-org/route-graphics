@@ -3055,7 +3055,7 @@ export const createAudioStage = () => {
 
   const releaseEffectOwnership = (
     ownership,
-    { nextNode = null, claimedProperties = new Set() } = {},
+    { settlementNode = null, claimedProperties = new Set() } = {},
   ) => {
     if (!ownership) return;
 
@@ -3073,7 +3073,7 @@ export const createAudioStage = () => {
         if (claimedProperties.has(property)) {
           holdSoundProperty(instance, property);
         } else {
-          settleSoundProperty(instance, nextNode, property);
+          settleSoundProperty(instance, settlementNode, property);
         }
       }
     }
@@ -3089,7 +3089,7 @@ export const createAudioStage = () => {
         if (claimedProperties.has(property)) {
           holdChannelProperty(channel, property);
         } else {
-          settleChannelProperty(channel, nextNode, property);
+          settleChannelProperty(channel, settlementNode, property);
         }
       }
     }
@@ -3101,7 +3101,10 @@ export const createAudioStage = () => {
         (entry) => entry.effect.targetId === effect.targetId,
       );
       releaseEffectOwnership(ownership, {
-        nextNode: accepted?.nextNode ?? null,
+        settlementNode:
+          accepted?.lifecycle === "replace"
+            ? accepted.prevNode
+            : (accepted?.nextNode ?? null),
         claimedProperties: new Set(
           Object.keys(accepted?.effect.properties ?? {}),
         ),
@@ -3111,7 +3114,7 @@ export const createAudioStage = () => {
 
     for (const { effect, ownership } of effectPlan.settled) {
       releaseEffectOwnership(ownership, {
-        nextNode: effectPlan.nextNodes.byId.get(effect.targetId) ?? null,
+        settlementNode: effectPlan.nextNodes.byId.get(effect.targetId) ?? null,
       });
       ownedAudioEffects.delete(effect.id);
     }
@@ -3368,7 +3371,12 @@ export const createAudioStage = () => {
         prevChannelById.get(prevSound.channelId)?.interruption === "loopEnd";
       const finishPreviousSound = () => {
         ownSound(id, instance);
-        ownSound(prevSound.channelId, instance);
+        if (
+          prevSound.channelId !== null &&
+          !nextChannelById.has(prevSound.channelId)
+        ) {
+          ownSound(prevSound.channelId, instance);
+        }
         suppressControlledEvents(instance);
         if (!finishAtLoopEnd) {
           return removeSoundInstance(
@@ -3432,6 +3440,11 @@ export const createAudioStage = () => {
 
     for (const [id, nextSound] of nextSoundById) {
       if (!prevSoundById.has(id)) {
+        const staleKey = currentSoundKeyById.get(id);
+        const staleInstance = staleKey ? sounds.get(staleKey) : null;
+        if (staleInstance) {
+          removeSoundInstance(staleInstance, [], 0);
+        }
         const added = addSoundInstance({
           sound: nextSound,
           effects: acceptedTransitions,

@@ -3108,6 +3108,70 @@ describe("AudioStage graph rendering", () => {
     ).not.toHaveBeenCalled();
   });
 
+  it("retries next-only enter effects after an uncommitted source start", async () => {
+    let startAttempts = 0;
+    const { stage, context } = await setupAudioStage({
+      contextOptions: {
+        startImpl: () => {
+          startAttempts += 1;
+          if (startAttempts === 1) {
+            throw new Error("browser start failure");
+          }
+        },
+      },
+    });
+    const audio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "theme",
+        volume: 80,
+      },
+    ];
+    const audioEffects = [
+      {
+        id: "bgm-enter",
+        type: "audio-transition",
+        targetId: "bgm",
+        properties: {
+          volume: {
+            enter: {
+              initialValue: 0,
+              keyframes: [{ value: 80, duration: 500 }],
+            },
+          },
+        },
+      },
+    ];
+
+    expect(() =>
+      stage.renderGraph({
+        nextAudio: audio,
+        nextAudioEffects: audioEffects,
+      }),
+    ).toThrow("browser start failure");
+    const failedInstance = findCurrentSound(stage, "bgm");
+
+    context.currentTime = 11;
+    expect(() =>
+      stage.renderGraph({
+        nextAudio: audio,
+        nextAudioEffects: audioEffects,
+      }),
+    ).not.toThrow();
+
+    const retriedInstance = findCurrentSound(stage, "bgm");
+    expect(startAttempts).toBe(2);
+    expect(retriedInstance).not.toBe(failedInstance);
+    expect(stage._inspect().sounds.size).toBe(1);
+    expect(
+      retriedInstance.gainNode.gain.setValueAtTime,
+    ).toHaveBeenLastCalledWith(0, 11);
+    expect(
+      retriedInstance.gainNode.gain.linearRampToValueAtTime,
+    ).toHaveBeenLastCalledWith(0.8, 11.5);
+  });
+
   it("supersedes a pending enter occurrence before delayed playback", async () => {
     const { stage, context } = await setupAudioStage();
     const firstAudio = [
@@ -3435,6 +3499,172 @@ describe("AudioStage graph rendering", () => {
 
     expect(stage._inspect().sounds.has(sound.internalId)).toBe(false);
     expect(stage._inspect().channels.has("music")).toBe(false);
+  });
+
+  it("keeps a child handoff tail alive when a retained channel effect settles", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([
+        ["first", { duration: 20 }],
+        ["second", { duration: 20 }],
+      ]),
+    });
+    const initialAudio = [
+      {
+        id: "music",
+        type: "audio-channel",
+        volume: 100,
+        children: [{ id: "bgm", type: "sound", src: "first", volume: 80 }],
+      },
+    ];
+    const replacementAudio = [
+      {
+        id: "music",
+        type: "audio-channel",
+        volume: 40,
+        children: [{ id: "bgm", type: "sound", src: "second", volume: 80 }],
+      },
+    ];
+    const channelEffect = {
+      id: "music-update:visit-1",
+      type: "audio-transition",
+      targetId: "music",
+      properties: {
+        volume: { update: keyframePhase(40, 1000) },
+      },
+    };
+    const handoffEffect = {
+      id: "bgm-handoff:visit-1",
+      type: "audio-transition",
+      targetId: "bgm",
+      properties: {
+        volume: {
+          exit: keyframePhase(0, 1000),
+          enter: keyframePhase(80, 1000, { initialValue: 0 }),
+        },
+      },
+    };
+
+    stage.renderGraph({ nextAudio: initialAudio });
+    const outgoing = findCurrentSound(stage, "bgm");
+    stage.renderGraph({
+      prevAudio: initialAudio,
+      nextAudio: replacementAudio,
+      nextAudioEffects: [channelEffect, handoffEffect],
+    });
+
+    expect(outgoing.source.stop).toHaveBeenCalledTimes(1);
+    expect(outgoing.source.stop).toHaveBeenLastCalledWith(11);
+    expect(
+      stage._inspect().ownedAudioEffects.get(channelEffect.id).soundInstances,
+    ).not.toContain(outgoing);
+
+    context.currentTime = 10.25;
+    stage.renderGraph({
+      prevAudio: replacementAudio,
+      nextAudio: replacementAudio,
+      prevAudioEffects: [channelEffect, handoffEffect],
+      nextAudioEffects: [handoffEffect],
+    });
+
+    expect(stage._inspect().sounds.get(outgoing.internalId)).toBe(outgoing);
+    expect(outgoing.source.stop).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(999);
+    expect(stage._inspect().sounds.get(outgoing.internalId)).toBe(outgoing);
+    vi.advanceTimersByTime(1);
+    expect(stage._inspect().sounds.has(outgoing.internalId)).toBe(false);
+  });
+
+  it("settles a replacement tail against its outgoing snapshot", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([
+        ["first", { duration: 20 }],
+        ["second", { duration: 20 }],
+      ]),
+      contextOptions: { reflectScheduledAudioParamValue: false },
+    });
+    const initialAudio = [
+      {
+        id: "music",
+        type: "audio-channel",
+        interruption: "loopEnd",
+        children: [
+          { id: "bgm", type: "sound", src: "first", volume: 80, pan: 0 },
+        ],
+      },
+    ];
+    const outgoingAudio = [
+      {
+        ...initialAudio[0],
+        children: [
+          {
+            id: "bgm",
+            type: "sound",
+            src: "first",
+            volume: 80,
+            pan: 0.75,
+          },
+        ],
+      },
+    ];
+    const replacementAudio = [
+      {
+        ...initialAudio[0],
+        children: [
+          {
+            id: "bgm",
+            type: "sound",
+            src: "second",
+            volume: 80,
+            pan: -0.5,
+          },
+        ],
+      },
+    ];
+    const panEffect = {
+      id: "bgm-pan:visit-1",
+      type: "audio-transition",
+      targetId: "bgm",
+      properties: {
+        pan: { update: keyframePhase(0.75, 1000) },
+      },
+    };
+    const handoffEffect = {
+      id: "bgm-handoff:visit-2",
+      type: "audio-transition",
+      targetId: "bgm",
+      properties: {
+        volume: {
+          exit: keyframePhase(0, 1000),
+          enter: keyframePhase(80, 1000, { initialValue: 0 }),
+        },
+      },
+    };
+
+    stage.renderGraph({ nextAudio: initialAudio });
+    stage.renderGraph({
+      prevAudio: initialAudio,
+      nextAudio: outgoingAudio,
+      nextAudioEffects: [panEffect],
+    });
+    const outgoing = findCurrentSound(stage, "bgm");
+
+    context.currentTime = 10.25;
+    stage.renderGraph({
+      prevAudio: outgoingAudio,
+      nextAudio: replacementAudio,
+      prevAudioEffects: [panEffect],
+      nextAudioEffects: [handoffEffect],
+    });
+
+    expect(outgoing.finishing).toBe(true);
+    expect(outgoing.pannerNode.pan.setValueAtTime).toHaveBeenLastCalledWith(
+      0.75,
+      10.25,
+    );
+    expect(outgoing.pannerNode.pan.setValueAtTime).not.toHaveBeenLastCalledWith(
+      -0.5,
+      10.25,
+    );
   });
 
   it("settles an active retained update when its effect is removed", async () => {

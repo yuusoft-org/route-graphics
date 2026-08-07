@@ -204,8 +204,11 @@ export const planAudioEffects = ({
 
   for (const effect of nextEffects) {
     const ownership = ownedAudioEffects.get(effect.id);
-    const previous = prevById.get(effect.id) ?? ownership?.effect;
+    const previous = prevById.get(effect.id);
     const signature = getAudioEffectSignature(effect);
+    const previousSignature = previous
+      ? getAudioEffectSignature(previous)
+      : null;
     const prevNode = prevNodes.byId.get(effect.targetId);
     const nextNode = nextNodes.byId.get(effect.targetId);
     const targetType = getTargetType({
@@ -215,7 +218,7 @@ export const planAudioEffects = ({
       ownedAudioEffects,
     });
 
-    if (ownership?.signature === signature) {
+    if (previousSignature === signature && ownership?.signature === signature) {
       if (!targetType) {
         throw new Error(
           `Input error: continued audio effect "${effect.id}" has no public target or renderer ownership record.`,
@@ -230,11 +233,7 @@ export const planAudioEffects = ({
       continue;
     }
 
-    if (
-      !ownership &&
-      previous &&
-      getAudioEffectSignature(previous) === signature
-    ) {
+    if (!ownership && previous && previousSignature === signature) {
       throw new Error(
         `Input error: audio effect "${effect.id}" cannot continue without renderer ownership.`,
       );

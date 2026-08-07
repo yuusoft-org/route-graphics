@@ -75,6 +75,33 @@ describe("planAudioEffects", () => {
     expect(plan.transitions.size).toBe(0);
   });
 
+  it("accepts a next-only owned effect again after an uncommitted attempt", () => {
+    const enter = effect("enter:1", {
+      volume: { enter: phase(80) },
+    });
+    const ownership = {
+      effect: enter,
+      targetType: "sound",
+      signature: getAudioEffectSignature(enter),
+    };
+
+    const plan = planAudioEffects({
+      prevState: state(),
+      nextState: state([sound()], [enter]),
+      ownedAudioEffects: new Map([[enter.id, ownership]]),
+    });
+
+    expect(plan.continued).toEqual([]);
+    expect(plan.accepted).toMatchObject([
+      {
+        effect: enter,
+        lifecycle: "add",
+        targetType: "sound",
+      },
+    ]);
+    expect(plan.superseded).toEqual([{ effect: enter, ownership }]);
+  });
+
   it("rejects a continued detached effect without renderer ownership", () => {
     const exit = effect("exit:1", {
       volume: { exit: phase(0) },
