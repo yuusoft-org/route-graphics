@@ -52,13 +52,27 @@ describe("rect runtime validation", () => {
             repeatEdgePixels: true,
           },
           hover: {
+            fill: "#eeeeee",
+            alpha: 0.9,
             cursor: "pointer",
             soundSrc: "hover.mp3",
             soundVolume: 40,
             payload: { action: "hover" },
           },
-          click: { payload: { action: "click" } },
+          click: {
+            fill: { type: "solid", color: "#dddddd" },
+            alpha: 0,
+            payload: { action: "click", opacity: 0.4 },
+          },
           rightClick: {
+            fill: {
+              type: "radial-gradient",
+              stops: [
+                { offset: 0, color: "#ffffff" },
+                { offset: 1, color: "#000000" },
+              ],
+            },
+            alpha: 1,
             soundSrc: "context.mp3",
             soundVolume: 25,
           },
@@ -144,6 +158,17 @@ describe("rect runtime validation", () => {
       "unknown hover property",
       { hover: { opacity: 0.5 } },
       "rect.hover.opacity",
+    ],
+    ["out-of-range hover alpha", { hover: { alpha: 1.1 } }, "rect.hover.alpha"],
+    [
+      "non-finite click alpha",
+      { click: { alpha: Number.NaN } },
+      "rect.click.alpha",
+    ],
+    [
+      "invalid right-click fill",
+      { rightClick: { fill: "not-a-real-color()" } },
+      "rect.rightClick.fill",
     ],
     ["non-object click", { click: true }, "rect.click"],
     [

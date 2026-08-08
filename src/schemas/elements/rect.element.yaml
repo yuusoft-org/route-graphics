@@ -251,6 +251,14 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      fill:
+        "$ref": "#/$def/fill"
+        description: Fill while the rect is hovered
+      alpha:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: Alpha while the rect is hovered
       soundSrc:
         type: string
         description: source of sound to be played when hovering over the sprite
@@ -270,6 +278,14 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      fill:
+        "$ref": "#/$def/fill"
+        description: Fill while the rect is pressed with the primary pointer
+      alpha:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: Alpha while the rect is pressed with the primary pointer
       soundSrc:
         type: string
         description: source of sound to be played when the sprite is clicked
@@ -312,6 +328,14 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      fill:
+        "$ref": "#/$def/fill"
+        description: Fill while the rect is pressed with the secondary pointer
+      alpha:
+        type: number
+        minimum: 0
+        maximum: 1
+        description: Alpha while the rect is pressed with the secondary pointer
       soundSrc:
         type: string
         description: source of sound to be played when the rect is right-clicked

@@ -54,8 +54,9 @@ describe("renderElements unchanged update hooks", () => {
 
   it("updates an unchanged shader-filtered element to reset stale progress", () => {
     const parent = new Container();
-    const child = new Container();
+    const child = new Graphics();
     child.label = "shader-rect";
+    child.rect(0, 0, 100, 100).fill("#ffffff");
     parent.addChild(child);
     installShaderProgressProperty(child);
     child.uProgress = 1;

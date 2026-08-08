@@ -325,6 +325,8 @@ const validatePointerEvent = (event, path, { cursor = false } = {}) => {
   assertKnownFields(
     event,
     new Set([
+      "fill",
+      "alpha",
       "soundSrc",
       "soundVolume",
       "payload",
@@ -332,6 +334,12 @@ const validatePointerEvent = (event, path, { cursor = false } = {}) => {
     ]),
     path,
   );
+  if (event.fill !== undefined) {
+    validateRectFill(event.fill, `${path}.fill`);
+  }
+  if (event.alpha !== undefined) {
+    assertRange(event.alpha, `${path}.alpha`, 0, 1);
+  }
   validateSoundFields(event, path, { cursor });
 };
 

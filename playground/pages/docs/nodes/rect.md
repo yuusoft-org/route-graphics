@@ -16,33 +16,33 @@ Try it in the [Playground](/playground/?template=basic-shapes).
 
 ## Field Reference
 
-| Field          | Type             | Required | Default     | Notes                                   |
-| -------------- | ---------------- | -------- | ----------- | --------------------------------------- |
-| `id`           | string           | Yes      | -           | Element id.                             |
-| `type`         | string           | Yes      | -           | Must be `rect`.                         |
-| `width`        | number           | Yes      | -           | Render width.                           |
-| `height`       | number           | Yes      | -           | Render height.                          |
-| `x`            | number           | No       | `0`         | Position before anchor transform.       |
-| `y`            | number           | No       | `0`         | Position before anchor transform.       |
-| `anchorX`      | number           | No       | `0`         | Anchor offset ratio.                    |
-| `anchorY`      | number           | No       | `0`         | Anchor offset ratio.                    |
-| `originX`      | number           | No       | anchor      | Transform origin X in pixels.           |
-| `originY`      | number           | No       | anchor      | Transform origin Y in pixels.           |
-| `alpha`        | number           | No       | `1`         | Opacity `0..1`.                         |
-| `fill`         | string \| object | No       | transparent | Fill color or structured gradient fill. |
-| `border`       | object           | No       | -           | Border config.                          |
-| `cornerRadius` | number \| object | No       | `0`         | Uniform or per-corner radii.            |
-| `rotation`     | number           | No       | `0`         | Degrees.                                |
-| `scaleX`       | number           | No       | `1`         | Horizontal geometry scale.              |
-| `scaleY`       | number           | No       | `1`         | Vertical geometry scale.                |
-| `blur`         | object           | No       | -           | Directional Gaussian blur.              |
-| `filters`      | array            | No       | `[]`        | Ordered custom shader filters.          |
-| `hover`        | object           | No       | -           | Hover event config.                     |
-| `click`        | object           | No       | -           | Click event config.                     |
-| `rightClick`   | object           | No       | -           | Right click event config.               |
-| `drag`         | object           | No       | -           | `start`/`move`/`end` payload hooks.     |
-| `scrollUp`     | object           | No       | -           | Wheel-up payload hook.                  |
-| `scrollDown`   | object           | No       | -           | Wheel-down payload hook.                |
+| Field          | Type             | Required | Default     | Notes                                    |
+| -------------- | ---------------- | -------- | ----------- | ---------------------------------------- |
+| `id`           | string           | Yes      | -           | Element id.                              |
+| `type`         | string           | Yes      | -           | Must be `rect`.                          |
+| `width`        | number           | Yes      | -           | Render width.                            |
+| `height`       | number           | Yes      | -           | Render height.                           |
+| `x`            | number           | No       | `0`         | Position before anchor transform.        |
+| `y`            | number           | No       | `0`         | Position before anchor transform.        |
+| `anchorX`      | number           | No       | `0`         | Anchor offset ratio.                     |
+| `anchorY`      | number           | No       | `0`         | Anchor offset ratio.                     |
+| `originX`      | number           | No       | anchor      | Transform origin X in pixels.            |
+| `originY`      | number           | No       | anchor      | Transform origin Y in pixels.            |
+| `alpha`        | number           | No       | `1`         | Opacity `0..1`.                          |
+| `fill`         | string \| object | No       | transparent | Fill color or structured gradient fill.  |
+| `border`       | object           | No       | -           | Border config.                           |
+| `cornerRadius` | number \| object | No       | `0`         | Uniform or per-corner radii.             |
+| `rotation`     | number           | No       | `0`         | Degrees.                                 |
+| `scaleX`       | number           | No       | `1`         | Horizontal geometry scale.               |
+| `scaleY`       | number           | No       | `1`         | Vertical geometry scale.                 |
+| `blur`         | object           | No       | -           | Directional Gaussian blur.               |
+| `filters`      | array            | No       | `[]`        | Ordered custom shader filters.           |
+| `hover`        | object           | No       | -           | Hover appearance and event config.       |
+| `click`        | object           | No       | -           | Primary-press appearance/event config.   |
+| `rightClick`   | object           | No       | -           | Secondary-press appearance/event config. |
+| `drag`         | object           | No       | -           | `start`/`move`/`end` payload hooks.      |
+| `scrollUp`     | object           | No       | -           | Wheel-up payload hook.                   |
+| `scrollDown`   | object           | No       | -           | Wheel-down payload hook.                 |
 
 `filters` runs after built-in rendering effects. See
 [Shaders](/docs/guides/shaders/) for source, uniform, texture, pipeline, and
@@ -133,6 +133,61 @@ Gradient notes:
 
 The public fill contract is renderer-independent. Renderer resources and
 sampling objects are managed internally.
+
+## Interaction Appearance
+
+`hover`, `click`, and `rightClick` can override `fill` and `alpha` while their
+pointer state is active. The same objects continue to carry event metadata.
+
+| Field         | `hover` | `click` | `rightClick` |
+| ------------- | ------- | ------- | ------------ |
+| `fill`        | Yes     | Yes     | Yes          |
+| `alpha`       | Yes     | Yes     | Yes          |
+| `soundSrc`    | Yes     | Yes     | Yes          |
+| `soundVolume` | Yes     | Yes     | Yes          |
+| `payload`     | Yes     | Yes     | Yes          |
+| `cursor`      | Yes     | No      | No           |
+
+```yaml
+fill: "#202020"
+alpha: 0.8
+hover:
+  fill: "#303030"
+  alpha: 0.9
+  cursor: pointer
+click:
+  fill: "#101010"
+  alpha: 0.7
+  payload:
+    action: select
+rightClick:
+  fill: "#401010"
+  alpha: 0.75
+```
+
+The visual lifecycle is:
+
+- hover appearance applies while the pointer is over the rect
+- click appearance applies while the primary pointer is held down
+- right-click appearance applies while the secondary pointer is held down
+- releasing outside clears pressed appearance without emitting a successful
+  click event
+
+When states overlap, each field resolves independently in this order:
+
+1. active `rightClick`
+2. active `click`
+3. active `hover`
+4. current base value
+
+This means a click state that defines only `alpha` keeps the active hover fill.
+Base fill and alpha animations continue underneath interaction overrides;
+releasing an override reveals the latest animated value.
+
+Route Graphics uses `alpha` as its canonical renderer field. It does not accept
+`opacity`, `colorId`, or other embedding-layer aliases in interaction objects.
+Embedding layers must resolve those values before rendering. Keys inside
+`payload` are arbitrary event data and are never interpreted as appearance.
 
 ## Rect Style Animation
 
@@ -246,16 +301,22 @@ elements:
       color: "0xffffff"
       alpha: 0.7
     hover:
+      fill: "0x303030"
+      alpha: 0.9
       cursor: pointer
       soundSrc: hover-sfx
       payload:
         action: panelHover
     click:
+      fill: "0x101010"
+      alpha: 0.7
       soundSrc: click-sfx
       soundVolume: 90
       payload:
         action: panelClick
     rightClick:
+      fill: "0x401010"
+      alpha: 0.75
       soundSrc: rightclick-sfx
       payload:
         action: panelContext

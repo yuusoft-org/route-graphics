@@ -15,8 +15,11 @@ import {
   hasShaderProgressUpdateAnimation,
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
-import { drawRectVisual } from "./rectDrawing.js";
 import { bindRectInteractions } from "./rectInteractions.js";
+import {
+  installRectAppearanceRuntime,
+  notifyRectBaseStyleChange,
+} from "./rectAppearanceRuntime.js";
 import {
   getRectStyleTargetState,
   installRectStyleRuntime,
@@ -54,10 +57,7 @@ export const addRect = ({
     rect,
     element,
     (property, runtime) => {
-      drawRectVisual(rect, runtime.state, {
-        ...runtime.element,
-        ...runtime.state,
-      });
+      notifyRectBaseStyleChange(rect);
       const dimensionChanged =
         property === "rect.width" ||
         property === "rect.height" ||
@@ -74,6 +74,7 @@ export const addRect = ({
       }
     },
   );
+  installRectAppearanceRuntime(rect, element, styleRuntime);
   const targetState = getElementTransformTargetState(element, { alpha });
 
   if (scaleX !== undefined) {
@@ -85,8 +86,6 @@ export const addRect = ({
   }
 
   const drawRect = () => {
-    drawRectVisual(rect, styleRuntime.state, element);
-    rect.alpha = alpha;
     // Rect computed nodes already bake scale into width/height for layout.
     // Reset the live transform so update tweens do not double-apply scale.
     rect.scale.x = 1;
