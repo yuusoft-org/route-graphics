@@ -27,6 +27,16 @@ const LISTENER_EVENTS = [
 const getPayload = (config) =>
   config?.payload && typeof config.payload === "object" ? config.payload : {};
 
+const hasInteractionConfig = (element) =>
+  Boolean(
+    element.hover ||
+    element.click ||
+    element.rightClick ||
+    element.scrollUp ||
+    element.scrollDown ||
+    element.drag,
+  );
+
 const emit = (eventHandler, eventName, rect, config, eventData = {}) => {
   eventHandler?.(eventName, {
     _event: {
@@ -182,8 +192,11 @@ const syncBinding = (binding, { app, element, eventHandler }) => {
 
   if (!element.hover) {
     binding.hoverController.setDirectHover(false);
-    binding.rect.cursor = "auto";
   }
+  binding.rect.cursor =
+    element.hover && binding.hoverController.isHovering()
+      ? (element.hover.cursor ?? "auto")
+      : "auto";
   if (!element.click) {
     binding.pressController.setDirectPress(false);
   }
@@ -197,18 +210,7 @@ const syncBinding = (binding, { app, element, eventHandler }) => {
   syncAppearanceState(binding);
 
   binding.rect._cleanupScrollInteraction?.();
-  const hasInteraction = Boolean(
-    element.hover ||
-    element.click ||
-    element.rightClick ||
-    element.scrollUp ||
-    element.scrollDown ||
-    element.drag,
-  );
-  binding.rect.eventMode = hasInteraction ? "static" : "auto";
-  if (!hasInteraction) {
-    binding.rect.hitArea = null;
-  }
+  binding.rect.eventMode = "static";
 
   if (element.scrollUp || element.scrollDown) {
     setupScrollInteraction({
@@ -244,6 +246,13 @@ export const cleanupRectInteractions = (rect) => {
 
 export const bindRectInteractions = ({ app, rect, element, eventHandler }) => {
   let binding = rect[RECT_INTERACTION_BINDING];
+  if (!hasInteractionConfig(element)) {
+    if (binding) {
+      cleanupRectInteractions(rect);
+    }
+    return;
+  }
+
   if (!binding) {
     binding = createBinding({ app, rect, element, eventHandler });
     rect[RECT_INTERACTION_BINDING] = binding;

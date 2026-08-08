@@ -129,6 +129,14 @@ describe("event semantics", () => {
     expect(rect.cursor).toBe("auto");
     expect(rect._isDragging).toBe(false);
     expect(rect.hitArea).toBeNull();
+    expect(rect.listenerCount("pointerover")).toBe(0);
+    expect(rect.listenerCount("pointerdown")).toBe(0);
+    expect(rect.listenerCount("rightclick")).toBe(0);
+    expect(Symbol.for("routeGraphics.setInheritedHover") in rect).toBe(false);
+    expect(Symbol.for("routeGraphics.setInheritedPress") in rect).toBe(false);
+    expect(Symbol.for("routeGraphics.setInheritedRightPress") in rect).toBe(
+      false,
+    );
     expect(app.canvas.removeEventListener).toHaveBeenCalledWith(
       "wheel",
       expect.any(Function),
@@ -138,6 +146,72 @@ describe("event semantics", () => {
     rect.emit("pointerover");
     rect.emit("pointerup");
     expect(eventHandler).not.toHaveBeenCalled();
+  });
+
+  it("skips interaction bindings for decorative rects", () => {
+    const rect = new Graphics();
+    rect.label = "decorative";
+
+    bindRectInteractions({
+      app: { audioStage: { add: vi.fn() } },
+      rect,
+      eventHandler: vi.fn(),
+      element: { id: "decorative", width: 100, height: 60 },
+    });
+
+    expect(rect.eventNames()).toEqual([]);
+    expect(Symbol.for("routeGraphics.setInheritedHover") in rect).toBe(false);
+    expect(Symbol.for("routeGraphics.setInheritedPress") in rect).toBe(false);
+    expect(Symbol.for("routeGraphics.setInheritedRightPress") in rect).toBe(
+      false,
+    );
+  });
+
+  it("refreshes the cursor when an active hover config changes", () => {
+    const rect = new Graphics();
+    rect.label = "cursor-sync";
+    const app = { audioStage: { add: vi.fn() } };
+    const eventHandler = vi.fn();
+
+    bindRectInteractions({
+      app,
+      rect,
+      eventHandler,
+      element: {
+        id: "cursor-sync",
+        width: 100,
+        height: 60,
+        hover: { cursor: "pointer" },
+      },
+    });
+    rect.emit("pointerover");
+    expect(rect.cursor).toBe("pointer");
+
+    bindRectInteractions({
+      app,
+      rect,
+      eventHandler,
+      element: {
+        id: "cursor-sync",
+        width: 100,
+        height: 60,
+        hover: { cursor: "crosshair" },
+      },
+    });
+    expect(rect.cursor).toBe("crosshair");
+
+    bindRectInteractions({
+      app,
+      rect,
+      eventHandler,
+      element: {
+        id: "cursor-sync",
+        width: 100,
+        height: 60,
+        hover: {},
+      },
+    });
+    expect(rect.cursor).toBe("auto");
   });
 
   it("applies right-click sound volume consistently", () => {
