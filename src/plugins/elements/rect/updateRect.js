@@ -26,6 +26,7 @@ import {
   installRectAppearanceRuntime,
   notifyRectBaseStyleChange,
   syncRectAppearanceRuntime,
+  syncRectInteractionAppearance,
 } from "./rectAppearanceRuntime.js";
 import {
   RECT_STYLE_STATE_KEY,
@@ -257,6 +258,15 @@ export const updateRect = ({
     // No animations, update immediately
     updateElement();
   } else {
+    if (!isDeepEqual(prevElement, nextElement)) {
+      syncRectInteractionAppearance(rectElement, nextElement);
+      bindRectInteractions({
+        app,
+        rect: rectElement,
+        element: nextElement,
+        eventHandler,
+      });
+    }
     deferRenderStateCommit?.();
   }
 };

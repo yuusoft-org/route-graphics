@@ -8,9 +8,9 @@ const getInteractionField = (runtime, field) => {
   for (const interaction of INTERACTION_PRIORITY) {
     if (
       runtime.active[interaction] &&
-      runtime.element?.[interaction]?.[field] !== undefined
+      runtime.interactionElement?.[interaction]?.[field] !== undefined
     ) {
-      return runtime.element[interaction][field];
+      return runtime.interactionElement[interaction][field];
     }
   }
 
@@ -48,6 +48,7 @@ export const installRectAppearanceRuntime = (
     const target = {
       displayObject,
       element,
+      interactionElement: element,
       styleRuntime,
       _baseAlpha: element.alpha ?? 1,
       active: {
@@ -57,8 +58,13 @@ export const installRectAppearanceRuntime = (
       },
       sync(nextElement, nextStyleRuntime) {
         this.element = nextElement;
+        this.interactionElement = nextElement;
         this.styleRuntime = nextStyleRuntime;
         this._baseAlpha = nextElement.alpha ?? 1;
+        applyAppearance(displayObject, runtime);
+      },
+      syncInteractions(nextElement) {
+        this.interactionElement = nextElement;
         applyAppearance(displayObject, runtime);
       },
       setInteractionActive(interaction, isActive) {
@@ -97,6 +103,7 @@ export const installRectAppearanceRuntime = (
     applyAppearance(displayObject, runtime);
   } else {
     runtime.element = element;
+    runtime.interactionElement = element;
     runtime.styleRuntime = styleRuntime;
   }
 
@@ -114,6 +121,10 @@ export const syncRectAppearanceRuntime = (
   }
   runtime.sync(element, styleRuntime);
   return runtime;
+};
+
+export const syncRectInteractionAppearance = (displayObject, element) => {
+  displayObject?.[RECT_APPEARANCE_STATE_KEY]?.syncInteractions(element);
 };
 
 export const notifyRectBaseStyleChange = (displayObject) => {

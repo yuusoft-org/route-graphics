@@ -514,11 +514,23 @@
  */
 
 /**
- * @typedef {(HoverProps & RectInteractionAppearance)} RectHover
+ * @typedef {Object} RectInteractionMetadata
+ * @property {string} [soundSrc]
+ * @property {number} [soundVolume]
+ * @property {Object} [payload]
  */
 
 /**
- * @typedef {(ClickProps & RectInteractionAppearance)} RectClick
+ * @typedef {Object} RectHoverMetadata
+ * @property {string} [cursor]
+ */
+
+/**
+ * @typedef {(RectInteractionAppearance & RectInteractionMetadata & RectHoverMetadata)} RectHover
+ */
+
+/**
+ * @typedef {(RectInteractionAppearance & RectInteractionMetadata)} RectClick
  */
 
 /**

@@ -226,6 +226,56 @@ describe("rect interaction visual states", () => {
     });
   });
 
+  it.each([
+    {
+      name: "replaces",
+      nextOverrides: { hover: { fill: "#555555", alpha: 0.7 } },
+      expected: { fill: "#555555", alpha: 0.7 },
+    },
+    {
+      name: "removes",
+      nextOverrides: {},
+      expected: { fill: "#111111", alpha: 0.8 },
+    },
+  ])(
+    "$name active interaction appearance before an unrelated tween completes",
+    ({ nextOverrides, expected }) => {
+      const prevElement = createRect({
+        hover: { fill: "#222222", alpha: 0.9 },
+      });
+      const nextElement = createRect({ x: 100, ...nextOverrides });
+      const { parent, rect, animationBus } = mountRect({
+        element: prevElement,
+      });
+      const animations = normalizeAnimations([
+        {
+          id: "move-panel",
+          targetId: "panel",
+          type: "update",
+          tween: {
+            x: { auto: { duration: 1000, easing: "linear" } },
+          },
+        },
+      ]);
+
+      rect.emit("pointerover");
+      updateRect({
+        app,
+        parent,
+        prevElement,
+        nextElement,
+        animations,
+        animationBus,
+        completionTracker,
+        eventHandler: vi.fn(),
+        zIndex: 0,
+      });
+
+      expect(getRectEffectiveAppearance(rect)).toEqual(expected);
+      expect(rect.x).toBe(prevElement.x);
+    },
+  );
+
   it("supports inherited hover, press, and right-press state", () => {
     const root = new Container();
     const { rect } = mountRect({
