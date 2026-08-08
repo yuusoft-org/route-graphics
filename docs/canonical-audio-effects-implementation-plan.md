@@ -1,9 +1,8 @@
 # Canonical Audio Effects Implementation Plan
 
-Status: implemented and verified; design reviewed in
-[`canonical-audio-effects-plan-review.md`](./canonical-audio-effects-plan-review.md)
+Status: implemented and verified
 
-Last updated: 2026-08-06
+Last updated: 2026-08-08
 
 ## Decision
 
