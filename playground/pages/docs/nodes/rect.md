@@ -322,6 +322,53 @@ elements:
         action: panelContext
 ```
 
+## Example: Interaction + Base Animation
+
+Render the first state, keep the pointer over the panel, and then render the
+second state. The blue hover appearance remains active while the base `fill`
+and `alpha` animate underneath it. Moving the pointer out reveals the latest
+animated base values rather than the values from when hover began.
+
+```yaml
+states:
+  - elements:
+      - id: animated-panel
+        type: rect
+        x: 160
+        y: 120
+        width: 400
+        height: 240
+        fill: "#374151"
+        alpha: 0.8
+        hover:
+          fill: "#2563eb"
+          alpha: 1
+          cursor: pointer
+  - elements:
+      - id: animated-panel
+        type: rect
+        x: 160
+        y: 120
+        width: 400
+        height: 240
+        fill: "#8b5cf6"
+        alpha: 0.3
+        hover:
+          fill: "#2563eb"
+          alpha: 1
+          cursor: pointer
+    animations:
+      - id: animate-panel-base
+        targetId: animated-panel
+        type: update
+        tween:
+          fill:
+            color:
+              auto: { duration: 1000, easing: linear }
+          alpha:
+            auto: { duration: 1000, easing: linear }
+```
+
 ## Example: Drag + Scroll
 
 ```yaml
