@@ -74,6 +74,53 @@ out:
   rotation: 90
   alpha: 1
 ---
+case: Test parsing rect interaction appearance and metadata
+in:
+  - state:
+      id: rect-interactions
+      type: rect
+      width: 80
+      height: 100
+      fill: red
+      hover:
+        fill: yellow
+        alpha: 0.9
+        cursor: pointer
+        payload:
+          fill: payload-fill
+          opacity: 0.5
+      click:
+        fill: blue
+        alpha: 0.7
+      rightClick:
+        fill: green
+        alpha: 0
+out:
+  id: rect-interactions
+  type: rect
+  width: 80
+  height: 100
+  x: 0
+  "y": 0
+  originX: 0
+  originY: 0
+  fill: red
+  hover:
+    fill: yellow
+    alpha: 0.9
+    cursor: pointer
+    payload:
+      fill: payload-fill
+      opacity: 0.5
+  click:
+    fill: blue
+    alpha: 0.7
+  rightClick:
+    fill: green
+    alpha: 0
+  rotation: 0
+  alpha: 1
+---
 case: Test parsing rect with explicit origin independent of anchor
 in:
   - state:

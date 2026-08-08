@@ -3,13 +3,18 @@ import {
   radiansToDegrees,
   refreshElementPivot,
 } from "../elements/util/transform.js";
+import { RECT_APPEARANCE_STATE_KEY } from "../elements/rect/rectAppearanceRuntime.js";
 
 export const isTranslateAnimationProperty = (property) =>
   property === "translateX" || property === "translateY";
 
-const getMappedPath = (propertyPathMap, path) => {
+const getMappedPath = (object, propertyPathMap, path) => {
   if (typeof path !== "string") {
     return path;
+  }
+
+  if (path === "alpha" && object?.[RECT_APPEARANCE_STATE_KEY]) {
+    return [RECT_APPEARANCE_STATE_KEY, "baseAlpha"];
   }
 
   if (path.startsWith("rect.")) {
@@ -25,7 +30,7 @@ export const getAnimationProperty = (
   propertyPathMap,
   defaultValue,
 ) => {
-  const mappedPath = getMappedPath(propertyPathMap, path);
+  const mappedPath = getMappedPath(object, propertyPathMap, path);
 
   if (typeof mappedPath === "string") {
     const result = object[mappedPath];
@@ -46,7 +51,7 @@ export const getAnimationProperty = (
 };
 
 export const setAnimationProperty = (object, path, propertyPathMap, value) => {
-  const mappedPath = getMappedPath(propertyPathMap, path);
+  const mappedPath = getMappedPath(object, propertyPathMap, path);
   const nextValue = path === "rotation" ? degreesToRadians(value) : value;
 
   if (typeof mappedPath === "string") {

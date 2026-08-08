@@ -210,6 +210,12 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      fill:
+        "$ref": "#/$def/fill"
+      alpha:
+        type: number
+        minimum: 0
+        maximum: 1
       soundSrc:
         type: string
         description: source of sound to be played when hovering over the sprite
@@ -229,6 +235,12 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      fill:
+        "$ref": "#/$def/fill"
+      alpha:
+        type: number
+        minimum: 0
+        maximum: 1
       soundSrc:
         type: string
         description: source of sound to be played when the sprite is clicked
@@ -268,6 +280,12 @@ properties:
     type: object
     additionalProperties: false
     properties:
+      fill:
+        "$ref": "#/$def/fill"
+      alpha:
+        type: number
+        minimum: 0
+        maximum: 1
       soundSrc:
         type: string
         description: source of sound to be played when the rect is right-clicked

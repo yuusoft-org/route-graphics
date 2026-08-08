@@ -1,6 +1,14 @@
 import { normalizeVolume } from "../../../util/normalizeVolume.js";
 import { isPrimaryPointerEvent } from "../util/isPrimaryPointerEvent.js";
+import {
+  createHoverStateController,
+  createPressStateController,
+  createRightPressStateController,
+} from "../util/hoverInheritance.js";
 import { setupScrollInteraction } from "../util/setupScrollInteraction.js";
+import { setRectInteractionActive } from "./rectAppearanceRuntime.js";
+
+const RECT_INTERACTION_BINDING = Symbol("routeGraphicsRectInteractions");
 
 const LISTENER_EVENTS = [
   "pointerover",
@@ -11,10 +19,23 @@ const LISTENER_EVENTS = [
   "pointerdown",
   "globalpointermove",
   "pointerupoutside",
+  "rightdown",
+  "rightup",
+  "rightupoutside",
 ];
 
 const getPayload = (config) =>
   config?.payload && typeof config.payload === "object" ? config.payload : {};
+
+const hasInteractionConfig = (element) =>
+  Boolean(
+    element.hover ||
+    element.click ||
+    element.rightClick ||
+    element.scrollUp ||
+    element.scrollDown ||
+    element.drag,
+  );
 
 const emit = (eventHandler, eventName, rect, config, eventData = {}) => {
   eventHandler?.(eventName, {
@@ -36,11 +57,187 @@ const playSound = (app, eventName, config) => {
   });
 };
 
+const syncAppearanceState = (binding) => {
+  setRectInteractionActive(
+    binding.rect,
+    "hover",
+    binding.hoverController.isHovering(),
+  );
+  setRectInteractionActive(
+    binding.rect,
+    "click",
+    binding.pressController.isPressed(),
+  );
+  setRectInteractionActive(
+    binding.rect,
+    "rightClick",
+    binding.rightPressController.isPressed(),
+  );
+};
+
+const createBinding = ({ app, rect, element, eventHandler }) => {
+  const binding = {
+    app,
+    rect,
+    element,
+    eventHandler,
+    hoverController: null,
+    pressController: null,
+    rightPressController: null,
+  };
+
+  binding.hoverController = createHoverStateController({
+    displayObject: rect,
+    onHoverChange: (isActive) =>
+      setRectInteractionActive(rect, "hover", isActive),
+  });
+  binding.pressController = createPressStateController({
+    displayObject: rect,
+    onPressChange: (isActive) =>
+      setRectInteractionActive(rect, "click", isActive),
+  });
+  binding.rightPressController = createRightPressStateController({
+    displayObject: rect,
+    onPressChange: (isActive) =>
+      setRectInteractionActive(rect, "rightClick", isActive),
+  });
+
+  rect.on("pointerover", () => {
+    const hover = binding.element.hover;
+    if (!hover) return;
+
+    binding.hoverController.setDirectHover(true);
+    emit(binding.eventHandler, "hover", rect, hover);
+    if (hover.cursor) rect.cursor = hover.cursor;
+    playSound(binding.app, "hover", hover);
+  });
+
+  rect.on("pointerout", () => {
+    binding.hoverController.setDirectHover(false);
+    rect.cursor = "auto";
+  });
+
+  rect.on("pointerdown", (event) => {
+    if (!isPrimaryPointerEvent(event)) return;
+
+    if (binding.element.click) {
+      binding.pressController.setDirectPress(true);
+    }
+
+    const start = binding.element.drag?.start;
+    if (binding.element.drag) {
+      rect._isDragging = true;
+      if (start) emit(binding.eventHandler, "dragStart", rect, start);
+    }
+  });
+
+  const releasePrimary = (event, { outside = false } = {}) => {
+    if (!isPrimaryPointerEvent(event)) return;
+
+    binding.pressController.setDirectPress(false);
+
+    const click = binding.element.click;
+    if (!outside && click) {
+      emit(binding.eventHandler, "click", rect, click);
+      playSound(binding.app, "click", click);
+    }
+
+    if (rect._isDragging) {
+      rect._isDragging = false;
+      const end = binding.element.drag?.end;
+      if (end) emit(binding.eventHandler, "dragEnd", rect, end);
+    }
+  };
+
+  rect.on("pointerup", (event) => releasePrimary(event));
+  rect.on("pointerupoutside", (event) =>
+    releasePrimary(event, { outside: true }),
+  );
+
+  rect.on("globalpointermove", (event) => {
+    const move = binding.element.drag?.move;
+    if (!move || !rect._isDragging) return;
+    emit(binding.eventHandler, "dragMove", rect, move, {
+      x: event.global.x,
+      y: event.global.y,
+    });
+  });
+
+  rect.on("rightdown", () => {
+    if (binding.element.rightClick) {
+      binding.rightPressController.setDirectPress(true);
+    }
+  });
+
+  const releaseRight = () => {
+    binding.rightPressController.setDirectPress(false);
+  };
+  rect.on("rightup", releaseRight);
+  rect.on("rightupoutside", releaseRight);
+  rect.on("rightclick", () => {
+    releaseRight();
+    const rightClick = binding.element.rightClick;
+    if (!rightClick) return;
+    emit(binding.eventHandler, "rightClick", rect, rightClick);
+    playSound(binding.app, "rightClick", rightClick);
+  });
+
+  return binding;
+};
+
+const syncBinding = (binding, { app, element, eventHandler }) => {
+  binding.app = app;
+  binding.element = element;
+  binding.eventHandler = eventHandler;
+
+  if (!element.hover) {
+    binding.hoverController.setDirectHover(false);
+  }
+  binding.rect.cursor =
+    element.hover && binding.hoverController.isHovering()
+      ? (element.hover.cursor ?? "auto")
+      : "auto";
+  if (!element.click) {
+    binding.pressController.setDirectPress(false);
+  }
+  if (!element.rightClick) {
+    binding.rightPressController.setDirectPress(false);
+  }
+  if (!element.drag) {
+    binding.rect._isDragging = false;
+  }
+
+  syncAppearanceState(binding);
+
+  binding.rect._cleanupScrollInteraction?.();
+  binding.rect.eventMode = "static";
+
+  if (element.scrollUp || element.scrollDown) {
+    setupScrollInteraction({
+      canvas: app.canvas,
+      displayObject: binding.rect,
+      width: element.width,
+      height: element.height,
+      scrollUpEvent: element.scrollUp,
+      scrollDownEvent: element.scrollDown,
+      eventHandler,
+    });
+  }
+};
+
 export const cleanupRectInteractions = (rect) => {
   rect._cleanupScrollInteraction?.();
+  const binding = rect[RECT_INTERACTION_BINDING];
+  binding?.hoverController.destroy();
+  binding?.pressController.destroy();
+  binding?.rightPressController.destroy();
   for (const eventName of LISTENER_EVENTS) {
     rect.removeAllListeners(eventName);
   }
+  delete rect[RECT_INTERACTION_BINDING];
+  setRectInteractionActive(rect, "hover", false);
+  setRectInteractionActive(rect, "click", false);
+  setRectInteractionActive(rect, "rightClick", false);
   rect.eventMode = "auto";
   rect.cursor = "auto";
   rect.hitArea = null;
@@ -48,83 +245,18 @@ export const cleanupRectInteractions = (rect) => {
 };
 
 export const bindRectInteractions = ({ app, rect, element, eventHandler }) => {
-  cleanupRectInteractions(rect);
-
-  const hover = element.hover;
-  const click = element.click;
-  const rightClick = element.rightClick;
-  const scrollUp = element.scrollUp;
-  const scrollDown = element.scrollDown;
-  const drag = element.drag;
-  const hasInteraction = Boolean(
-    hover || click || rightClick || scrollUp || scrollDown || drag,
-  );
-
-  if (!hasInteraction) {
+  let binding = rect[RECT_INTERACTION_BINDING];
+  if (!hasInteractionConfig(element)) {
+    if (binding) {
+      cleanupRectInteractions(rect);
+    }
     return;
   }
 
-  rect.eventMode = "static";
-
-  if (hover) {
-    rect.on("pointerover", () => {
-      emit(eventHandler, "hover", rect, hover);
-      if (hover.cursor) rect.cursor = hover.cursor;
-      playSound(app, "hover", hover);
-    });
-    rect.on("pointerout", () => {
-      rect.cursor = "auto";
-    });
+  if (!binding) {
+    binding = createBinding({ app, rect, element, eventHandler });
+    rect[RECT_INTERACTION_BINDING] = binding;
   }
 
-  if (click) {
-    rect.on("pointerup", (event) => {
-      if (!isPrimaryPointerEvent(event)) return;
-      emit(eventHandler, "click", rect, click);
-      playSound(app, "click", click);
-    });
-  }
-
-  if (rightClick) {
-    rect.on("rightclick", () => {
-      emit(eventHandler, "rightClick", rect, rightClick);
-      playSound(app, "rightClick", rightClick);
-    });
-  }
-
-  if (scrollUp || scrollDown) {
-    setupScrollInteraction({
-      canvas: app.canvas,
-      displayObject: rect,
-      width: element.width,
-      height: element.height,
-      scrollUpEvent: scrollUp,
-      scrollDownEvent: scrollDown,
-      eventHandler,
-    });
-  }
-
-  if (drag) {
-    const { start, end, move } = drag;
-    const endDrag = (event) => {
-      if (!isPrimaryPointerEvent(event) || !rect._isDragging) return;
-      rect._isDragging = false;
-      if (end) emit(eventHandler, "dragEnd", rect, end);
-    };
-
-    rect.on("pointerdown", (event) => {
-      if (!isPrimaryPointerEvent(event)) return;
-      rect._isDragging = true;
-      if (start) emit(eventHandler, "dragStart", rect, start);
-    });
-    rect.on("pointerup", endDrag);
-    rect.on("pointerupoutside", endDrag);
-    rect.on("globalpointermove", (event) => {
-      if (!move || !rect._isDragging) return;
-      emit(eventHandler, "dragMove", rect, move, {
-        x: event.global.x,
-        y: event.global.y,
-      });
-    });
-  }
+  syncBinding(binding, { app, element, eventHandler });
 };

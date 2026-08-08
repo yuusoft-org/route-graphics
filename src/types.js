@@ -508,6 +508,32 @@
  */
 
 /**
+ * @typedef {Object} RectInteractionAppearance
+ * @property {RectFill} [fill] - Fill override while the interaction is active
+ * @property {number} [alpha] - Alpha override from 0 to 1 while the interaction is active
+ */
+
+/**
+ * @typedef {Object} RectInteractionMetadata
+ * @property {string} [soundSrc]
+ * @property {number} [soundVolume]
+ * @property {Object} [payload]
+ */
+
+/**
+ * @typedef {Object} RectHoverMetadata
+ * @property {string} [cursor]
+ */
+
+/**
+ * @typedef {(RectInteractionAppearance & RectInteractionMetadata & RectHoverMetadata)} RectHover
+ */
+
+/**
+ * @typedef {(RectInteractionAppearance & RectInteractionMetadata)} RectClick
+ */
+
+/**
  * @typedef {Object} RectComputedProps
  * @property {'rect'} type
  * @property {RectFill} [fill] - Optional fill. When omitted, the rect renders transparent.
@@ -517,14 +543,14 @@
  * @property {number} border.alpha
  * @property {{topLeft: number, topRight: number, bottomRight: number, bottomLeft: number}} [cornerRadius]
  * @property {BlurConfig} [blur]
+ * @property {RectHover} [hover]
+ * @property {RectClick} [click]
+ * @property {RectClick} [rightClick]
  * @property {string} cursor - Cursor style (e.g., "pointer")
  * @property {string} pointerDown - Event name for pointer down
  * @property {string} pointerUp - Event name for pointer up
  * @property {string} pointerMove - Event name for pointer move
  * @property {number} rotation - Rotation in degrees
- * @property {HoverProps} hover
- * @property {ClickProps} click
- * @property {ClickProps} rightClick
  * @property {ScrollProps} [scrollUp]
  * @property {ScrollProps} [scrollDown]
  * @typedef {(ComputedNode & RectComputedProps)} RectComputedNode

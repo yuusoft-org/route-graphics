@@ -21,14 +21,28 @@ import {
   syncShaderFilters,
 } from "../util/shaderFilterEffect.js";
 import { setElementRenderState } from "../elementRenderState.js";
-import { drawRectVisual } from "./rectDrawing.js";
 import { bindRectInteractions } from "./rectInteractions.js";
+import {
+  installRectAppearanceRuntime,
+  notifyRectBaseStyleChange,
+  syncRectAppearanceRuntime,
+  syncRectInteractionAppearance,
+} from "./rectAppearanceRuntime.js";
 import {
   RECT_STYLE_STATE_KEY,
   getRectStyleTargetState,
   installRectStyleRuntime,
   syncRectStyleRuntime,
 } from "./rectStyleRuntime.js";
+
+const getRectInteractionConfig = (element) => ({
+  hover: element.hover,
+  click: element.click,
+  rightClick: element.rightClick,
+  drag: element.drag,
+  scrollUp: element.scrollUp,
+  scrollDown: element.scrollDown,
+});
 
 export const shouldRestoreStaticRectTransform = ({ parent, nextElement }) => {
   const rectElement = parent.children.find(
@@ -73,6 +87,11 @@ export const updateRect = ({
 
   if (!rectElement) return;
 
+  const interactionsChanged = !isDeepEqual(
+    getRectInteractionConfig(prevElement),
+    getRectInteractionConfig(nextElement),
+  );
+
   rectElement.zIndex = zIndex;
 
   const { width, height, alpha, scaleX, scaleY } = nextElement;
@@ -116,10 +135,7 @@ export const updateRect = ({
     rectElement,
     prevElement,
     (property, runtime) => {
-      drawRectVisual(rectElement, runtime.state, {
-        ...runtime.element,
-        ...runtime.state,
-      });
+      notifyRectBaseStyleChange(rectElement);
       const dimensionChanged =
         property === "rect.width" ||
         property === "rect.height" ||
@@ -136,6 +152,7 @@ export const updateRect = ({
       }
     },
   );
+  installRectAppearanceRuntime(rectElement, prevElement, rectStyleRuntime);
   const rectStyleStartState = getRectStyleTargetState(prevElement, {
     liveScaleX,
     liveScaleY,
@@ -203,8 +220,7 @@ export const updateRect = ({
   const updateElement = () => {
     if (!isDeepEqual(prevElement, nextElement)) {
       const styleRuntime = syncRectStyleRuntime(rectElement, nextElement);
-      drawRectVisual(rectElement, styleRuntime.state, nextElement);
-      rectElement.alpha = alpha;
+      syncRectAppearanceRuntime(rectElement, nextElement, styleRuntime);
       // Rect computed nodes already bake scale into width/height for layout.
       // Reset the live transform so update tweens do not double-apply scale.
       rectElement.scale.x = 1;
@@ -256,6 +272,15 @@ export const updateRect = ({
     // No animations, update immediately
     updateElement();
   } else {
+    if (interactionsChanged) {
+      syncRectInteractionAppearance(rectElement, nextElement);
+      bindRectInteractions({
+        app,
+        rect: rectElement,
+        element: nextElement,
+        eventHandler,
+      });
+    }
     deferRenderStateCommit?.();
   }
 };
