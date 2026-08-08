@@ -35,6 +35,15 @@ import {
   syncRectStyleRuntime,
 } from "./rectStyleRuntime.js";
 
+const getRectInteractionConfig = (element) => ({
+  hover: element.hover,
+  click: element.click,
+  rightClick: element.rightClick,
+  drag: element.drag,
+  scrollUp: element.scrollUp,
+  scrollDown: element.scrollDown,
+});
+
 export const shouldRestoreStaticRectTransform = ({ parent, nextElement }) => {
   const rectElement = parent.children.find(
     (child) => child.label === nextElement.id,
@@ -77,6 +86,11 @@ export const updateRect = ({
   );
 
   if (!rectElement) return;
+
+  const interactionsChanged = !isDeepEqual(
+    getRectInteractionConfig(prevElement),
+    getRectInteractionConfig(nextElement),
+  );
 
   rectElement.zIndex = zIndex;
 
@@ -258,7 +272,7 @@ export const updateRect = ({
     // No animations, update immediately
     updateElement();
   } else {
-    if (!isDeepEqual(prevElement, nextElement)) {
+    if (interactionsChanged) {
       syncRectInteractionAppearance(rectElement, nextElement);
       bindRectInteractions({
         app,

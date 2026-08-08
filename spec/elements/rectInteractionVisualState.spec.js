@@ -412,7 +412,7 @@ describe("rect interaction visual states", () => {
 
   it("does not redraw geometry after an update alpha initial value is applied", () => {
     const prevElement = createRect({ alpha: 1 });
-    const nextElement = createRect({ alpha: 1 });
+    const nextElement = createRect({ alpha: 1, x: 100 });
     const { parent, rect, animationBus } = mountRect({ element: prevElement });
     const animations = normalizeAnimations([
       {
