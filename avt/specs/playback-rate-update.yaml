@@ -32,9 +32,13 @@ states:
           loop: true
           volume: 70
           playbackRate: 1.75
-          transition:
-            update:
-              playbackRate:
+      audioEffects:
+        - id: tone-rate-update:1
+          type: audio-transition
+          targetId: tone
+          properties:
+            playbackRate:
+              update:
                 keyframes:
                   - value: 1.75
                     duration: 900

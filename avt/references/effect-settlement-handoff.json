@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "wavSha256": "c605be46509d84498699e7ad296073ffcccced1d5bbc8d7a1c0558e2f7b14aa2",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 144000,
+    "durationMs": 3000,
+    "byteLength": 576044,
+    "signal": {
+      "peak": 0.254547119140625,
+      "rms": 0.17685452802030588,
+      "nonZeroSamples": 287276
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "handoff-settlement-before",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "handoff-settlement-active",
+        "aborted": false
+      }
+    },
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "handoff-settlement-removed",
+        "aborted": false
+      }
+    }
+  ]
+}

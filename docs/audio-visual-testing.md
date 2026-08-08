@@ -63,11 +63,6 @@ states:
           src: trackA
           loop: true
           volume: 100
-          transition:
-            exit:
-              volume:
-                keyframes:
-                  - { value: 0, duration: 1000, easing: linear }
   - atMs: 500
     state:
       id: incoming
@@ -79,9 +74,16 @@ states:
           src: trackB
           loop: true
           volume: 100
-          transition:
-            enter:
-              volume:
+      audioEffects:
+        - id: bgm-handoff:1
+          type: audio-transition
+          targetId: bgm
+          properties:
+            volume:
+              exit:
+                keyframes:
+                  - { value: 0, duration: 1000, easing: linear }
+              enter:
                 initialValue: 0
                 keyframes:
                   - { value: 100, duration: 1000, easing: linear }

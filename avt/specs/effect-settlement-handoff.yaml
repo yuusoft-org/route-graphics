@@ -1,5 +1,5 @@
-title: Delayed replacement overlap
-description: Verifies independent outgoing and incoming holds before overlapping fades.
+title: Active handoff settlement
+description: Verifies effect removal cleans the outgoing source and settles the incoming source.
 durationMs: 3000
 sampleRate: 48000
 numberOfChannels: 2
@@ -13,7 +13,7 @@ assets:
 states:
   - atMs: 0
     state:
-      id: delayed-overlap-before
+      id: handoff-settlement-before
       elements: []
       animations: []
       audio:
@@ -21,10 +21,10 @@ states:
           type: sound
           src: tone440
           loop: true
-          volume: 85
+          volume: 80
   - atMs: 500
     state:
-      id: delayed-overlap-after
+      id: handoff-settlement-active
       elements: []
       animations: []
       audio:
@@ -32,23 +32,33 @@ states:
           type: sound
           src: tone880
           loop: true
-          volume: 85
+          volume: 80
       audioEffects:
-        - id: bgm-delayed-handoff:1
+        - id: bgm-handoff:1
           type: audio-transition
           targetId: bgm
           properties:
             volume:
               exit:
                 keyframes:
-                  - delay: 400
-                    value: 0
-                    duration: 600
+                  - value: 0
+                    duration: 2000
                     easing: linear
               enter:
                 initialValue: 0
                 keyframes:
-                  - delay: 200
-                    value: 85
-                    duration: 800
+                  - value: 80
+                    duration: 2000
                     easing: linear
+  - atMs: 1000
+    state:
+      id: handoff-settlement-removed
+      elements: []
+      animations: []
+      audio:
+        - id: bgm
+          type: sound
+          src: tone880
+          loop: true
+          volume: 80
+      audioEffects: []

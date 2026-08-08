@@ -25,13 +25,6 @@ states:
           startAt: 0.2
           endAt: 0.8
           volume: 75
-          transition:
-            exit:
-              volume:
-                keyframes:
-                  - value: 0
-                    duration: 500
-                    easing: linear
   - atMs: 900
     state:
       id: loop-tail-after
@@ -41,3 +34,14 @@ states:
         - id: music
           type: audio-channel
           interruption: loopEnd
+      audioEffects:
+        - id: tone-exit:1
+          type: audio-transition
+          targetId: tone
+          properties:
+            volume:
+              exit:
+                keyframes:
+                  - value: 0
+                    duration: 500
+                    easing: linear

@@ -15,12 +15,9 @@ const NO_AUDIO_PLAYBACK_POSITION_OPERATIONS = new Set();
 const AUDIO_PLAYBACK_KEYS = new Set(["commandId", "operation", "positionMs"]);
 const AUDIO_TRANSITION_TYPE = "audio-transition";
 const AUDIO_EFFECT_TYPES = new Set([AUDIO_TRANSITION_TYPE]);
+const AUDIO_EFFECT_KEYS = new Set(["id", "type", "targetId", "properties"]);
 const AUDIO_TRANSITION_PHASES = new Set(["enter", "exit", "update"]);
 const AUDIO_TRANSITION_PROPERTIES = new Set(["volume", "pan", "playbackRate"]);
-const AUDIO_TRANSITION_PROPERTIES_BY_NODE_TYPE = {
-  "audio-channel": new Set(["volume", "pan"]),
-  sound: new Set(["volume", "pan", "playbackRate"]),
-};
 const AUDIO_TRANSITION_PROPERTY_RANGES = {
   volume: { min: 0, max: 100 },
   pan: { min: -1, max: 1 },
@@ -170,14 +167,7 @@ const normalizePlaybackCommand = (
   };
 };
 
-const validateSound = (
-  node,
-  path,
-  ids,
-  flattenedSounds,
-  inlineTransitions,
-  channelId = null,
-) => {
+const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
   assertNonEmptyString(node.id, `${path}.id`);
   assertUniqueId(ids, node.id, `${path}.id`);
   assertNonEmptyString(node.src, `${path}.src`);
@@ -214,16 +204,8 @@ const validateSound = (
       : normalizePlaybackCommand(node.playback, `${path}.playback`);
 
   if (node.transition !== undefined) {
-    inlineTransitions.set(
-      node.id,
-      validateInlineAudioTransition(node.transition, `${path}.transition`, {
-        nodeType: "sound",
-        propertyValues: {
-          volume,
-          pan: node.pan ?? 0,
-          playbackRate: node.playbackRate ?? 1,
-        },
-      }),
+    throw new Error(
+      `Input error: ${path}.transition is not supported. Use top-level audioEffects instead.`,
     );
   }
 
@@ -250,7 +232,6 @@ const validateChannel = (
   ids,
   flattenedChannels,
   flattenedSounds,
-  inlineTransitions,
 ) => {
   assertNonEmptyString(node.id, `${path}.id`);
   assertUniqueId(ids, node.id, `${path}.id`);
@@ -280,15 +261,8 @@ const validateChannel = (
         });
 
   if (node.transition !== undefined) {
-    inlineTransitions.set(
-      node.id,
-      validateInlineAudioTransition(node.transition, `${path}.transition`, {
-        nodeType: "audio-channel",
-        propertyValues: {
-          volume,
-          pan: node.pan ?? 0,
-        },
-      }),
+    throw new Error(
+      `Input error: ${path}.transition is not supported. Use top-level audioEffects instead.`,
     );
   }
 
@@ -335,14 +309,7 @@ const validateChannel = (
       );
     }
 
-    validateSound(
-      child,
-      childPath,
-      ids,
-      flattenedSounds,
-      inlineTransitions,
-      node.id,
-    );
+    validateSound(child, childPath, ids, flattenedSounds, node.id);
   }
 };
 
@@ -353,7 +320,6 @@ const validateAudioNodes = (audio, ids) => {
 
   const flattenedChannels = [];
   const flattenedSounds = [];
-  const inlineTransitions = new Map();
   const builtinNodeIds = new Set();
 
   for (const [index, node] of audio.entries()) {
@@ -367,14 +333,7 @@ const validateAudioNodes = (audio, ids) => {
     }
 
     if (node.type === "audio-channel") {
-      validateChannel(
-        node,
-        path,
-        ids,
-        flattenedChannels,
-        flattenedSounds,
-        inlineTransitions,
-      );
+      validateChannel(node, path, ids, flattenedChannels, flattenedSounds);
       builtinNodeIds.add(node.id);
       for (const sound of flattenedSounds) {
         if (sound.channelId === node.id) {
@@ -382,7 +341,7 @@ const validateAudioNodes = (audio, ids) => {
         }
       }
     } else {
-      validateSound(node, path, ids, flattenedSounds, inlineTransitions);
+      validateSound(node, path, ids, flattenedSounds);
       builtinNodeIds.add(node.id);
     }
   }
@@ -390,7 +349,6 @@ const validateAudioNodes = (audio, ids) => {
   return {
     channels: flattenedChannels,
     sounds: flattenedSounds,
-    inlineTransitions,
     builtinNodeIds,
     builtinNodeTypes: new Map(
       [...flattenedChannels, ...flattenedSounds].map((node) => [
@@ -401,12 +359,7 @@ const validateAudioNodes = (audio, ids) => {
   };
 };
 
-const validateTransitionPhase = (
-  phase,
-  path,
-  propertyName,
-  { finalValue } = {},
-) => {
+const validateTransitionPhase = (phase, path, propertyName) => {
   assertRecord(phase, path);
 
   for (const key of Object.keys(phase)) {
@@ -483,76 +436,10 @@ const validateTransitionPhase = (
 
     assertOptionalBoolean(keyframe.relative, `${keyframePath}.relative`);
   }
-
-  if (finalValue !== undefined) {
-    const finalKeyframe = phase.keyframes[phase.keyframes.length - 1];
-    if (finalKeyframe.relative === true) {
-      throw new Error(
-        `Input error: ${path}.keyframes must end with an absolute value.`,
-      );
-    }
-    if (finalKeyframe.value !== finalValue) {
-      throw new Error(
-        `Input error: ${path}.keyframes must end at the node's declared ${propertyName} value ${finalValue}.`,
-      );
-    }
-  }
 };
 
-function validateInlineAudioTransition(
-  transition,
-  path,
-  { nodeType, propertyValues },
-) {
-  assertNonEmptyRecord(transition, path);
-  const normalizedProperties = {};
-
-  for (const [phaseName, propertyTracks] of Object.entries(transition)) {
-    if (!AUDIO_TRANSITION_PHASES.has(phaseName)) {
-      throw new Error(
-        `Input error: unsupported inline audio transition phase "${phaseName}" at ${path}.`,
-      );
-    }
-
-    assertNonEmptyRecord(propertyTracks, `${path}.${phaseName}`);
-    for (const [propertyName, track] of Object.entries(propertyTracks)) {
-      if (!AUDIO_TRANSITION_PROPERTIES.has(propertyName)) {
-        throw new Error(
-          `Input error: unsupported inline audio transition property "${propertyName}" at ${path}.${phaseName}.`,
-        );
-      }
-      if (
-        !AUDIO_TRANSITION_PROPERTIES_BY_NODE_TYPE[nodeType].has(propertyName)
-      ) {
-        throw new Error(
-          `Input error: inline audio transition property "${propertyName}" is not supported for node type "${nodeType}" at ${path}.${phaseName}.`,
-        );
-      }
-
-      validateTransitionPhase(
-        track,
-        `${path}.${phaseName}.${propertyName}`,
-        propertyName,
-        phaseName === "enter" || phaseName === "update"
-          ? { finalValue: propertyValues[propertyName] }
-          : {},
-      );
-      normalizedProperties[propertyName] ??= {};
-      normalizedProperties[propertyName][phaseName] = track;
-    }
-  }
-
-  return normalizedProperties;
-}
-
-const validateAudioTransition = (effect, path, nodeTypes) => {
+const validateAudioTransition = (effect, path) => {
   assertNonEmptyString(effect.targetId, `${path}.targetId`);
-  const targetType = nodeTypes.get(effect.targetId);
-  if (!targetType) {
-    throw new Error(
-      `Input error: ${path}.targetId "${effect.targetId}" does not resolve to an audio node.`,
-    );
-  }
 
   assertNonEmptyRecord(effect.properties, `${path}.properties`);
 
@@ -562,14 +449,6 @@ const validateAudioTransition = (effect, path, nodeTypes) => {
     if (!AUDIO_TRANSITION_PROPERTIES.has(propertyName)) {
       throw new Error(
         `Input error: unsupported audio transition property "${propertyName}" at ${path}.properties.`,
-      );
-    }
-
-    if (
-      !AUDIO_TRANSITION_PROPERTIES_BY_NODE_TYPE[targetType].has(propertyName)
-    ) {
-      throw new Error(
-        `Input error: audio transition property "${propertyName}" is not supported for target type "${targetType}" at ${path}.properties.`,
       );
     }
 
@@ -594,7 +473,7 @@ const validateAudioTransition = (effect, path, nodeTypes) => {
   }
 };
 
-const validateAudioEffects = (audioEffects, ids, nodeTypes) => {
+const validateAudioEffects = (audioEffects, ids) => {
   if (!Array.isArray(audioEffects)) {
     throw new Error("Input error: `audioEffects` must be an array.");
   }
@@ -608,6 +487,14 @@ const validateAudioEffects = (audioEffects, ids, nodeTypes) => {
     assertNonEmptyString(effect.id, `${path}.id`);
     assertUniqueId(ids, effect.id, `${path}.id`);
 
+    for (const key of Object.keys(effect)) {
+      if (!AUDIO_EFFECT_KEYS.has(key)) {
+        throw new Error(
+          `Input error: unsupported audio effect field "${key}" at ${path}.`,
+        );
+      }
+    }
+
     if (!AUDIO_EFFECT_TYPES.has(effect.type)) {
       throw new Error(
         `Input error: unsupported audio effect type "${effect.type}" at ${path}.`,
@@ -615,7 +502,7 @@ const validateAudioEffects = (audioEffects, ids, nodeTypes) => {
     }
 
     if (effect.type === AUDIO_TRANSITION_TYPE) {
-      validateAudioTransition(effect, path, nodeTypes);
+      validateAudioTransition(effect, path);
       if (transitionTargetIds.has(effect.targetId)) {
         throw new Error(
           `Input error: duplicate audio-transition targetId "${effect.targetId}" at ${path}.targetId.`,
@@ -640,20 +527,7 @@ export const normalizeAudioRenderState = ({
 } = {}) => {
   const ids = new Set();
   const flattened = validateAudioNodes(audio, ids);
-  const transitions = validateAudioEffects(
-    audioEffects,
-    ids,
-    flattened.builtinNodeTypes,
-  );
-
-  for (const [targetId, properties] of flattened.inlineTransitions) {
-    if (transitions.has(targetId)) {
-      throw new Error(
-        `Input error: audio node "${targetId}" cannot define both inline transition and legacy audio-transition input.`,
-      );
-    }
-    transitions.set(targetId, properties);
-  }
+  const transitions = validateAudioEffects(audioEffects, ids);
 
   return {
     audio,
@@ -661,6 +535,7 @@ export const normalizeAudioRenderState = ({
     channels: flattened.channels,
     sounds: flattened.sounds,
     transitions,
+    effectById: new Map(audioEffects.map((effect) => [effect.id, effect])),
   };
 };
 

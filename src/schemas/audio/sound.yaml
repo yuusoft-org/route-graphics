@@ -46,9 +46,6 @@ properties:
     description: Playback speed multiplier
     default: 1
     minimum: 0
-  transition:
-    $ref: "audio-transition.yaml#/definitions/soundInlineTransition"
-    description: Inline lifecycle automation for sound properties
   startAt:
     type: number
     description: Start offset in seconds

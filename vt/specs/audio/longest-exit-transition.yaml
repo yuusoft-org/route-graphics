@@ -19,18 +19,24 @@ states:
         volume: 80
         pan: 0
         playbackRate: 1
-        transition:
-          exit:
-            volume:
+  - id: longest-exit-stopped
+    audio: []
+    audioEffects:
+      - id: longest-exit:1
+        type: audio-transition
+        targetId: longest-exit-bgm
+        properties:
+          volume:
+            exit:
               keyframes:
                 - { value: 60, duration: 1000, easing: linear }
                 - { value: 80, duration: 1000, easing: linear }
-            pan:
+          pan:
+            exit:
               keyframes:
                 - { value: 1, duration: 1000, easing: linear }
-            playbackRate:
+          playbackRate:
+            exit:
               keyframes:
                 - { value: 0.75, duration: 1000, easing: linear }
                 - { value: 0.25, duration: 2000, easing: linear }
-  - id: longest-exit-stopped
-    audio: []

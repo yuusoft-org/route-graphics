@@ -507,7 +507,7 @@ describe("normalizeAudioRenderState", () => {
           },
         ],
       }),
-    ).toThrow('targetId "missing" does not resolve');
+    ).not.toThrow();
 
     expect(() =>
       normalizeAudioRenderState({
@@ -547,9 +547,7 @@ describe("normalizeAudioRenderState", () => {
           },
         ],
       }),
-    ).toThrow(
-      'audio transition property "playbackRate" is not supported for target type "audio-channel"',
-    );
+    ).not.toThrow();
 
     expect(() =>
       normalizeAudioRenderState({

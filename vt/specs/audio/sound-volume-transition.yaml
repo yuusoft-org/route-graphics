@@ -18,9 +18,13 @@ states:
         src: bgm-1
         loop: true
         volume: 80
-        transition:
-          enter:
-            volume:
+    audioEffects:
+      - id: sound-volume-enter:1
+        type: audio-transition
+        targetId: sound-volume-transition-bgm
+        properties:
+          volume:
+            enter:
               initialValue: 0
               keyframes:
                 - { value: 80, duration: 2000, easing: easeInOutSine }
@@ -31,15 +35,24 @@ states:
         src: bgm-1
         loop: true
         volume: 25
-        transition:
-          update:
-            volume:
+    audioEffects:
+      - id: sound-volume-update:2
+        type: audio-transition
+        targetId: sound-volume-transition-bgm
+        properties:
+          volume:
+            update:
               keyframes:
                 - { value: 60, duration: 1000, easing: easeOutQuad }
                 - { value: 25, duration: 1000, easing: easeInQuad }
-          exit:
-            volume:
-              keyframes:
-                - { value: 0, duration: 2000, easing: easeInOutSine }
   - id: sound-volume-transition-exit
     audio: []
+    audioEffects:
+      - id: sound-volume-exit:3
+        type: audio-transition
+        targetId: sound-volume-transition-bgm
+        properties:
+          volume:
+            exit:
+              keyframes:
+                - { value: 0, duration: 2000, easing: easeInOutSine }

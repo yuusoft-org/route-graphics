@@ -1,5 +1,5 @@
-title: Canonical audio effect lifecycle
-description: Verifies retained update and removal exit ramps through the canonical audioEffects interface.
+title: Active retained update settlement
+description: Verifies effect removal cancels a retained volume ramp and settles to declarative volume.
 durationMs: 3000
 sampleRate: 48000
 numberOfChannels: 2
@@ -10,7 +10,7 @@ assets:
 states:
   - atMs: 0
     state:
-      id: legacy-before
+      id: update-settlement-before
       elements: []
       animations: []
       audio:
@@ -18,11 +18,10 @@ states:
           type: sound
           src: tone440
           loop: true
-          volume: 90
-      audioEffects: []
+          volume: 100
   - atMs: 500
     state:
-      id: legacy-after
+      id: update-settlement-active
       elements: []
       animations: []
       audio:
@@ -30,7 +29,7 @@ states:
           type: sound
           src: tone440
           loop: true
-          volume: 35
+          volume: 20
       audioEffects:
         - id: tone-update:1
           type: audio-transition
@@ -39,24 +38,18 @@ states:
             volume:
               update:
                 keyframes:
-                  - value: 35
-                    duration: 700
+                  - value: 20
+                    duration: 2000
                     easing: linear
-  - atMs: 1800
+  - atMs: 1000
     state:
-      id: legacy-removed
+      id: update-settlement-removed
       elements: []
       animations: []
-      audio: []
-      audioEffects:
-        - id: tone-exit:2
-          type: audio-transition
-          targetId: tone
-          properties:
-            volume:
-              exit:
-                keyframes:
-                  - delay: 200
-                    value: 0
-                    duration: 500
-                    easing: linear
+      audio:
+        - id: tone
+          type: sound
+          src: tone440
+          loop: true
+          volume: 20
+      audioEffects: []
