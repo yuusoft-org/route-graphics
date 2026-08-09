@@ -2150,6 +2150,94 @@ describe("RouteGraphics public API", () => {
     expect(app.findElementByLabel("preview-rect")?.x).toBeCloseTo(37.5);
   });
 
+  it("renders simultaneous transitions and accepts the next state", async () => {
+    const { app } = await setupRouteGraphics({
+      pluginsFactory: async () => {
+        const [{ rectPlugin }, { tweenPlugin }] = await Promise.all([
+          import("../src/plugins/elements/rect/index.js"),
+          import("../src/plugins/animations/tween/index.js"),
+        ]);
+
+        return {
+          elements: [rectPlugin],
+          animations: [tweenPlugin],
+          audio: [],
+        };
+      },
+    });
+    const background = {
+      id: "background",
+      type: "rect",
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 240,
+      fill: "#000000",
+    };
+    const character = {
+      id: "character",
+      type: "rect",
+      x: 100,
+      y: 40,
+      width: 80,
+      height: 180,
+      fill: "#FFFFFF",
+    };
+    const createFadeTransition = ({ id, targetId }) => ({
+      id,
+      targetId,
+      type: "transition",
+      prev: {
+        tween: {
+          alpha: {
+            initialValue: 1,
+            keyframes: [{ duration: 300, value: 0, easing: "linear" }],
+          },
+        },
+      },
+      next: {
+        tween: {
+          alpha: {
+            initialValue: 0,
+            keyframes: [{ duration: 300, value: 1, easing: "linear" }],
+          },
+        },
+      },
+    });
+
+    app.render({
+      id: "simultaneous-transition-baseline",
+      elements: [background, character],
+    });
+
+    expect(() =>
+      app.render({
+        id: "simultaneous-transition-active",
+        elements: [
+          { ...background, fill: "#222222" },
+          { ...character, fill: "#DDDDDD" },
+        ],
+        animations: [
+          createFadeTransition({
+            id: "bg-cg-animation-transition",
+            targetId: "background",
+          }),
+          createFadeTransition({
+            id: "character-animation-in",
+            targetId: "character",
+          }),
+        ],
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      app.render({
+        id: "simultaneous-transition-next-state",
+        elements: [{ ...background, fill: "#222222" }],
+      }),
+    ).not.toThrow();
+  });
+
   it("forwards authored timeline events through the public event handler", async () => {
     const eventHandler = vi.fn();
     const { app, pixiMock } = await setupRouteGraphics({

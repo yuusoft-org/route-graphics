@@ -731,6 +731,110 @@ describe("runReplaceAnimation", () => {
     expect(animationBus.getState().activeCount).toBe(0);
   });
 
+  it("isolates virtual write targets for simultaneous transitions", () => {
+    const previousBackground = createDisplayObject("background");
+    const previousCharacter = createDisplayObject("character");
+    const parent = createParent(previousBackground, previousCharacter);
+    previousBackground.parent = parent;
+    previousCharacter.parent = parent;
+
+    const plugin = {
+      add: vi.fn(({ parent: targetParent, element }) => {
+        targetParent.addChild(createDisplayObject(element.id));
+      }),
+      delete: vi.fn(({ parent: targetParent, element }) => {
+        const displayObject = targetParent.children.find(
+          (child) => child.label === element.id,
+        );
+        if (displayObject) {
+          targetParent.removeChild(displayObject);
+        }
+      }),
+    };
+    const animationBus = createAnimationBus();
+    const dispatch = vi.spyOn(animationBus, "dispatch");
+    const app = {
+      renderer: {
+        width: 1280,
+        height: 720,
+        generateTexture: vi.fn(() => Texture.EMPTY),
+      },
+    };
+    const completionTracker = {
+      getVersion: () => 11,
+      track: vi.fn(),
+      complete: vi.fn(),
+    };
+    const createTransition = ({ id, targetId }) =>
+      runReplaceAnimation({
+        app,
+        parent,
+        prevElement: { id: targetId, type: "container" },
+        nextElement: { id: targetId, type: "container", children: [] },
+        animation: {
+          id,
+          targetId,
+          type: "transition",
+          prev: {
+            tween: {
+              alpha: {
+                initialValue: 1,
+                keyframes: [{ duration: 300, value: 0, easing: "linear" }],
+              },
+            },
+          },
+          next: {
+            tween: {
+              alpha: {
+                initialValue: 0,
+                keyframes: [{ duration: 300, value: 1, easing: "linear" }],
+              },
+            },
+          },
+        },
+        animations: new Map(),
+        animationBus,
+        completionTracker,
+        eventHandler: vi.fn(),
+        elementPlugins: [],
+        plugin,
+        zIndex: 0,
+        signal: new AbortController().signal,
+      });
+
+    createTransition({
+      id: "bg-cg-animation-transition",
+      targetId: "background",
+    });
+    createTransition({
+      id: "character-animation-in",
+      targetId: "character",
+    });
+
+    const identitiesByAnimationId = Object.fromEntries(
+      dispatch.mock.calls.map(([command]) => [
+        command.payload.id,
+        command.payload.instance.tracks.map((track) => track.target.identity),
+      ]),
+    );
+    expect(identitiesByAnimationId).toEqual({
+      "bg-cg-animation-transition": [
+        "transition:bg-cg-animation-transition:prev",
+        "transition:bg-cg-animation-transition:next",
+      ],
+      "character-animation-in": [
+        "transition:character-animation-in:prev",
+        "transition:character-animation-in:next",
+      ],
+    });
+
+    expect(() => animationBus.flush()).not.toThrow();
+    expect(animationBus.getState().activeCount).toBe(2);
+
+    animationBus.cancelAll();
+    expect(animationBus.getState().activeCount).toBe(0);
+  });
+
   it("returns async transition cleanup rejection to the caller", async () => {
     const prevDisplayObject = createDisplayObject("preview-background");
     const nextDisplayObject = createDisplayObject("preview-background");

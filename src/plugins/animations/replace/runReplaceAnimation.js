@@ -183,7 +183,7 @@ const getZeroForValueType = (valueType) => {
   return length === undefined ? 0 : Array(length).fill(0);
 };
 
-const createTransitionSurfaceTarget = (surface, subject) => {
+const createTransitionSurfaceTarget = (identityPrefix, surface, subject) => {
   const wrapper = subject?.wrapper;
   const base = {
     x: wrapper?.x ?? 0,
@@ -195,7 +195,7 @@ const createTransitionSurfaceTarget = (surface, subject) => {
   };
   return {
     handle: { kind: "surface", surface, subject, wrapper, base },
-    identity: `transition:${surface}`,
+    identity: `${identityPrefix}:${surface}`,
     subject: {
       x: base.x,
       y: base.y,
@@ -214,6 +214,7 @@ const createTransitionTimelineController = ({
   compositorEffect,
   validateTerminal = false,
 }) => {
+  const identityPrefix = `transition:${animation.id}`;
   const valueTypes = new Map(
     program.clipTemplates.map((clip) => [clip.channel, clip.valueType]),
   );
@@ -231,15 +232,15 @@ const createTransitionTimelineController = ({
       0,
   };
   const transitionTargets = {
-    prev: createTransitionSurfaceTarget("prev", prevSubject),
-    next: createTransitionSurfaceTarget("next", nextSubject),
+    prev: createTransitionSurfaceTarget(identityPrefix, "prev", prevSubject),
+    next: createTransitionSurfaceTarget(identityPrefix, "next", nextSubject),
     mask: maskHandles.map((handle, index) => ({
       handle,
-      identity: `transition:mask:${index}`,
+      identity: `${identityPrefix}:mask:${index}`,
     })),
     compositor: {
       handle: compositorHandle,
-      identity: "transition:compositor",
+      identity: `${identityPrefix}:compositor`,
     },
   };
 
@@ -357,7 +358,7 @@ const createTransitionTimelineController = ({
       for (const [index] of (animation.mask ?? []).entries()) {
         const value = terminalFrame.values.find(
           (item) =>
-            item.targetIdentity === `transition:mask:${index}` &&
+            item.targetIdentity === `${identityPrefix}:mask:${index}` &&
             item.channel === "transition.mask.progress",
         )?.value;
         if (value !== 1) {
