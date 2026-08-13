@@ -38,6 +38,11 @@ states:
                 - value: 0
                   duration: 100
                   easing: linear
+            playbackRate:
+              keyframes:
+                - value: 0
+                  duration: 100
+                  easing: linear
         - id: channel-loop
           type: audio-channel
           loop: true
