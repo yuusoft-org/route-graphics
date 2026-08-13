@@ -1,0 +1,62 @@
+title: Repeating sound boundary effects
+description: Verifies beginEffect and endEffect repeat for direct sound loops and looping parent channels.
+durationMs: 2200
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  directTone:
+    generator: tone
+    frequency: 440
+    durationMs: 400
+  channelTone:
+    generator: tone
+    frequency: 660
+    durationMs: 400
+states:
+  - atMs: 0
+    state:
+      id: sound-boundary-effects
+      elements: []
+      animations: []
+      audio:
+        - id: direct-loop
+          type: sound
+          src: directTone
+          loop: true
+          volume: 70
+          pan: -0.5
+          beginEffect:
+            volume:
+              keyframes:
+                - startValue: 0
+                  value: 70
+                  duration: 100
+                  easing: linear
+          endEffect:
+            volume:
+              keyframes:
+                - value: 0
+                  duration: 100
+                  easing: linear
+        - id: channel-loop
+          type: audio-channel
+          loop: true
+          pan: 0.5
+          children:
+            - id: channel-loop-sound
+              type: sound
+              src: channelTone
+              volume: 60
+              beginEffect:
+                volume:
+                  keyframes:
+                    - startValue: 0
+                      value: 60
+                      duration: 100
+                      easing: linear
+              endEffect:
+                volume:
+                  keyframes:
+                    - value: 0
+                      duration: 100
+                      easing: linear

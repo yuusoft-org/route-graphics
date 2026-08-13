@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "wavSha256": "0e2ac593ae6d8104c0b700a5c4e6cbda2d33bea05a91fa15126671c53960b320",
+  "metadata": {
+    "sampleRate": 48000,
+    "numberOfChannels": 2,
+    "frameCount": 105600,
+    "durationMs": 2200,
+    "byteLength": 422444,
+    "signal": {
+      "peak": 0.432464599609375,
+      "rms": 0.1935118248144377,
+      "nonZeroSamples": 211006
+    }
+  },
+  "events": [
+    {
+      "name": "renderComplete",
+      "payload": {
+        "id": "sound-boundary-effects",
+        "aborted": false
+      }
+    }
+  ]
+}
