@@ -609,6 +609,52 @@ const getTimeToMediaProgressMs = (
   );
 };
 
+const getAudioParamValueAfterDelayMs = (
+  param,
+  delayMs,
+  context = getAudioContext(),
+) => {
+  const automation = audioParamAutomation.get(param);
+  if (!automation) {
+    return getParamValue(param, 1);
+  }
+
+  const elapsedMs = Math.max(
+    0,
+    (context.currentTime - automation.startTime) * 1000 + delayMs,
+  );
+  return automation.normalizeValue(
+    getTimelineValueAtTime(automation.timeline, elapsedMs),
+  );
+};
+
+const getAudioParamProgressAfterDelayMs = (
+  param,
+  delayMs,
+  context = getAudioContext(),
+) =>
+  integrateAudioParamValue(
+    param,
+    context.currentTime,
+    context.currentTime + Math.max(0, delayMs) / 1000,
+  );
+
+const getAudioParamAutomationRemainingMs = (
+  param,
+  context = getAudioContext(),
+) => {
+  const automation = audioParamAutomation.get(param);
+  if (!automation) return 0;
+
+  const elapsedMs = Math.max(
+    0,
+    (context.currentTime - automation.startTime) * 1000,
+  );
+  const timelineEndMs =
+    automation.timeline[automation.timeline.length - 1].time;
+  return Math.max(0, timelineEndMs - elapsedMs);
+};
+
 const hasContinuingPlaybackProgress = (param) => {
   const automation = audioParamAutomation.get(param);
   if (!automation) {
@@ -720,15 +766,16 @@ const applySoundPlaybackRateTransition = ({
   sound,
   transition,
   currentValue,
+  source = sound.source,
 }) => {
-  if (sound.source) {
+  if (source) {
     const duration = applyPlaybackRate({
-      source: sound.source,
+      source,
       targetValue: sound.playbackRate,
       transition,
     });
     sound.playbackRateAutomation = transition
-      ? (audioParamAutomation.get(sound.source.playbackRate) ?? null)
+      ? (audioParamAutomation.get(source.playbackRate) ?? null)
       : null;
     return duration;
   }
@@ -743,14 +790,14 @@ const applySoundPlaybackRateTransition = ({
 
 const applyPendingSoundEnterTransitions = (sound, source) => {
   const transitions = sound.pendingEnterTransitions;
+  if (transitions?.volume) {
+    applyVolume({
+      gainNode: sound.gainNode,
+      targetValue: getVolumeValue(sound),
+      transition: transitions?.volume ?? null,
+    });
+  }
   if (transitions) {
-    if (transitions.volume) {
-      applyVolume({
-        gainNode: sound.gainNode,
-        targetValue: getVolumeValue(sound),
-        transition: transitions.volume,
-      });
-    }
     if (transitions.pan) {
       applyPan({
         pannerNode: sound.pannerNode,
@@ -788,6 +835,400 @@ const consumePendingSoundEnterTransitions = (sound, transitions) => {
   if (sound.pendingEnterTransitions === transitions) {
     sound.pendingEnterTransitions = null;
   }
+};
+
+const getTransitionDurationMs = (transition) =>
+  transition?.keyframes?.reduce(
+    (duration, keyframe) =>
+      duration +
+      Math.max(0, toFiniteParamValue(keyframe.delay, 0)) +
+      Math.max(0, toFiniteParamValue(keyframe.duration, 0)),
+    0,
+  ) ?? 0;
+
+const cancelSoundEndEffect = (sound) => {
+  if (sound.endEffectTimeoutId === null) return;
+
+  cancelTimeout(sound.endEffectTimeoutId);
+  sound.endEffectTimeoutId = null;
+};
+
+const hasSoundBoundaryEffects = (sound) =>
+  sound.beginEffect !== null || sound.endEffect !== null;
+
+const getSoundBoundaryEffectDurationMs = (effect) =>
+  Math.max(0, ...Object.values(effect ?? {}).map(getTransitionDurationMs));
+
+const rememberSoundBoundaryAutomation = (sound, property, param, phase) => {
+  if (!param || !phase) return;
+
+  const automation = audioParamAutomation.get(param);
+  if (!automation) return;
+
+  sound.boundaryAutomations[property] = {
+    phase,
+    param,
+    automation,
+  };
+};
+
+const applySoundBoundaryPropertyValue = (sound, property, source) => {
+  if (property === "volume") {
+    applyVolume({
+      gainNode: sound.gainNode,
+      targetValue: getVolumeValue(sound),
+      transition: null,
+    });
+    return;
+  }
+  if (property === "pan") {
+    applyPan({
+      pannerNode: sound.pannerNode,
+      targetValue: sound.pan,
+      transition: null,
+    });
+    return;
+  }
+  if (property === "playbackRate") {
+    applyPlaybackRate({
+      source,
+      targetValue: sound.playbackRate ?? 1,
+      transition: null,
+    });
+    sound.playbackRateAutomation = null;
+  }
+};
+
+const settleSoundBoundaryPhase = (
+  sound,
+  phase,
+  { beforePlaybackRate } = {},
+) => {
+  const settledProperties = new Set();
+  for (const [property, record] of Object.entries(sound.boundaryAutomations)) {
+    if (record.phase !== phase) continue;
+
+    if (audioParamAutomation.get(record.param) === record.automation) {
+      if (property === "playbackRate") {
+        beforePlaybackRate?.();
+      }
+      applySoundBoundaryPropertyValue(sound, property, sound.source);
+      settledProperties.add(property);
+    }
+    delete sound.boundaryAutomations[property];
+  }
+
+  const pauseState = sound.channelPauseState?.boundaryAutomationState;
+  if (!pauseState) return;
+
+  for (const property of ["volume", "pan", "playbackRate"]) {
+    if (pauseState[property]?.phase !== phase) continue;
+
+    if (!settledProperties.has(property)) {
+      applySoundBoundaryPropertyValue(sound, property, sound.source);
+    }
+    pauseState[property] = null;
+  }
+  if (!Object.values(pauseState).some(Boolean)) {
+    sound.channelPauseState.boundaryAutomationState = null;
+  }
+};
+
+const getSoundEndEffectDelayMs = ({
+  sound,
+  source,
+  mediaDuration,
+  context = getAudioContext(),
+}) => {
+  const effectDurationMs = getSoundBoundaryEffectDurationMs(sound.endEffect);
+  const playbackRateTransition = sound.endEffect?.playbackRate;
+  if (!playbackRateTransition) {
+    const iterationDurationMs = getTimeToMediaProgressMs(
+      source.playbackRate,
+      mediaDuration,
+      context,
+    );
+    return Number.isFinite(iterationDurationMs)
+      ? Math.max(0, iterationDurationMs - effectDurationMs)
+      : null;
+  }
+
+  const getProgressThroughEffect = (delayMs) => {
+    const currentValue = normalizePlaybackRateValue(
+      getAudioParamValueAfterDelayMs(source.playbackRate, delayMs, context),
+    );
+    const timeline = buildAudioTimeline({
+      transition: playbackRateTransition,
+      currentValue,
+      normalizeTransitionValue: normalizePlaybackRateValue,
+      denormalizeParamValue: (value) => value,
+    });
+    return integrateTimelineRange(
+      timeline,
+      0,
+      effectDurationMs,
+      normalizePlaybackRateValue,
+    );
+  };
+  const getTotalProgress = (delayMs) =>
+    getAudioParamProgressAfterDelayMs(source.playbackRate, delayMs, context) +
+    getProgressThroughEffect(delayMs);
+
+  if (getTotalProgress(0) >= mediaDuration) {
+    return 0;
+  }
+
+  let highMs = getTimeToMediaProgressMs(
+    source.playbackRate,
+    mediaDuration,
+    context,
+  );
+  if (!Number.isFinite(highMs)) {
+    highMs = getAudioParamAutomationRemainingMs(source.playbackRate, context);
+    if (getTotalProgress(highMs) < mediaDuration) {
+      return 0;
+    }
+  }
+
+  let lowMs = 0;
+  for (let iteration = 0; iteration < 48; iteration++) {
+    const midpointMs = (lowMs + highMs) / 2;
+    if (getTotalProgress(midpointMs) >= mediaDuration) {
+      highMs = midpointMs;
+    } else {
+      lowMs = midpointMs;
+    }
+  }
+  return Math.max(0, highMs);
+};
+
+const captureActiveAudioParamAutomation = (
+  param,
+  { hold = false, context = getAudioContext() } = {},
+) => {
+  const automation = audioParamAutomation.get(param);
+  if (!automation) return null;
+
+  const elapsedMs = Math.max(
+    0,
+    (context.currentTime - automation.startTime) * 1000,
+  );
+  const timelineEndMs =
+    automation.timeline[automation.timeline.length - 1].time;
+  if (elapsedMs >= timelineEndMs) return null;
+
+  if (hold) {
+    holdParamNow(param, context);
+  }
+  return { automation, elapsedMs };
+};
+
+const resumeAudioParamAutomation = (
+  param,
+  snapshot,
+  context = getAudioContext(),
+) => {
+  if (!param || !snapshot) return null;
+
+  const automation = {
+    ...snapshot.automation,
+    startTime: context.currentTime - snapshot.elapsedMs / 1000,
+  };
+  applyDeferredTimeline({
+    param,
+    automation,
+    normalizeParamValue: automation.normalizeValue,
+    context,
+  });
+  return automation;
+};
+
+const captureSoundBoundaryPauseState = (sound, context = getAudioContext()) => {
+  const properties = new Set([
+    ...Object.keys(sound.beginEffect ?? {}),
+    ...Object.keys(sound.endEffect ?? {}),
+  ]);
+  if (properties.size === 0) return null;
+
+  const captureProperty = (property, param, hold = false) => {
+    const snapshot = captureActiveAudioParamAutomation(param, {
+      hold,
+      context,
+    });
+    if (!snapshot) return null;
+
+    const record = sound.boundaryAutomations[property];
+    return {
+      ...snapshot,
+      phase: record?.automation === snapshot.automation ? record.phase : null,
+    };
+  };
+  const state = {
+    volume: properties.has("volume")
+      ? captureProperty("volume", sound.gainNode?.gain, true)
+      : null,
+    pan: properties.has("pan")
+      ? captureProperty("pan", sound.pannerNode?.pan, true)
+      : null,
+    playbackRate: properties.has("playbackRate")
+      ? captureProperty("playbackRate", sound.source?.playbackRate)
+      : null,
+  };
+  return Object.values(state).some(Boolean) ? state : null;
+};
+
+const resumeSoundBoundaryPauseState = (
+  sound,
+  state,
+  context = getAudioContext(),
+) => {
+  if (!state) return;
+
+  const volumeAutomation = resumeAudioParamAutomation(
+    sound.gainNode?.gain,
+    state.volume,
+    context,
+  );
+  if (volumeAutomation && state.volume.phase) {
+    rememberSoundBoundaryAutomation(
+      sound,
+      "volume",
+      sound.gainNode.gain,
+      state.volume.phase,
+    );
+  }
+  const panAutomation = resumeAudioParamAutomation(
+    sound.pannerNode?.pan,
+    state.pan,
+    context,
+  );
+  if (panAutomation && state.pan.phase) {
+    rememberSoundBoundaryAutomation(
+      sound,
+      "pan",
+      sound.pannerNode.pan,
+      state.pan.phase,
+    );
+  }
+  if (state.playbackRate) {
+    sound.playbackRateAutomation = {
+      ...state.playbackRate.automation,
+      startTime: context.currentTime - state.playbackRate.elapsedMs / 1000,
+    };
+    sound.pendingBoundaryPlaybackRatePhase = state.playbackRate.phase;
+  }
+};
+
+const resetSoundBoundaryProperties = (sound, source) => {
+  sound.endEffectActive = false;
+  sound.boundaryAutomations = {};
+  sound.pendingBoundaryPlaybackRatePhase = null;
+  const properties = new Set([
+    ...Object.keys(sound.beginEffect ?? {}),
+    ...Object.keys(sound.endEffect ?? {}),
+  ]);
+  if (properties.has("volume")) {
+    applyVolume({
+      gainNode: sound.gainNode,
+      targetValue: getVolumeValue(sound),
+      transition: null,
+    });
+  }
+  if (properties.has("pan")) {
+    applyPan({
+      pannerNode: sound.pannerNode,
+      targetValue: sound.pan,
+      transition: null,
+    });
+  }
+  if (properties.has("playbackRate")) {
+    applyPlaybackRate({
+      source,
+      targetValue: sound.playbackRate ?? 1,
+      transition: null,
+    });
+    sound.playbackRateAutomation = null;
+  }
+};
+
+const applySoundBoundaryEffect = ({
+  sound,
+  source,
+  effect,
+  phase,
+  blocked = {},
+}) => {
+  if (!effect) return 0;
+  const blockedProperties = blocked ?? {};
+  const durations = [];
+  if (effect.volume && !blockedProperties.volume) {
+    durations.push(
+      applyVolume({
+        gainNode: sound.gainNode,
+        targetValue: getVolumeValue(sound),
+        transition: effect.volume,
+      }),
+    );
+    rememberSoundBoundaryAutomation(
+      sound,
+      "volume",
+      sound.gainNode?.gain,
+      phase,
+    );
+  }
+  if (effect.pan && !blockedProperties.pan) {
+    durations.push(
+      applyPan({
+        pannerNode: sound.pannerNode,
+        targetValue: sound.pan,
+        transition: effect.pan,
+      }),
+    );
+    rememberSoundBoundaryAutomation(sound, "pan", sound.pannerNode?.pan, phase);
+  }
+  if (effect.playbackRate && !blockedProperties.playbackRate) {
+    durations.push(
+      applySoundPlaybackRateTransition({
+        sound,
+        source,
+        transition: effect.playbackRate,
+      }),
+    );
+    rememberSoundBoundaryAutomation(
+      sound,
+      "playbackRate",
+      source?.playbackRate,
+      phase,
+    );
+  }
+  return Math.max(0, ...durations);
+};
+
+const scheduleSoundEndEffect = ({ sound, source, mediaDuration }) => {
+  if (sound.endEffectActive) return;
+
+  cancelSoundEndEffect(sound);
+  if (!sound.endEffect || mediaDuration === undefined) return;
+
+  const delayMs = getSoundEndEffectDelayMs({
+    sound,
+    source,
+    mediaDuration,
+  });
+  if (delayMs === null) return;
+
+  sound.endEffectTimeoutId = scheduleTimeout(() => {
+    sound.endEffectTimeoutId = null;
+    if (sound.source !== source || sound.finishing) return;
+
+    sound.endEffectActive = true;
+    applySoundBoundaryEffect({
+      sound,
+      source,
+      effect: sound.endEffect,
+      phase: "end",
+    });
+  }, delayMs);
 };
 
 const createChannelInstance = (channel, outputNode) => {
@@ -860,6 +1301,13 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
     finishing: false,
     finishingCallbacks: new Set(),
     pendingEnterTransitions: null,
+    beginEffect: sound.beginEffect ?? null,
+    endEffect: sound.endEffect ?? null,
+    endEffectTimeoutId: null,
+    endEffectActive: false,
+    boundaryAutomations: {},
+    pendingBoundaryPlaybackRatePhase: null,
+    boundaryEndScheduleInvalidated: false,
     playbackRateAutomation: null,
     playbackPending: false,
     pendingTimeoutId: null,
@@ -901,7 +1349,11 @@ const createSoundInstance = ({ sound, channelNode, internalId }) => {
   };
 };
 
-const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
+const createSourceForSound = (
+  sound,
+  startOffset = sound.startAt ?? 0,
+  { iterationStart = true } = {},
+) => {
   const context = getAudioContext();
   const audioBuffer = AudioAsset.getAsset(sound.src);
   debugAudio("asset lookup", {
@@ -918,13 +1370,23 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
 
   const source = context.createBufferSource();
   source.buffer = audioBuffer;
-  source.loop = sound.loop ?? false;
+  source.loop = (sound.loop ?? false) && !hasSoundBoundaryEffects(sound);
 
   connect(source, sound.gainNode);
 
   sound.sourceEnded = false;
   source.onended = () => {
     if (sound.source !== source) {
+      return;
+    }
+
+    cancelSoundEndEffect(sound);
+    if (sound.loop && hasSoundBoundaryEffects(sound) && !sound.finishing) {
+      sound.sourceEnded = true;
+      playSound(sound, {
+        startOffset: sound.startAt ?? 0,
+        startDelayMs: 0,
+      });
       return;
     }
 
@@ -950,11 +1412,38 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
   } else {
     source.start(startTime, offset);
   }
+  if (iterationStart) {
+    resetSoundBoundaryProperties(sound, source);
+  }
   const pendingEnterTransitions = applyPendingSoundEnterTransitions(
     sound,
     source,
   );
+  if (!iterationStart && sound.pendingBoundaryPlaybackRatePhase) {
+    rememberSoundBoundaryAutomation(
+      sound,
+      "playbackRate",
+      source.playbackRate,
+      sound.pendingBoundaryPlaybackRatePhase,
+    );
+    sound.pendingBoundaryPlaybackRatePhase = null;
+  }
+  if (iterationStart) {
+    applySoundBoundaryEffect({
+      sound,
+      source,
+      effect: sound.beginEffect,
+      phase: "begin",
+      blocked: pendingEnterTransitions,
+    });
+  }
   consumePendingSoundEnterTransitions(sound, pendingEnterTransitions);
+  const mediaDuration =
+    duration ??
+    (Number.isFinite(audioBuffer.duration)
+      ? Math.max(audioBuffer.duration - offset, 0)
+      : undefined);
+  scheduleSoundEndEffect({ sound, source, mediaDuration });
   debugAudio("source started", {
     id: sound.id,
     src: sound.src,
@@ -972,7 +1461,11 @@ const createSourceForSound = (sound, startOffset = sound.startAt ?? 0) => {
 
 const playSound = (
   sound,
-  { startOffset = sound.startAt ?? 0, startDelayMs = sound.startDelayMs } = {},
+  {
+    startOffset = sound.startAt ?? 0,
+    startDelayMs = sound.startDelayMs,
+    iterationStart = true,
+  } = {},
 ) => {
   if (sound.pendingTimeoutId !== null) {
     cancelTimeout(sound.pendingTimeoutId);
@@ -1010,7 +1503,9 @@ const playSound = (
     sound.delayDeadlineMs = null;
     sound.pendingDelayMs = 0;
     const previousSource = sound.source;
-    sound.source = createSourceForSound(sound, startOffset);
+    sound.source = createSourceForSound(sound, startOffset, {
+      iterationStart,
+    });
     sound.playbackPending = false;
     sound.pendingStartOffset = null;
     if (previousSource && previousSource !== sound.source) {
@@ -1048,6 +1543,7 @@ const playSound = (
 };
 
 const stopSource = (sound, delayMs = 0) => {
+  cancelSoundEndEffect(sound);
   sound.playRequestId = (sound.playRequestId ?? 0) + 1;
   sound.playbackPending = false;
   sound.pendingDelayMs = 0;
@@ -1070,8 +1566,15 @@ const stopSource = (sound, delayMs = 0) => {
 };
 
 const cleanupSound = (sound) => {
+  cancelSoundEndEffect(sound);
   sound.onSourceEnded = null;
   sound.pendingEnterTransitions = null;
+  sound.beginEffect = null;
+  sound.endEffect = null;
+  sound.endEffectActive = false;
+  sound.boundaryAutomations = {};
+  sound.pendingBoundaryPlaybackRatePhase = null;
+  sound.boundaryEndScheduleInvalidated = false;
   sound.playbackRateAutomation = null;
 
   if (sound.control) {
@@ -2181,6 +2684,7 @@ export const createAudioStage = () => {
 
   const stopLegacySourceForChannelPause = (sound) => {
     const source = sound.source;
+    cancelSoundEndEffect(sound);
     sound.playRequestId = (sound.playRequestId ?? 0) + 1;
     sound.playbackPending = false;
     sound.pendingDelayMs = 0;
@@ -2226,6 +2730,7 @@ export const createAudioStage = () => {
         kind: "active",
         offset,
         remainingDelayMs: 0,
+        boundaryAutomationState: captureSoundBoundaryPauseState(sound),
       };
       stopLegacySourceForChannelPause(sound);
       sound.sourceEnded = false;
@@ -2266,9 +2771,11 @@ export const createAudioStage = () => {
       return;
     }
 
+    resumeSoundBoundaryPauseState(sound, pauseState.boundaryAutomationState);
     playSound(sound, {
       startOffset: pauseState.offset,
       startDelayMs: pauseState.remainingDelayMs,
+      iterationStart: pauseState.kind !== "active",
     });
   };
 
@@ -2338,9 +2845,7 @@ export const createAudioStage = () => {
       return;
     }
 
-    channelSounds.forEach((sound) => {
-      playSound(sound);
-    });
+    channelSounds.forEach((sound) => playSound(sound));
   };
 
   const bindChannelLoopCompletion = (sound) => {
@@ -2586,6 +3091,7 @@ export const createAudioStage = () => {
   };
 
   const applySoundExitTransitions = (instance, effects) => {
+    cancelSoundEndEffect(instance);
     instance.pendingEnterTransitions = null;
     const volumeTransition = getTransitionPhase(
       effects,
@@ -2655,6 +3161,8 @@ export const createAudioStage = () => {
   const removeSoundInstance = (instance, effects, inheritedDuration = 0) => {
     if (!instance) return 0;
 
+    cancelSoundEndEffect(instance);
+    instance.loop = false;
     instance.finishing = false;
     instance.pendingEnterTransitions = null;
     instance.onSourceEnded = null;
@@ -2864,6 +3372,28 @@ export const createAudioStage = () => {
     const loopChanged = instance.loop !== sound.loop;
     const playbackRateChanged = instance.playbackRate !== sound.playbackRate;
     const startDelayChanged = instance.startDelayMs !== sound.startDelayMs;
+    const nextBeginEffect = sound.beginEffect ?? null;
+    const nextEndEffect = sound.endEffect ?? null;
+    const beginEffectChanged =
+      JSON.stringify(instance.beginEffect) !== JSON.stringify(nextBeginEffect);
+    const endEffectChanged =
+      JSON.stringify(instance.endEffect) !== JSON.stringify(nextEndEffect);
+    const boundaryModeChanged =
+      hasSoundBoundaryEffects(instance) !==
+      (nextBeginEffect !== null || nextEndEffect !== null);
+    const recreateSegmentLoop =
+      Boolean(instance.source) &&
+      !instance.control &&
+      instance.loop &&
+      sound.loop &&
+      sound.endAt !== null &&
+      sound.endAt !== undefined &&
+      boundaryModeChanged;
+    const segmentLoopResumeOffset = recreateSegmentLoop
+      ? getLegacyPlaybackOffset(instance)
+      : null;
+    const boundaryEndScheduleInvalidated =
+      instance.boundaryEndScheduleInvalidated;
     const sourceBeforeUpdate = instance.source;
     const currentPlaybackRateValue = instance.source
       ? getCurrentParamValue(instance.source.playbackRate, getAudioContext())
@@ -2896,8 +3426,59 @@ export const createAudioStage = () => {
       checkpointLegacyPlaybackOffset(instance);
     }
 
+    let boundaryPlaybackRateSettled = false;
+    const beforeBoundaryPlaybackRateSettlement = () => {
+      if (
+        boundaryPlaybackRateSettled ||
+        recreateSegmentLoop ||
+        !instance.source ||
+        instance.sourceEnded ||
+        instance.playbackPending
+      ) {
+        return;
+      }
+      checkpointLegacyPlaybackOffset(instance);
+      boundaryPlaybackRateSettled = true;
+    };
+    if (beginEffectChanged) {
+      settleSoundBoundaryPhase(instance, "begin", {
+        beforePlaybackRate: beforeBoundaryPlaybackRateSettlement,
+      });
+    }
+    if (endEffectChanged) {
+      cancelSoundEndEffect(instance);
+      settleSoundBoundaryPhase(instance, "end", {
+        beforePlaybackRate: beforeBoundaryPlaybackRateSettlement,
+      });
+      instance.endEffectActive = false;
+    }
+
+    const remainingMediaForEndEffect =
+      instance.source &&
+      nextEndEffect &&
+      (playbackRateChanged ||
+        endEffectChanged ||
+        boundaryEndScheduleInvalidated)
+        ? getRemainingIterationMediaSeconds(instance)
+        : null;
+
+    if (recreateSegmentLoop) {
+      const source = instance.source;
+      cancelSoundEndEffect(instance);
+      source.onended = null;
+      instance.source = null;
+      instance.sourceStartedAt = null;
+      instance.sourceEnded = false;
+      try {
+        source.stop(getAudioContext().currentTime);
+      } catch {
+        // Stopping an already-stopped source is harmless while changing loop mode.
+      }
+      disconnect(source);
+    }
+
+    const parentChannel = getParentChannelForSound(sound);
     if (instance.channelId !== sound.channelId) {
-      const parentChannel = getParentChannelForSound(sound);
       connectSoundToChannel(instance, parentChannel.gainNode);
     }
 
@@ -2912,8 +3493,11 @@ export const createAudioStage = () => {
     instance.channelId = sound.channelId;
     bindChannelLoopCompletion(instance);
 
+    instance.beginEffect = nextBeginEffect;
+    instance.endEffect = nextEndEffect;
+
     if (instance.source && !instance.control) {
-      instance.source.loop = sound.loop;
+      instance.source.loop = sound.loop && !hasSoundBoundaryEffects(instance);
     }
 
     const volumeTransition = getTransitionPhase(
@@ -2974,6 +3558,35 @@ export const createAudioStage = () => {
         });
       }
     }
+
+    if (recreateSegmentLoop) {
+      playSound(instance, {
+        startOffset: segmentLoopResumeOffset,
+        startDelayMs: 0,
+        iterationStart: false,
+      });
+    }
+
+    if (
+      !recreateSegmentLoop &&
+      instance.source &&
+      hasSoundBoundaryEffects(instance) &&
+      (playbackRateChanged ||
+        endEffectChanged ||
+        boundaryEndScheduleInvalidated)
+    ) {
+      const remainingMediaSeconds =
+        remainingMediaForEndEffect ??
+        getRemainingIterationMediaSeconds(instance);
+      if (remainingMediaSeconds !== null) {
+        scheduleSoundEndEffect({
+          sound: instance,
+          source: instance.source,
+          mediaDuration: remainingMediaSeconds,
+        });
+      }
+    }
+    instance.boundaryEndScheduleInvalidated = false;
 
     if (
       !instance.control &&
@@ -3063,6 +3676,14 @@ export const createAudioStage = () => {
       return;
     }
     if (property === "playbackRate") {
+      if (
+        instance.source &&
+        !instance.control &&
+        !instance.sourceEnded &&
+        !instance.playbackPending
+      ) {
+        checkpointLegacyPlaybackOffset(instance);
+      }
       instance.playbackRateAutomation = null;
       if (instance.source) {
         applyPlaybackRate({
@@ -3070,6 +3691,9 @@ export const createAudioStage = () => {
           targetValue: node?.playbackRate ?? instance.playbackRate,
           transition: null,
         });
+        if (instance.endEffect && !instance.endEffectActive) {
+          instance.boundaryEndScheduleInvalidated = true;
+        }
       }
     }
   };

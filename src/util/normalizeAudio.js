@@ -25,6 +25,7 @@ const AUDIO_TRANSITION_PROPERTY_RANGES = {
 };
 const AUDIO_EASINGS = new Set(SUPPORTED_EASING_NAMES);
 const AUDIO_TRANSITION_PHASE_KEYS = new Set(["initialValue", "keyframes"]);
+const AUDIO_BOUNDARY_EFFECT_KEYS = new Set(["keyframes"]);
 const AUDIO_TRANSITION_KEYFRAME_KEYS = new Set([
   "value",
   "startValue",
@@ -203,10 +204,24 @@ const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
       ? undefined
       : normalizePlaybackCommand(node.playback, `${path}.playback`);
 
+  if (playback && (node.beginEffect || node.endEffect)) {
+    throw new Error(
+      `Input error: ${path}.beginEffect and ${path}.endEffect are not supported with transport-controlled playback.`,
+    );
+  }
+
   if (node.transition !== undefined) {
     throw new Error(
       `Input error: ${path}.transition is not supported. Use top-level audioEffects instead.`,
     );
+  }
+
+  for (const field of ["beginEffect", "endEffect"]) {
+    if (node[field] !== undefined) {
+      validateSoundBoundaryEffect(node[field], `${path}.${field}`, {
+        endEffect: field === "endEffect",
+      });
+    }
   }
 
   flattenedSounds.push({
@@ -223,6 +238,10 @@ const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
     endAt: node.endAt ?? null,
     channelId,
     ...(playback ? { playback } : {}),
+    ...(node.beginEffect
+      ? { beginEffect: structuredClone(node.beginEffect) }
+      : {}),
+    ...(node.endEffect ? { endEffect: structuredClone(node.endEffect) } : {}),
   });
 };
 
@@ -437,6 +456,54 @@ const validateTransitionPhase = (phase, path, propertyName) => {
     assertOptionalBoolean(keyframe.relative, `${keyframePath}.relative`);
   }
 };
+
+const getBoundaryTrackDurationMs = (track) =>
+  track.keyframes.reduce(
+    (duration, keyframe) =>
+      duration + (keyframe.delay ?? 0) + keyframe.duration,
+    0,
+  );
+
+function validateSoundBoundaryEffect(effect, path, { endEffect = false } = {}) {
+  assertNonEmptyRecord(effect, path);
+
+  for (const [propertyName, track] of Object.entries(effect)) {
+    if (!AUDIO_TRANSITION_PROPERTIES.has(propertyName)) {
+      throw new Error(
+        `Input error: unsupported sound boundary property "${propertyName}" at ${path}.`,
+      );
+    }
+    assertRecord(track, `${path}.${propertyName}`);
+    for (const key of Object.keys(track)) {
+      if (!AUDIO_BOUNDARY_EFFECT_KEYS.has(key)) {
+        throw new Error(
+          `Input error: unsupported sound boundary field "${key}" at ${path}.${propertyName}.`,
+        );
+      }
+    }
+    validateTransitionPhase(track, `${path}.${propertyName}`, propertyName);
+    if (track.keyframes.at(-1).relative === true) {
+      throw new Error(
+        `Input error: ${path}.${propertyName}.keyframes must end with an absolute value.`,
+      );
+    }
+  }
+
+  const playbackRateTrack = effect.playbackRate;
+  if (!endEffect || playbackRateTrack?.keyframes.at(-1).value !== 0) {
+    return;
+  }
+
+  const playbackRateDurationMs = getBoundaryTrackDurationMs(playbackRateTrack);
+  const effectDurationMs = Math.max(
+    ...Object.values(effect).map(getBoundaryTrackDurationMs),
+  );
+  if (playbackRateDurationMs < effectDurationMs) {
+    throw new Error(
+      `Input error: ${path}.playbackRate cannot end at 0 before the other boundary tracks finish.`,
+    );
+  }
+}
 
 const validateAudioTransition = (effect, path) => {
   assertNonEmptyString(effect.targetId, `${path}.targetId`);

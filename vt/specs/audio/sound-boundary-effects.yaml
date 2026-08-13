@@ -1,0 +1,48 @@
+---
+title: Audio Manual - Sound Boundary Effects
+description: Browser fixture for repeated beginEffect and endEffect fades on a direct sound loop and a looping parent channel.
+skipScreenshot: true
+specs:
+  - state 1 is silent so pressing n or clicking Next starts audio from a user gesture
+  - state 2 should repeatedly fade bgm-3 in and out on each direct sound iteration
+  - state 3 should repeat the same boundary fades when the parent channel starts each child iteration
+  - state 4 should stop all audio
+---
+states:
+  - id: sound-boundary-effects-ready
+    audio: []
+  - id: sound-boundary-effects-direct
+    audio:
+      - id: boundary-direct-bgm
+        type: sound
+        src: bgm-3
+        loop: true
+        volume: 70
+        beginEffect:
+          volume:
+            keyframes:
+              - { startValue: 0, value: 70, duration: 1000, easing: linear }
+        endEffect:
+          volume:
+            keyframes:
+              - { value: 0, duration: 1000, easing: linear }
+  - id: sound-boundary-effects-channel
+    audio:
+      - id: boundary-channel
+        type: audio-channel
+        loop: true
+        children:
+          - id: boundary-channel-bgm
+            type: sound
+            src: bgm-3
+            volume: 70
+            beginEffect:
+              volume:
+                keyframes:
+                  - { startValue: 0, value: 70, duration: 1000, easing: linear }
+            endEffect:
+              volume:
+                keyframes:
+                  - { value: 0, duration: 1000, easing: linear }
+  - id: sound-boundary-effects-stopped
+    audio: []
