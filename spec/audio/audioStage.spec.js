@@ -3133,6 +3133,114 @@ describe("AudioStage graph rendering", () => {
     expect(context.sources).toHaveLength(2);
   });
 
+  it("settles an active endEffect removed from a retained loop", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 1 }]]),
+    });
+    const initialAudio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "theme",
+        loop: true,
+        volume: 80,
+        endEffect: { volume: keyframePhase(0, 200) },
+      },
+    ];
+    const updatedAudio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "theme",
+        loop: true,
+        volume: 80,
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: initialAudio });
+    const sound = findCurrentSound(stage, "bgm");
+    context.currentTime = 10.8;
+    vi.advanceTimersByTime(800);
+
+    context.currentTime = 10.85;
+    stage.renderGraph({
+      prevAudio: initialAudio,
+      nextAudio: updatedAudio,
+    });
+
+    expect(sound.gainNode.gain.cancelScheduledValues).toHaveBeenLastCalledWith(
+      10.85,
+    );
+    expect(sound.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.8,
+      10.85,
+    );
+    expect(context.sources[0].loop).toBe(true);
+  });
+
+  it("discards stale boundary automation when updating a paused channel", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 1 }]]),
+    });
+    const channel = (commandId, operation, withEndEffect) => [
+      {
+        id: "music",
+        type: "audio-channel",
+        playback: { commandId, operation },
+        children: [
+          {
+            id: "theme",
+            type: "sound",
+            src: "theme",
+            loop: true,
+            volume: 80,
+            ...(withEndEffect
+              ? { endEffect: { volume: keyframePhase(0, 200) } }
+              : {}),
+          },
+        ],
+      },
+    ];
+    const playing = channel(1, "resume", true);
+    const paused = channel(2, "pause", true);
+    const updatedWhilePaused = channel(2, "pause", false);
+    const resumed = channel(3, "resume", false);
+
+    stage.renderGraph({ nextAudio: playing });
+    const sound = findCurrentSound(stage, "theme");
+    context.currentTime = 10.8;
+    vi.advanceTimersByTime(800);
+
+    context.currentTime = 10.85;
+    stage.renderGraph({ prevAudio: playing, nextAudio: paused });
+    expect(sound.channelPauseState.boundaryAutomationState.volume.phase).toBe(
+      "end",
+    );
+
+    context.currentTime = 10.9;
+    stage.renderGraph({
+      prevAudio: paused,
+      nextAudio: updatedWhilePaused,
+    });
+    expect(sound.channelPauseState.boundaryAutomationState).toBeNull();
+    expect(sound.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.8,
+      10.9,
+    );
+
+    context.currentTime = 20;
+    stage.renderGraph({
+      prevAudio: updatedWhilePaused,
+      nextAudio: resumed,
+    });
+    expect(context.sources).toHaveLength(2);
+    expect(sound.gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(
+      0.8,
+      10.9,
+    );
+    expect(context.sources[1].loop).toBe(true);
+  });
+
   it("measures the current loop remainder before enabling boundary effects", async () => {
     const { stage, context } = await setupAudioStage({
       assetMap: new Map([["theme", { duration: 1 }]]),
@@ -3166,6 +3274,61 @@ describe("AudioStage graph rendering", () => {
     expect(
       sound.gainNode.gain.linearRampToValueAtTime,
     ).toHaveBeenLastCalledWith(0, 13);
+  });
+
+  it("recreates a partial native loop when enabling boundary effects", async () => {
+    const { stage, context } = await setupAudioStage({
+      assetMap: new Map([["theme", { duration: 2 }]]),
+    });
+    const initialAudio = [
+      {
+        id: "bgm",
+        type: "sound",
+        src: "theme",
+        loop: true,
+        startAt: 0.2,
+        endAt: 1.2,
+        volume: 80,
+      },
+    ];
+    const boundaryAudio = [
+      {
+        ...initialAudio[0],
+        endEffect: { volume: keyframePhase(0, 200) },
+      },
+    ];
+
+    stage.renderGraph({ nextAudio: initialAudio });
+    const firstSource = context.sources[0];
+    expect(firstSource.loop).toBe(true);
+    expect(firstSource.loopStart).toBe(0.2);
+    expect(firstSource.loopEnd).toBe(1.2);
+
+    context.currentTime = 12.5;
+    stage.renderGraph({
+      prevAudio: initialAudio,
+      nextAudio: boundaryAudio,
+    });
+
+    expect(firstSource.stop).toHaveBeenCalledWith(12.5);
+    expect(context.sources).toHaveLength(2);
+    const resumedSource = context.sources[1];
+    const [, offset, duration] = resumedSource.start.mock.calls[0];
+    expect(resumedSource.loop).toBe(false);
+    expect(offset).toBeCloseTo(0.7);
+    expect(duration).toBeCloseTo(0.5);
+
+    const sound = findCurrentSound(stage, "bgm");
+    expect(sound.gainNode.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+    context.currentTime = 12.75;
+    vi.advanceTimersByTime(250);
+    expect(sound.gainNode.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+    context.currentTime = 12.8;
+    vi.advanceTimersByTime(50);
+    const [target, endTime] =
+      sound.gainNode.gain.linearRampToValueAtTime.mock.calls.at(-1);
+    expect(target).toBe(0);
+    expect(endTime).toBeCloseTo(13);
   });
 
   it("reschedules endEffect when playbackRate effect ownership settles", async () => {

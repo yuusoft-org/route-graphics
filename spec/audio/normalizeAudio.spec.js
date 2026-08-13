@@ -162,6 +162,36 @@ describe("audio effect normalization", () => {
     ).toThrow("not supported with transport-controlled playback");
   });
 
+  it("rejects a zero-ending playbackRate track shorter than another endEffect track", () => {
+    expect(() =>
+      normalizeAudioRenderState({
+        audio: [
+          sound({
+            endEffect: {
+              volume: track(0, { duration: 500 }),
+              playbackRate: track(0, { duration: 100 }),
+            },
+          }),
+        ],
+      }),
+    ).toThrow(
+      "endEffect.playbackRate cannot end at 0 before the other boundary tracks finish",
+    );
+
+    expect(() =>
+      normalizeAudioRenderState({
+        audio: [
+          sound({
+            endEffect: {
+              volume: track(0, { duration: 500 }),
+              playbackRate: track(0, { duration: 500 }),
+            },
+          }),
+        ],
+      }),
+    ).not.toThrow();
+  });
+
   it("rejects unknown fields on canonical effects", () => {
     expect(() =>
       normalizeAudioRenderState({

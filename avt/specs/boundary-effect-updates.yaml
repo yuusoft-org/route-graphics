@@ -1,0 +1,67 @@
+title: Dynamic sound boundary effects
+description: Verifies active boundary removal settles automation and partial loops preserve their segment when boundary effects are enabled.
+durationMs: 2000
+sampleRate: 48000
+numberOfChannels: 2
+assets:
+  removalTone:
+    generator: tone
+    frequency: 330
+    durationMs: 1000
+  segmentTone:
+    generator: tone
+    frequency: 550
+    durationMs: 1400
+states:
+  - atMs: 0
+    state:
+      id: boundary-effects-initial
+      elements: []
+      animations: []
+      audio:
+        - id: removal-loop
+          type: sound
+          src: removalTone
+          loop: true
+          volume: 60
+          pan: -0.5
+          endEffect:
+            volume:
+              keyframes:
+                - value: 0
+                  duration: 400
+                  easing: linear
+        - id: partial-loop
+          type: sound
+          src: segmentTone
+          loop: true
+          startAt: 0.2
+          endAt: 0.8
+          volume: 50
+          pan: 0.5
+  - atMs: 700
+    state:
+      id: boundary-effects-updated
+      elements: []
+      animations: []
+      audio:
+        - id: removal-loop
+          type: sound
+          src: removalTone
+          loop: true
+          volume: 60
+          pan: -0.5
+        - id: partial-loop
+          type: sound
+          src: segmentTone
+          loop: true
+          startAt: 0.2
+          endAt: 0.8
+          volume: 50
+          pan: 0.5
+          endEffect:
+            volume:
+              keyframes:
+                - value: 0
+                  duration: 100
+                  easing: linear

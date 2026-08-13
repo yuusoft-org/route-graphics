@@ -218,7 +218,9 @@ const validateSound = (node, path, ids, flattenedSounds, channelId = null) => {
 
   for (const field of ["beginEffect", "endEffect"]) {
     if (node[field] !== undefined) {
-      validateSoundBoundaryEffect(node[field], `${path}.${field}`);
+      validateSoundBoundaryEffect(node[field], `${path}.${field}`, {
+        endEffect: field === "endEffect",
+      });
     }
   }
 
@@ -455,7 +457,14 @@ const validateTransitionPhase = (phase, path, propertyName) => {
   }
 };
 
-function validateSoundBoundaryEffect(effect, path) {
+const getBoundaryTrackDurationMs = (track) =>
+  track.keyframes.reduce(
+    (duration, keyframe) =>
+      duration + (keyframe.delay ?? 0) + keyframe.duration,
+    0,
+  );
+
+function validateSoundBoundaryEffect(effect, path, { endEffect = false } = {}) {
   assertNonEmptyRecord(effect, path);
 
   for (const [propertyName, track] of Object.entries(effect)) {
@@ -478,6 +487,21 @@ function validateSoundBoundaryEffect(effect, path) {
         `Input error: ${path}.${propertyName}.keyframes must end with an absolute value.`,
       );
     }
+  }
+
+  const playbackRateTrack = effect.playbackRate;
+  if (!endEffect || playbackRateTrack?.keyframes.at(-1).value !== 0) {
+    return;
+  }
+
+  const playbackRateDurationMs = getBoundaryTrackDurationMs(playbackRateTrack);
+  const effectDurationMs = Math.max(
+    ...Object.values(effect).map(getBoundaryTrackDurationMs),
+  );
+  if (playbackRateDurationMs < effectDurationMs) {
+    throw new Error(
+      `Input error: ${path}.playbackRate cannot end at 0 before the other boundary tracks finish.`,
+    );
   }
 }
 
