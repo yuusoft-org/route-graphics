@@ -1,6 +1,6 @@
 # Audio Channel Design
 
-Last updated: 2026-08-06
+Last updated: 2026-08-13
 
 Canonical `audioEffects` keyframes support the optional `startValue` semantics
 defined in
@@ -18,7 +18,8 @@ also still accepts flat Route Graphics `sound` audio nodes for compatibility.
   Graphics visual nodes and animations
 - keep channels out of `resources`
 - keep audio nodes focused on current audio state
-- keep automation in `audioEffects`
+- keep graph-edge automation in `audioEffects`
+- keep natural sound-iteration automation on the sound node
 - support mixer-style channel volume without a separate mixer concept
 - support smooth volume fades and crossfades
 - preserve compatibility with existing flat `sound` render state
@@ -157,6 +158,14 @@ startDelayMs: 0
 playbackRate: 1
 startAt: 0
 endAt: null
+beginEffect:
+  volume:
+    keyframes:
+      - { startValue: 0, value: 100, duration: 300 }
+endEffect:
+  volume:
+    keyframes:
+      - { value: 0, duration: 500 }
 ```
 
 Fields:
@@ -175,6 +184,8 @@ Fields:
 | `startAt`      | number      | `0`      | Start offset in seconds                      |
 | `endAt`        | number/null | `null`   | Optional end time in seconds                 |
 | `playback`     | object      | omitted  | Optional command-controlled transport        |
+| `beginEffect`  | object      | omitted  | Update tracks run at each iteration start    |
+| `endEffect`    | object      | omitted  | Update tracks ending at each natural end     |
 
 `startAt` and `endAt` are intended for partial playback. If `endAt` is present,
 duration is `endAt - startAt`.
@@ -186,6 +197,19 @@ When `playback` is present, the sound uses ordered `play`, `pause`, `resume`,
 `stop`, and `seek` commands instead of automatic declarative startup. See
 [Command-Controlled Sound Playback](./audio-playback-commands.md) for the
 strict JSON shape, lifecycle events, and reconciliation rules.
+
+`beginEffect` and `endEffect` use a direct property-to-keyframe-track map. They
+support `volume`, `pan`, and `playbackRate`. `beginEffect` runs whenever a
+playback iteration starts. `endEffect` starts early enough for its longest
+track to finish at the natural iteration boundary. Both repeat for a sound
+loop and for every iteration of a looping parent channel. Each new iteration
+resets properties used by either boundary effect to the sound's declared
+values before applying `beginEffect`.
+
+Boundary effects are intentionally separate from top-level `audioEffects`:
+they describe media-time behavior owned by one sound, not a previous-to-next
+render-state edge. A sound cannot combine boundary effects with
+command-controlled `playback`.
 
 ### Sound Identity and Replay
 
@@ -254,8 +278,10 @@ Route Graphics should reject invalid audio render state instead of guessing:
 - more than one `audio-transition` targeting the same audio node in one render
   state
 - lifecycle phases that do not apply to the current edge
-- `enter` or `update` tracks whose final absolute keyframe does not match the
-  next node's declared property value
+- `enter` or `update` tracks whose final absolute keyframe does
+  not match the next node's declared property value
+- malformed `beginEffect` or `endEffect` tracks, including relative final
+  keyframes
 - an `update` track for a property whose declared value did not change
 - unknown audio node, effect, phase, or automated property types
 

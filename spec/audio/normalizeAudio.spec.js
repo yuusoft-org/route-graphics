@@ -96,6 +96,72 @@ describe("audio effect normalization", () => {
     ).not.toThrow();
   });
 
+  it("normalizes flat sound beginEffect and endEffect update tracks", () => {
+    const beginEffect = {
+      volume: {
+        keyframes: [
+          { startValue: 0, value: 80, duration: 100 },
+          { value: 100, duration: 200 },
+        ],
+      },
+      pan: track(-0.25),
+    };
+    const endEffect = {
+      volume: track(0),
+      playbackRate: track(0.75),
+    };
+
+    const normalized = normalizeAudioRenderState({
+      audio: [sound({ beginEffect, endEffect })],
+    });
+
+    expect(normalized.sounds[0]).toMatchObject({ beginEffect, endEffect });
+    expect(normalized.audioEffects).toEqual([]);
+  });
+
+  it.each(["loopEnter", "finish"])(
+    "rejects removed top-level %s lifecycle tracks",
+    (phase) => {
+      expect(() =>
+        normalizeAudioRenderState({
+          audio: [sound({ loop: true })],
+          audioEffects: [effect({ volume: { [phase]: track(80) } })],
+        }),
+      ).toThrow(`unsupported audio transition phase "${phase}"`);
+    },
+  );
+
+  it("rejects malformed or transport-controlled sound boundary effects", () => {
+    expect(() =>
+      normalizeAudioRenderState({
+        audio: [sound({ beginEffect: { pitch: track(1) } })],
+      }),
+    ).toThrow('unsupported sound boundary property "pitch"');
+
+    expect(() =>
+      normalizeAudioRenderState({
+        audio: [
+          sound({
+            endEffect: {
+              volume: track(-20, { relative: true }),
+            },
+          }),
+        ],
+      }),
+    ).toThrow("keyframes must end with an absolute value");
+
+    expect(() =>
+      normalizeAudioRenderState({
+        audio: [
+          sound({
+            beginEffect: { volume: track(100) },
+            playback: { commandId: 1, operation: "play", positionMs: 0 },
+          }),
+        ],
+      }),
+    ).toThrow("not supported with transport-controlled playback");
+  });
+
   it("rejects unknown fields on canonical effects", () => {
     expect(() =>
       normalizeAudioRenderState({
