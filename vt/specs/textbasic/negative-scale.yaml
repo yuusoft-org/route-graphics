@@ -3,6 +3,7 @@ title: Negative Text Scale
 description: Text content is the subject of this test, making glyph direction a direct reflection oracle.
 specs:
   - negative horizontal scale should mirror the complete text layout
+  - centered fixed-width text should remain centered on its authored anchor after reflection
   - negative vertical scale should reflect glyphs around the anchor-derived center
   - two negative axes and non-unit magnitude should compose without corrupting layout
 ---
