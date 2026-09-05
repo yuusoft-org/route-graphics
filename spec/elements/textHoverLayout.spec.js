@@ -1,5 +1,6 @@
 import { Container } from "pixi.js";
 import { describe, expect, it, vi } from "vitest";
+import { createAnimationBus } from "../../src/plugins/animations/animationBus.js";
 import {
   addText,
   getTextAnimationTargetState,
@@ -78,6 +79,77 @@ describe("text hover layout", () => {
     aligned.emit("pointerout");
     assertAlignment();
   });
+
+  it.each(
+    ["center", "right"].flatMap((align) =>
+      [2, -2].flatMap((targetScaleX) =>
+        [0, 30].map((rotation) => ({ align, targetScaleX, rotation })),
+      ),
+    ),
+  )(
+    "keeps $align alignment while animating from zero scale to $targetScaleX, rotation $rotation",
+    ({ align, targetScaleX, rotation }) => {
+      const parent = new Container();
+      const animationBus = createAnimationBus();
+      const state = {
+        type: "text",
+        x: 240,
+        y: 120,
+        width: 600,
+        anchorX: 0.5,
+        anchorY: 0.5,
+        scaleX: 0,
+        scaleY: 1.5,
+        rotation,
+        content: "Collapsed text",
+        textStyle: { fontFamily: "Arial", fontSize: 24 },
+      };
+
+      for (const textAlign of ["left", align]) {
+        const element = parseText({
+          state: {
+            ...state,
+            id: textAlign,
+            textStyle: { ...state.textStyle, align: textAlign },
+          },
+        });
+        addText({ ...createSharedParams(), parent, zIndex: 0, element });
+        const text = parent.getChildByLabel(textAlign);
+        expect(text.scale.x).toBe(0);
+
+        animationBus.dispatch({
+          type: "START",
+          payload: {
+            id: textAlign,
+            element: text,
+            properties: {
+              scaleX: { auto: { duration: 1000, easing: "linear" } },
+            },
+            targetState: { scaleX: targetScaleX },
+          },
+        });
+      }
+      animationBus.flush();
+
+      const left = parent.getChildByLabel("left");
+      const aligned = parent.getChildByLabel(align);
+      for (const time of [250, 500, 1000]) {
+        animationBus.setTime(time);
+        expect(left.scale.x).toBeCloseTo((targetScaleX * time) / 1000);
+        expect(aligned.scale.x).toBeCloseTo(left.scale.x);
+
+        const measuredWidth = Math.abs(left.width / left.scale.x);
+        const offset =
+          Math.max(0, state.width - measuredWidth) *
+          (align === "center" ? 0.5 : 1);
+        const expected = getWorldPosition(left, { x: offset, y: 0 });
+        const actual = getWorldPosition(aligned);
+        expect(actual.x).toBeCloseTo(expected.x, 4);
+        expect(actual.y).toBeCloseTo(expected.y, 4);
+      }
+      animationBus.destroy();
+    },
+  );
 
   it("renders the full authored scale magnitude around the text anchor", () => {
     const parent = new Container();
