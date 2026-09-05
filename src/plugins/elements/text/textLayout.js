@@ -152,8 +152,14 @@ const applyTextElementTransform = (
     rotation,
   };
 
+  // Alignment is measured in unscaled text space. The shared transform
+  // divides its pivot input by scale, so convert the offset to that input's
+  // coordinate space first (including the sign of mirrored text).
+  const scaleX = Number.isFinite(transformedElement.scaleX)
+    ? transformedElement.scaleX
+    : 1;
   applyElementTransform(textElement, transformedElement, {
-    localOriginX: originX - offsetX,
+    localOriginX: originX - offsetX * scaleX,
     localOriginY: originY,
     scaleMode: "full",
   });

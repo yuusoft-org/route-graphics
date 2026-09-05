@@ -34,6 +34,51 @@ const getWorldPivotPosition = (displayObject) =>
   getWorldPosition(displayObject, displayObject.pivot);
 
 describe("text hover layout", () => {
+  it.each(
+    [0, 0.25, 1, 2, -0.5, -2].flatMap((scaleX) =>
+      ["left", "center", "right"].flatMap((align) =>
+        [0, 30].map((rotation) => ({ scaleX, align, rotation })),
+      ),
+    ),
+  )("keeps $align alignment in local layout units at scale $scaleX, rotation $rotation", ({ scaleX, align, rotation }) => {
+    const parent = new Container();
+    const state = {
+      type: "text", x: 240, y: 120, width: 600,
+      anchorX: 0.5, anchorY: 0.5, scaleX, scaleY: 1.5, rotation,
+      content: "Scaled text",
+      textStyle: { fontFamily: "Arial", fontSize: 24, strokeWidth: 8, strokeColor: "#000000" },
+      hover: { textStyle: { fontSize: 30 } },
+    };
+    const leftElement = parseText({ state: { ...state, id: "left-reference" } });
+    const alignedElement = parseText({ state: {
+      ...state, id: "aligned", textStyle: { ...state.textStyle, align },
+    } });
+    for (const element of [leftElement, alignedElement]) {
+      addText({ ...createSharedParams(), parent, zIndex: 0, element });
+    }
+    const left = parent.getChildByLabel("left-reference");
+    const aligned = parent.getChildByLabel("aligned");
+    const assertAlignment = () => {
+      // A layout offset is local text space: transform it exactly once,
+      // including mirrored scales and rotation around the authored anchor.
+      const width = scaleX === 0 ? 0 : Math.abs(left.width / scaleX);
+      const ratio = align === "center" ? 0.5 : align === "right" ? 1 : 0;
+      const offset = Math.max(0, 600 - width) * ratio;
+      const expected = getWorldPosition(left, { x: offset, y: 0 });
+      const actual = getWorldPosition(aligned);
+      expect(actual.x).toBeCloseTo(expected.x, 4);
+      expect(actual.y).toBeCloseTo(expected.y, 4);
+      expect(Number.isFinite(aligned.pivot.x)).toBe(true);
+    };
+    assertAlignment();
+    left.emit("pointerover");
+    aligned.emit("pointerover");
+    assertAlignment();
+    left.emit("pointerout");
+    aligned.emit("pointerout");
+    assertAlignment();
+  });
+
   it("renders the full authored scale magnitude around the text anchor", () => {
     const parent = new Container();
     const element = parseText({

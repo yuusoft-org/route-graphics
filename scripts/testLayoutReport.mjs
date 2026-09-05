@@ -116,6 +116,26 @@ try {
           },
         ],
       };
+      for (const scaleX of [0.25, -0.5, 2]) {
+        for (const align of ["left", "center", "right"]) {
+          state.elements.push({
+            id: `scaled-${scaleX}-${align}`,
+            type: "text",
+            content: "Scaled",
+            x: 100,
+            y: 12,
+            width: 180,
+            scaleX,
+            textStyle: {
+              fontFamily: "LayoutReportTest",
+              fontSize: 12,
+              align,
+              strokeWidth: 2,
+              strokeColor: "#000000",
+            },
+          });
+        }
+      }
       app.render(state);
       app.render(state);
       await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -146,6 +166,16 @@ try {
         furigana: get("rich").textRuns.some((run) => run.text === "reading"),
         revealRuns: get("reveal").textRuns.length,
         liveFontSize: changed.textRuns[0].style.fontSize,
+        scaledAlignment: [0.25, -0.5, 2].every((scaleX) => {
+          const left = get(`scaled-${scaleX}-left`).textRuns[0];
+          return ["left", "center", "right"].every((align) => {
+            const run = get(`scaled-${scaleX}-${align}`).textRuns[0];
+            const ratio = align === "center" ? 0.5 : align === "right" ? 1 : 0;
+            const expected = left.display.worldTransform.tx +
+              Math.max(0, 180 - run.metrics.width) * ratio * scaleX;
+            return Math.abs(run.display.worldTransform.tx - expected) < 1e-6;
+          });
+        }),
       };
     } finally {
       app.destroy();
@@ -160,6 +190,7 @@ try {
     "mounted",
     "nestedOwner",
     "furigana",
+    "scaledAlignment",
   ])
     assert.equal(result[key], true, key);
   assert.equal(result.lines, 2);
