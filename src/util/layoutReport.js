@@ -1,4 +1,8 @@
 import { CanvasTextMetrics, Matrix, Text } from "pixi.js";
+import { getElementRenderState } from "../plugins/elements/elementRenderState.js";
+
+const textUnitProxy = (display) =>
+  display[Symbol.for("routeGraphics.timelineTextUnits")]?.container;
 
 const finite = (value) =>
   Number.isFinite(value) ? (value === 0 ? 0 : value) : null;
@@ -130,21 +134,48 @@ export const createLayoutReport = ({ elements, stage, viewport }) => {
   visit(elements);
 
   const labels = new Map();
+  const authoredLabels = new Map();
+  const authoredMounts = new Set();
+  const mountedDisplays = new Set();
   const collect = (display) => {
+    mountedDisplays.add(display);
+    const rendered = getElementRenderState(display);
+    if (rendered) authoredMounts.add(display);
     if (display.label) {
       const matches = labels.get(display.label) ?? [];
       matches.push(display);
       labels.set(display.label, matches);
+      if (rendered?.id === display.label) {
+        const mounts = authoredLabels.get(display.label) ?? [];
+        mounts.push(display);
+        authoredLabels.set(display.label, mounts);
+      }
     }
+    const proxy = textUnitProxy(display);
+    if (proxy) authoredMounts.add(proxy);
     for (const child of display.children ?? []) collect(child);
   };
   collect(stage);
-  const ids = new Set(records.map((record) => record.id));
+  // Render-state markers distinguish authored mounts from generated labels.
+  // Unmarked displays must be mounted under their authored parent; generated
+  // descendants can share an ID even when the authored element is absent.
+  const mounts = [];
+  for (const record of records) {
+    const parents =
+      record.parentIndex === null ? [stage] : mounts[record.parentIndex];
+    const matches =
+      authoredLabels.get(record.id) ??
+      (labels.get(record.id) ?? []).filter((display) =>
+        parents.includes(display.parent),
+      );
+    mounts.push(matches);
+    for (const display of matches) authoredMounts.add(display);
+  }
   const idCounts = new Map();
   for (const { id } of records) idCounts.set(id, (idCounts.get(id) ?? 0) + 1);
 
   for (const record of records) {
-    const matches = labels.get(record.id) ?? [];
+    const matches = mounts[record.index];
     record.mountStatus =
       matches.length > 1 || idCounts.get(record.id) > 1
         ? "ambiguous"
@@ -154,11 +185,15 @@ export const createLayoutReport = ({ elements, stage, viewport }) => {
     record.display = null;
     record.textRuns = [];
     if (record.mountStatus !== "mounted") continue;
-    record.display = describeDisplay(matches[0]);
+    // Completed animations can retain the proxy. Resolve it from the source
+    // mount, without syncing it or consulting the active animation list.
+    const proxy = textUnitProxy(matches[0]);
+    const root = mountedDisplays.has(proxy) ? proxy : matches[0];
+    record.display = describeDisplay(root);
     const collectText = (display, path) => {
       // Nested authored elements own their runs; do not count them again in
       // every ancestor. Paths distinguish rich-text and furigana children.
-      if (path.length > 0 && ids.has(display.label)) return;
+      if (path.length > 0 && authoredMounts.has(display)) return;
       if (display instanceof Text) {
         record.textRuns.push(describeText(display, path));
       }
@@ -166,7 +201,7 @@ export const createLayoutReport = ({ elements, stage, viewport }) => {
         collectText(child, [...path, index]),
       );
     };
-    collectText(matches[0], []);
+    collectText(root, []);
   }
 
   return {

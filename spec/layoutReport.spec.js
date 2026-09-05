@@ -2,6 +2,11 @@ import { Container, Matrix, Text } from "pixi.js";
 import { describe, expect, it } from "vitest";
 import { parseText } from "../src/plugins/elements/text/parseText.js";
 import { createTextDisplayObject } from "../src/plugins/elements/text/addText.js";
+import { setElementRenderState } from "../src/plugins/elements/elementRenderState.js";
+import { createAnimationBus } from "../src/plugins/animations/animationBus.js";
+import { dispatchUpdateAnimationsNow } from "../src/plugins/animations/updateAnimationDispatch.js";
+import { createCompletionTracker } from "../src/util/completionTracker.js";
+import { normalizeAnimations } from "../src/util/normalizeAnimations.js";
 import { createLayoutReport } from "../src/util/layoutReport.js";
 
 const viewport = { width: 1280, height: 720, resolution: 1 };
@@ -21,6 +26,44 @@ const makeText = (overrides = {}) =>
   });
 const report = (elements, stage) =>
   createLayoutReport({ elements, stage, viewport });
+
+const animateTextUnits = (
+  display,
+  { unit = "grapheme", allowEmpty = false } = {},
+) => {
+  const bus = createAnimationBus();
+  const tracker = createCompletionTracker();
+  tracker.reset("layout-report");
+  dispatchUpdateAnimationsNow({
+    animations: normalizeAnimations([
+      {
+        id: "split-text",
+        targetId: display.label,
+        type: "update",
+        gsap: {
+          profile: "portable-v1",
+          targets: {
+            units: { textUnits: { elementId: display.label, unit, allowEmpty } },
+          },
+          steps: [
+            {
+              kind: "to",
+              targets: "units",
+              values: { alpha: 0.5, y: 40 },
+              duration: 100,
+              easing: "linear",
+            },
+          ],
+        },
+      },
+    ]),
+    animationBus: bus,
+    completionTracker: tracker,
+    element: display,
+    targetState: {},
+  });
+  return bus;
+};
 
 describe("layout report v1", () => {
   it("retains non-enumerable layout metadata and reports mounted geometry", () => {
@@ -118,6 +161,137 @@ describe("layout report v1", () => {
     expect(JSON.parse(JSON.stringify(run))).toEqual(run);
     stage.destroy({ children: true });
   });
+
+  it.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ])(
+    "reports active and retained text-unit runs with nested=%s, metadata=%s",
+    (nested, metadata) => {
+      const parsed = makeText({
+        content: "A\nB",
+        width: undefined,
+        textStyle: { fontSize: 24, wordWrap: false },
+      });
+      const stage = new Container({ x: 11, y: 17, scale: 0.75 });
+      const parent = nested
+        ? stage.addChild(new Container({ label: "parent", alpha: 0.5 }))
+        : stage;
+      const elements = nested
+        ? [{ id: "parent", type: "container", children: [parsed] }]
+        : [parsed];
+      const display = parent.addChild(createTextDisplayObject(parsed, 0));
+      if (metadata) {
+        setElementRenderState(display, parsed);
+        if (nested) setElementRenderState(parent, elements[0]);
+      }
+      const bus = animateTextUnits(display);
+      try {
+        expect(report(elements, stage).elements.at(-1).textRuns[0].text).toBe(
+          "A\nB",
+        );
+        bus.flush();
+        bus.tick(50);
+        const proxy = parent.children.find(
+          (child) => child.label === "__timeline-text-units:text",
+        );
+        expect(display.renderable).toBe(false);
+        for (const activeCount of [1, 0]) {
+          const before = JSON.stringify(bus.getState());
+          const value = report(elements, stage);
+          expect(JSON.stringify(bus.getState())).toBe(before);
+          expect(report(elements, stage)).toEqual(value);
+          expect(JSON.parse(JSON.stringify(value))).toEqual(value);
+          const entry = value.elements.at(-1);
+          expect(entry.mountStatus).toBe("mounted");
+          expect(entry.display.renderable).toBe(true);
+          expect(entry.textRuns.map((run) => run.text)).toEqual(["A", "B"]);
+          expect(entry.textRuns.map((run) => run.path)).toEqual([
+            [0],
+            [1],
+          ]);
+          entry.textRuns.forEach((run, index) => {
+            const unit = proxy.children[index];
+            const matrix = unit.getGlobalTransform(new Matrix());
+            expect(run.display.alpha).toBe(activeCount ? 0.75 : 0.5);
+            expect(run.display.globalAlpha).toBe(unit.getGlobalAlpha());
+            expect(run.display.worldTransform.tx).toBe(matrix.tx);
+            expect(run.display.worldTransform.ty).toBe(matrix.ty);
+          });
+          if (nested) expect(value.elements[0].textRuns).toEqual([]);
+          expect(bus.getState().activeCount).toBe(activeCount);
+          if (activeCount) bus.tick(50);
+        }
+        display[Symbol.for("routeGraphics.timelineTextUnits")].destroy();
+        const restored = report(elements, stage).elements.at(-1);
+        expect(restored.textRuns.map((run) => run.text)).toEqual(["A\nB"]);
+        expect(restored.textRuns[0].path).toEqual([]);
+        expect(restored.display.renderable).toBe(true);
+      } finally {
+        bus.destroy();
+        stage.destroy({ children: true });
+      }
+    },
+  );
+
+  it("reports no runs for an empty retained text-unit proxy", () => {
+    const parsed = makeText({ content: "   ", width: undefined });
+    const stage = new Container();
+    const display = stage.addChild(createTextDisplayObject(parsed, 0));
+    const bus = animateTextUnits(display, { unit: "word", allowEmpty: true });
+    try {
+      bus.flush();
+      bus.tick(100);
+      expect(bus.getState().activeCount).toBe(0);
+      expect(display.renderable).toBe(false);
+      expect(report([parsed], stage).elements[0].textRuns).toEqual([]);
+    } finally {
+      bus.destroy();
+      stage.destroy({ children: true });
+    }
+  });
+
+  it.each([false, true])(
+    "keeps rich-text runs when an internal label matches an authored ID with metadata=%s",
+    (metadata) => {
+      const dialogue = makeText({
+        id: "dialogue",
+        content: [{ text: "Hello", furigana: { text: "reading" } }],
+      });
+      const other = makeText({ id: "dialogue-line-0", content: "Other" });
+      const stage = new Container();
+      const display = stage.addChild(createTextDisplayObject(dialogue, 0));
+      const otherDisplay = stage.addChild(createTextDisplayObject(other, 1));
+      expect(display.children[0].label).toBe(other.id);
+      if (metadata) {
+        setElementRenderState(display, dialogue);
+        setElementRenderState(otherDisplay, other);
+      }
+      const value = report([dialogue, other], stage);
+      expect(value.elements[0].mountStatus).toBe("mounted");
+      expect(value.elements[0].textRuns.map((run) => run.text)).toEqual([
+        "reading",
+        "Hello",
+      ]);
+      expect(value.elements[1].mountStatus).toBe("mounted");
+      expect(value.elements[1].textRuns.map((run) => run.text)).toEqual([
+        "Other",
+      ]);
+      otherDisplay.destroy();
+      const afterRemoval = report([dialogue, other], stage);
+      expect(afterRemoval.elements[0].textRuns).toEqual(
+        value.elements[0].textRuns,
+      );
+      expect(afterRemoval.elements[1]).toMatchObject({
+        mountStatus: "absent",
+        display: null,
+        textRuns: [],
+      });
+      stage.destroy({ children: true });
+    },
+  );
 
   it("reports absent and ambiguous mounts without choosing an arbitrary owner", () => {
     const parsed = makeText();

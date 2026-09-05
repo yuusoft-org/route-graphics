@@ -28,8 +28,11 @@ Adding a report does not make those systems deterministic.
 - `layout`: computed box/transform properties and available anchor, fixed-width,
   measured-width, and layout-size metadata normally lost in JSON serialization
   of parser internals. This describes committed targets, not animated positions.
-- `mountStatus`: `mounted`, `absent`, or `ambiguous`. Absent/duplicate labels
-  never silently bind to an unrelated display. `display` is null unless mounted.
+- `mountStatus`: `mounted`, `absent`, or `ambiguous`. Render-state metadata
+  distinguishes authored mounts from generated labels, with label lookup as a
+  fallback for unmarked displays under their authored parent. Missing or
+  duplicate mounts are not selected arbitrarily. `display` is null unless
+  mounted.
 - `display`: current position/pivot/scale, rotation in radians, local and global
   axis-aligned bounds, world affine transform `{a,b,c,d,tx,ty}`, alpha and global
   alpha, local visible/renderable flags, mask presence, and filter count.
@@ -38,6 +41,11 @@ Adding a report does not make those systems deterministic.
   owner. Plain text uses `[]`; rich/revealing text may have multiple runs,
   including furigana. Each run contains text, display geometry, anchor, selected
   resolved layout style, and Canvas line widths/heights/font ascent/descent.
+
+While a timeline text-unit proxy is mounted, `display` and `textRuns` describe
+that proxy in place of the hidden source Text. Run paths are relative to the
+proxy container. This also applies when units remain mounted after completion;
+their runs belong to the authored text element, not its parent container.
 
 All values are independent plain data. No Pixi objects, asset buffers, parser
 references, callbacks, or internal symbols escape. Geometry queries may refresh
