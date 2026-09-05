@@ -28,6 +28,7 @@ Options:
   --height <pixels>                Override render height
   --state <index>                  State index when YAML contains multiple states
   --time <ms>                      Sample animations at a manual time
+  --layout-report <path>           Write a JSON layout snapshot beside the PNG
   --background-color <value>       0xRRGGBB, #RRGGBB, or decimal
   --browser-executable <path>      Use a system Chrome/Chromium executable
   --wait-for-render-complete       Wait for renderComplete before capture
@@ -100,6 +101,13 @@ const parseCliArgs = (argv) => {
       case "--time":
         index += 1;
         options.timeMS = parseIntegerOption("Animation time", argv[index]);
+        break;
+      case "--layout-report":
+        index += 1;
+        if (!argv[index] || argv[index].startsWith("-")) {
+          throw new Error("Layout report requires an output path.");
+        }
+        options.layoutReportPath = argv[index];
         break;
       case "--background-color":
         index += 1;
@@ -320,6 +328,7 @@ const capturePng = async ({
   waitForRenderComplete,
   timeoutMS,
   browserExecutablePath,
+  includeLayoutReport,
 }) => {
   const browser = await chromium.launch({
     headless: true,
@@ -344,7 +353,7 @@ const capturePng = async ({
       waitUntil: "domcontentloaded",
     });
 
-    const base64 = await page.evaluate(
+    const capture = await page.evaluate(
       async ({ moduleUrl, renderPayload }) => {
         const nextFrame = async (count = 2) => {
           await new Promise((resolve) => {
@@ -448,7 +457,16 @@ const capturePng = async ({
 
           await nextFrame(2);
 
-          return await app.extractBase64();
+          // Pixi copies the framebuffer synchronously, then encodes it
+          // asynchronously. Snapshot geometry before yielding to another frame.
+          const imagePromise = app.extractBase64();
+          const layoutReport = renderPayload.includeLayoutReport
+            ? app.getLayoutReport()
+            : null;
+          return {
+            base64: await imagePromise,
+            layoutReport,
+          };
         } finally {
           if (renderTimeoutId !== null) {
             window.clearTimeout(renderTimeoutId);
@@ -467,6 +485,7 @@ const capturePng = async ({
           timeMS: timeMS ?? null,
           waitForRenderComplete,
           timeoutMS,
+          includeLayoutReport,
         },
       },
     );
@@ -475,7 +494,7 @@ const capturePng = async ({
       throw new Error(pageErrors.join("\n"));
     }
 
-    return base64;
+    return capture;
   } finally {
     await browser.close();
   }
@@ -525,6 +544,12 @@ const main = async () => {
 
   const inputPath = path.resolve(process.cwd(), cliOptions.inputPath);
   const outputPath = path.resolve(process.cwd(), cliOptions.outputPath);
+  const layoutReportPath = cliOptions.layoutReportPath
+    ? path.resolve(process.cwd(), cliOptions.layoutReportPath)
+    : null;
+  if (layoutReportPath === outputPath || layoutReportPath === inputPath) {
+    exitWithError("Layout report must not overwrite the input or PNG output.");
+  }
 
   await ensureBundleExists();
 
@@ -545,7 +570,7 @@ const main = async () => {
 
     try {
       const renderStartedAt = performance.now();
-      const base64 = await capturePng({
+      const { base64, layoutReport } = await capturePng({
         origin: assetServer.origin,
         width: renderPayload.width,
         height: renderPayload.height,
@@ -556,11 +581,19 @@ const main = async () => {
         waitForRenderComplete: cliOptions.waitForRenderComplete,
         timeoutMS: cliOptions.timeoutMS,
         browserExecutablePath: cliOptions.browserExecutablePath,
+        includeLayoutReport: layoutReportPath !== null,
       });
       const renderDurationMS = performance.now() - renderStartedAt;
 
       const writeStartedAt = performance.now();
       await writePngOutput(outputPath, base64);
+      if (layoutReportPath !== null) {
+        await fsPromises.mkdir(path.dirname(layoutReportPath), { recursive: true });
+        await fsPromises.writeFile(
+          layoutReportPath,
+          `${JSON.stringify(layoutReport, null, 2)}\n`,
+        );
+      }
       const writeDurationMS = performance.now() - writeStartedAt;
       const totalDurationMS = performance.now() - startedAt;
 

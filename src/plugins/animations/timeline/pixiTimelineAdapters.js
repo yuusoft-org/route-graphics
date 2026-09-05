@@ -272,6 +272,7 @@ const createPixiTextUnitPreparation = (textTarget, query) => {
   const preparation = {
     fingerprint,
     originalText: sourceText,
+    container,
     targets,
     commit: () => {
       if (committed) return;

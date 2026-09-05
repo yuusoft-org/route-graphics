@@ -32,6 +32,7 @@ import { hitTestElementBounds as hitTestElementBoundsInTree } from "./util/hitTe
 import { setShaderTimeInTree } from "./plugins/elements/util/shaderFilterEffect.js";
 import { validateShaderAnimationBindings } from "./plugins/elements/util/shaderStateValidation.js";
 import { validateShaderProgramsForRenderer } from "./renderer/pixi/shaderProgramValidation.js";
+import { createLayoutReport } from "./util/layoutReport.js";
 
 /**
  * @typedef {import('./types.js').RouteGraphicsInitOptions} RouteGraphicsInitOptions
@@ -1313,6 +1314,27 @@ const createRouteGraphics = () => {
 
     findElementByLabel: (targetLabel) => {
       return app.stage.getChildByLabel(targetLabel, true) ?? null;
+    },
+
+    /**
+     * Return a serializable layout snapshot of the last committed state and
+     * currently mounted text. Does not advance animation or trigger rendering.
+     */
+    getLayoutReport: () => {
+      if (!app?.renderer) {
+        throw new Error(
+          "Route Graphics must be initialized before reporting layout.",
+        );
+      }
+      return createLayoutReport({
+        elements: state.elements ?? [],
+        stage: app.stage,
+        viewport: {
+          width: app.screen.width,
+          height: app.screen.height,
+          resolution: app.renderer.resolution,
+        },
+      });
     },
 
     hitTestElementBounds: ({ x, y }) =>
