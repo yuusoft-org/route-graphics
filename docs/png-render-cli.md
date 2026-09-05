@@ -40,6 +40,7 @@ bun run render:png -- ./examples/hello.yaml -o ./out/hello.png
 | `--height <pixels>`           | Override the render height.                                               |
 | `--state <index>`             | Select a state when the YAML contains multiple states. Default: `0`.      |
 | `--time <ms>`                 | Sample animations in manual mode at a specific timeline position.         |
+| `--layout-report <path>`      | Write a [JSON layout snapshot](./layout-report.md) from the captured frame. |
 | `--background-color <value>`  | Override the background color. Accepts `#RRGGBB`, `0xRRGGBB`, or decimal. |
 | `--browser-executable <path>` | Use a system Chrome/Chromium instead of Playwright's managed browser.     |
 | `--wait-for-render-complete`  | Wait for a `renderComplete` event before capture.                         |

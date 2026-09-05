@@ -35,6 +35,9 @@ const expectedVideoFinalFramePath = path.join(
 const hasExecutable = (name) =>
   spawnSync(name, ["-version"], { stdio: "ignore" }).status === 0;
 const hasVideoToolchain = hasExecutable("ffmpeg") && hasExecutable("ffprobe");
+const browserArgs = process.env.ROUTE_GRAPHICS_TEST_BROWSER
+  ? ["--browser-executable", process.env.ROUTE_GRAPHICS_TEST_BROWSER]
+  : [];
 
 const readPixel = (png, x, y) => {
   const offset = (png.width * y + x) * 4;
@@ -81,7 +84,7 @@ const expectPngCloseToFixture = async ({
 const runCliRender = async ({ inputPath, outputPath, args = [] }) => {
   return await execFileAsync(
     process.execPath,
-    [cliPath, inputPath, "-o", outputPath, ...args],
+    [cliPath, inputPath, "-o", outputPath, ...browserArgs, ...args],
     {
       cwd: projectRoot,
       env: process.env,
@@ -92,7 +95,15 @@ const runCliRender = async ({ inputPath, outputPath, args = [] }) => {
 const runRouteGraphicsRender = async ({ inputPath, outputPath, args = [] }) => {
   return await execFileAsync(
     process.execPath,
-    [routeGraphicsCliPath, "render", inputPath, "-o", outputPath, ...args],
+    [
+      routeGraphicsCliPath,
+      "render",
+      inputPath,
+      "-o",
+      outputPath,
+      ...browserArgs,
+      ...args,
+    ],
     {
       cwd: projectRoot,
       env: process.env,
@@ -182,6 +193,64 @@ elements:
     expect(failure.stderr).toContain(
       "Direct asset references are not supported.",
     );
+  });
+
+  it("captures serializable layout beside an unchanged PNG", async () => {
+    const tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "rtgl-layout-cli-"),
+    );
+    try {
+      const outputPath = path.join(tempDir, "with-report.png");
+      const ordinaryPath = path.join(tempDir, "ordinary.png");
+      const layoutPath = path.join(tempDir, "layout.json");
+      await runCliRender({
+        inputPath: aliasFixturePath,
+        outputPath,
+        args: ["--layout-report", layoutPath],
+      });
+      await runCliRender({
+        inputPath: aliasFixturePath,
+        outputPath: ordinaryPath,
+      });
+      const layout = JSON.parse(await fs.readFile(layoutPath, "utf8"));
+      expect(layout.schema).toBe("route-graphics-layout-report-v1");
+      expect(layout.viewport).toEqual({
+        width: 1280,
+        height: 720,
+        resolution: 1,
+      });
+      expect(
+        layout.elements.some((element) => element.textRuns.length > 0),
+      ).toBe(true);
+      expect(toHex(await fs.readFile(outputPath))).toBe(
+        toHex(await fs.readFile(ordinaryPath)),
+      );
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("rejects missing or conflicting layout report paths before capture", async () => {
+    const tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "rtgl-layout-cli-"),
+    );
+    try {
+      const outputPath = path.join(tempDir, "capture.png");
+      const before = await fs.readFile(aliasFixturePath);
+      for (const args of [
+        ["--layout-report"],
+        ["--layout-report", outputPath],
+        ["--layout-report", aliasFixturePath],
+      ]) {
+        await expect(
+          runCliRender({ inputPath: aliasFixturePath, outputPath, args }),
+        ).rejects.toThrow();
+      }
+      expect(await fs.readFile(aliasFixturePath)).toEqual(before);
+      await expect(fs.access(outputPath)).rejects.toThrow();
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   it("renders the selected state without validating unused broken states", async () => {
