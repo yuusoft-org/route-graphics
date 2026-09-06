@@ -15,6 +15,4 @@ and node reference. These repository documents define the detailed contracts:
 
 The timeline roadmap, input document, and keyframe design still contain current
 contract details despite their historical filenames. Keep them alongside their
-conformance fixtures. Planning snapshots for the original animation rollout and
-canonical audio-effects migration live in [archive](./archive/); their original
-paths remain as links for compatibility.
+conformance fixtures.

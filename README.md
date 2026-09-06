@@ -136,7 +136,7 @@ For complete usage details, go to:
 - [Shaders](http://route-graphics.routevn.com/docs/guides/shaders/)
 - [Custom Plugins](http://route-graphics.routevn.com/docs/guides/custom-plugins/)
 
-Design notes (see the [documentation index](./docs/README.md) for current contracts and archived plans):
+Design notes (see the [documentation index](./docs/README.md) for current contracts):
 
 - [Audio Effects](./docs/audio-effects.md)
 - [Command-Controlled Sound Playback](./docs/audio-playback-commands.md)

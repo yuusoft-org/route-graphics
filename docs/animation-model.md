@@ -5,7 +5,6 @@ Last updated: 2026-08-06
 See also:
 
 - `docs/animation-type-semantics.md`
-- `docs/animation-implementation-plan.md`
 - `docs/keyframe-start-value-design.md`
 - `docs/portable-gsap-timelines.md`
 - `docs/shader-interface.md`
@@ -34,9 +33,6 @@ The runtime now exposes:
 - independently targeted shader parameter timelines
 - inline single-pass and multi-pass transition compositors
 - composable mask plus compositor transitions
-
-Current known runtime limitations are tracked in
-`docs/animation-implementation-plan.md`.
 
 ## Naming
 
@@ -111,8 +107,7 @@ handoff, including masked reveals, dissolves, exits, and replacements.
 
 Some current element plugins still dispatch `update` animations during add and
 delete paths for legacy compatibility. New authoring should not rely on that
-behavior; lifecycle tightening remains tracked in
-`docs/animation-implementation-plan.md`.
+behavior.
 
 `update` supports:
 

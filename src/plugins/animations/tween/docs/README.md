@@ -249,4 +249,3 @@ The design notes live in:
 
 - `docs/animation-model.md`
 - `docs/animation-type-semantics.md`
-- `docs/animation-implementation-plan.md`

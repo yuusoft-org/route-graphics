@@ -38,12 +38,12 @@ work from a successful render before advancing a scene.
 - Pixi is pinned to 8.10.2 for renderer-specific texture limits; the custom-mesh adapter follows that version's filter-surface contract. WGSL vertex-source preparation preserves the final input when Pixi reflects its attributes.
 - Removed the unused `cancalleableTimeout` utility, rectangle scroll re-export, particle behavior barrel, and non-index-exported `createAudioPlayer` wrapper. Test-only container parsing and the legacy timeline reference evaluator moved into `spec/support`.
 - `loadAudioAssets` delegates to shared asset ownership. `plugins.animations` and its descriptor factory remain compatibility APIs and are deprecated; no registration is needed for built-in animation execution.
-- Historical plans moved into `docs/archive` with forwarding links. Current timeline and keyframe contracts remain in place.
+- Removed superseded animation and audio implementation plans and their redirect stubs.
 
 ## Validation
 
 - Full unit/component/CLI suite: 1,808 tests across 126 files, including failed-render recovery, reentrant transition fallback, mixed-direction and persistent update reconciliation, point-interval overlap, CSP buffer offsets, and WGSL attribute reflection.
-- Docker visual regression: 886/886 images matched the existing references across 248 fixtures.
+- Latest Docker visual regression: 885/886 images matched across 248 fixtures on both attempts. The remaining failure is the wall-clock text-reveal progress screenshot `textrevealing/text-revealing-speed-scale-03.webp`; it needs controlled browser time. References were not regenerated.
 - Deterministic audio rendering: 23/23 specifications passed, with two renders per specification and unchanged references.
 - Real Chromium: strict-CSP initialization, ancestor/app destruction, successful and aborted completion reentry, independent animation completion, overwrite, and yoyo checks passed.
 - Browser layout inspection: passed, including scaled alignment and unchanged pixels/events during inspection.

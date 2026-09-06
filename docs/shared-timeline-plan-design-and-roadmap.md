@@ -7,7 +7,6 @@ Last updated: 2026-08-01
 Related documents:
 
 - `docs/animation-model.md`
-- `docs/animation-implementation-plan.md`
 - `docs/animation-type-semantics.md`
 - `docs/shader-interface.md`
 - `src/schemas/animations/animation.yaml`

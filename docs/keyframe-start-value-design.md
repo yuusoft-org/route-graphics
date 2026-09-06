@@ -7,7 +7,6 @@ Last updated: 2026-08-06
 Related documents:
 
 - `docs/animation-model.md`
-- `docs/animation-implementation-plan.md`
 - `docs/inline-audio-transitions.md`
 - `docs/portable-gsap-timelines.md`
 
