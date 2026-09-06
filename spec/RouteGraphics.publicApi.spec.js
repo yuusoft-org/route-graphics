@@ -471,8 +471,8 @@ const setupRouteGraphics = async ({
   },
 } = {}) => {
   const pixiMock = createPixiModuleMock({ rendererOverrides });
-  const { Color } = await vi.importActual("pixi.js");
-  pixiMock.Color = Color;
+  const { Color, GlUboSystem, GpuUboSystem } = await vi.importActual("pixi.js");
+  Object.assign(pixiMock, { Color, GlUboSystem, GpuUboSystem });
 
   vi.doMock("pixi.js", () => pixiMock);
   vi.doMock("../src/AudioStage.js", () => ({

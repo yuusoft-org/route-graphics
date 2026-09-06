@@ -8,6 +8,7 @@ import {
   UniformGroup,
 } from "pixi.js";
 import { applyPixiShaderFilterMesh } from "../../../renderer/pixi/shaderMeshAdapter.js";
+import { createGpuProgramOptions } from "../../../renderer/pixi/gpuProgramOptions.js";
 import { setManagedFilter } from "./managedFilters.js";
 import {
   getShaderStructureSignature,
@@ -352,17 +353,7 @@ export const createShaderFilter = ({
   };
 
   const filter = Filter.from({
-    gpu: {
-      name,
-      vertex: {
-        source: shader.source.webgpu.source,
-        entryPoint: "mainVertex",
-      },
-      fragment: {
-        source: shader.source.webgpu.source,
-        entryPoint: "mainFragment",
-      },
-    },
+    gpu: createGpuProgramOptions(shader.source.webgpu.source, name),
     gl: {
       vertex: shader.source.webgl.vertex ?? DEFAULT_SHADER_FILTER_VERTEX,
       fragment: shader.source.webgl.fragment,

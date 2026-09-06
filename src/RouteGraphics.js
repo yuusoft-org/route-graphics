@@ -7,7 +7,7 @@ import {
   VideoSource,
   detectVideoAlphaMode,
 } from "pixi.js";
-import "pixi.js/unsafe-eval";
+import "./renderer/pixi/cspCompatibility.js";
 import {
   sharedTextureAssetOwners,
   sharedTextureAliasOwners,

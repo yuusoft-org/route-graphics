@@ -1,4 +1,4 @@
-import { createCanvas, registerFont } from 'canvas'
+import { CanvasRenderingContext2D, createCanvas, registerFont } from 'canvas'
 import { JSDOM } from 'jsdom'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +20,7 @@ global.window = dom.window
 global.document = dom.window.document
 global.HTMLElement = dom.window.HTMLElement
 global.HTMLCanvasElement = dom.window.HTMLCanvasElement
+global.CanvasRenderingContext2D = CanvasRenderingContext2D
 
 // Patch <canvas> to use node-canvas
 global.HTMLCanvasElement.prototype.getContext = function (type) {

@@ -1,4 +1,5 @@
 import { Assets, GlProgram, GpuProgram } from "pixi.js";
+import { createGpuProgramOptions } from "./gpuProgramOptions.js";
 import { DEFAULT_SHADER_FILTER_VERTEX } from "../../plugins/elements/util/shaderFilterEffect.js";
 import { getShaderDiagnosticPath } from "../../plugins/elements/util/shaderConfig.js";
 
@@ -307,17 +308,12 @@ const validateWebGPUPass = ({ device, effect, owner, pass }) => {
   const path = getShaderDiagnosticPath(pass, getShaderDiagnosticPath(effect));
 
   try {
-    GpuProgram.from({
-      name: `route-graphics-validation-${pass.id}`,
-      vertex: {
-        source: pass.source.webgpu.source,
-        entryPoint: "mainVertex",
-      },
-      fragment: {
-        source: pass.source.webgpu.source,
-        entryPoint: "mainFragment",
-      },
-    });
+    GpuProgram.from(
+      createGpuProgramOptions(
+        pass.source.webgpu.source,
+        `route-graphics-validation-${pass.id}`,
+      ),
+    );
     device.createShaderModule?.({
       code: pass.source.webgpu.source,
       label: `Route Graphics ${path}`,

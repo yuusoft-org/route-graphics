@@ -102,8 +102,8 @@ states:
                   {
                     let color = textureSample(uTexture, uSampler, uv);
                     let phase = smoothstep(0.2, 0.6, shaderUniforms.uTime);
-                    let target = vec3<f32>(0.12, 0.82, 0.32);
-                    return vec4<f32>(mix(color.rgb, target, phase), color.a);
+                    let targetColor = vec3<f32>(0.12, 0.82, 0.32);
+                    return vec4<f32>(mix(color.rgb, targetColor, phase), color.a);
                   }
     animations:
       - id: timed-position-update

@@ -7,7 +7,7 @@ import { Point, RendererType, Texture } from "pixi.js";
  * fields. Keep Route Graphics' authored shader contract stable and update this
  * adapter when intentionally upgrading Pixi.
  */
-export const PIXI_SHADER_MESH_ADAPTER_VERSION = "8.9.2";
+export const PIXI_SHADER_MESH_ADAPTER_VERSION = "8.10.2";
 
 const REQUIRED_GLOBAL_UNIFORMS = [
   "uOutputFrame",
@@ -118,9 +118,8 @@ export const applyPixiShaderFilterMesh = ({
     output,
   });
   const bounds = filterData.bounds;
-  const offset = Point.shared;
-  const previousRenderSurface = filterData.previousRenderSurface;
-  const isFinalTarget = previousRenderSurface === output;
+  const offset = Point.shared.set(0, 0);
+  const isFinalTarget = filterData.outputRenderSurface === output;
   let resolution =
     renderer.renderTarget.rootRenderTarget.colorTexture.source.resolution;
   let currentIndex = filterStackIndex - 1;
@@ -129,7 +128,7 @@ export const applyPixiShaderFilterMesh = ({
     currentIndex--;
   }
 
-  if (currentIndex > 0) {
+  if (currentIndex > 0 && filterStack[currentIndex].inputTexture) {
     resolution = filterStack[currentIndex].inputTexture.source.resolution;
   }
 
@@ -182,6 +181,7 @@ export const applyPixiShaderFilterMesh = ({
   globalFrame[2] = rootTexture.source.width * resolution;
   globalFrame[3] = rootTexture.source.height * resolution;
 
+  if (output instanceof Texture) output.source.resource = null;
   const renderTarget = renderer.renderTarget.getRenderTarget(output);
   renderer.renderTarget.bind(output, Boolean(clear));
 

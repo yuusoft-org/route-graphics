@@ -65,7 +65,7 @@
     "hotkeys-js": "^4.0.0-beta.7",
     "js-yaml": "^4.1.0",
     "ogg-opus-decoder": "^1.7.3",
-    "pixi.js": "8.9.2",
+    "pixi.js": "8.10.2",
     "playwright": "1.57.0"
   },
   "devDependencies": {

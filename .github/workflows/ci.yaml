@@ -31,8 +31,6 @@ jobs:
   test:
     needs: build
     runs-on: ubuntu-latest
-    # Hosted software GPU support is not yet a verified required check.
-    continue-on-error: ${{ matrix.suite == 'webgpu' }}
     strategy:
       fail-fast: false
       matrix:
@@ -65,7 +63,7 @@ jobs:
         run: |
           node scripts/testRuntimeLifecycle.mjs
           node scripts/testLayoutReport.mjs
-      - name: WebGPU integration (informational)
+      - name: WebGPU integration
         if: matrix.suite == 'webgpu'
         run: node scripts/testWebGPUShaders.mjs
       - name: Visual regression

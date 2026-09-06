@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { chromium } from "playwright";
@@ -12,6 +12,8 @@ const routeGraphicsBundle = await readFile(
   path.join(repositoryRoot, "dist/RouteGraphics.js"),
 );
 const publicAssetRoot = path.join(repositoryRoot, "vt/static/public");
+const outputRoot = path.join(repositoryRoot, ".rettangoli/webgpu");
+await mkdir(outputRoot, { recursive: true });
 
 const loadStates = async (relativePath) => {
   const source = await readFile(
@@ -92,7 +94,7 @@ const fixtureHtml = `<!doctype html>
     </style>
   </head>
   <body>
-    <script type="module">
+    <script type="module" nonce="webgpu-test">
       import createRouteGraphics, {
         rectPlugin,
         spritePlugin,
@@ -100,7 +102,7 @@ const fixtureHtml = `<!doctype html>
       } from "/RouteGraphics.js";
 
       const cases = ${serializeForInlineScript(cases)};
-      const gpuErrors = [];
+      const gpuErrors = window.__routeGraphicsWebGPUErrors;
 
       const waitForPresentedFrame = async () => {
         await new Promise((resolve) => {
@@ -240,14 +242,16 @@ const fixtureHtml = `<!doctype html>
         }
       };
 
-      window.__routeGraphicsWebGPUTest = run().then(
+      run().then(
         (result) => ({ status: "passed", result }),
         (error) => ({
           status: "failed",
           error: error?.stack ?? error?.message ?? String(error),
           gpuErrors,
         }),
-      );
+      ).then((outcome) => {
+        window.__routeGraphicsWebGPUTest = outcome;
+      });
     </script>
   </body>
 </html>`;
@@ -267,7 +271,8 @@ const analyzeScreenshot = (buffer) => {
   );
   const mean = [0, 0, 0, 0];
   let samples = 0;
-  for (let index = 0; index < image.data.length; index += 4 * 64) {
+  // A fixed 64-pixel stride aliases the stripes in the multipass fixture.
+  for (let index = 0; index < image.data.length; index += 4) {
     mean[0] += image.data[index];
     mean[1] += image.data[index + 1];
     mean[2] += image.data[index + 2];
@@ -282,6 +287,10 @@ const analyzeScreenshot = (buffer) => {
 };
 
 const server = createServer((request, response) => {
+  response.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'nonce-webgpu-test'; worker-src 'self' blob:; style-src 'unsafe-inline'; img-src 'self' data: blob:;",
+  );
   const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
   if (requestUrl.pathname === "/") {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -341,25 +350,45 @@ let browser;
 try {
   browser = await chromium.launch({
     headless: true,
+    channel: "chromium",
     ...(browserExecutablePath ? { executablePath: browserExecutablePath } : {}),
     args: [
-      "--no-sandbox",
-      "--headless=new",
-      "--use-angle=vulkan",
+      // Exercise WebGPU on a software adapter on GPU-less CI runners. Keep
+      // Vulkan presentation enabled so browser screenshots contain the frame.
+      "--use-angle=swiftshader",
       "--enable-features=Vulkan",
-      "--disable-vulkan-surface",
       "--enable-unsafe-webgpu",
+      "--enable-unsafe-swiftshader",
     ],
   });
   const page = await browser.newPage({
     viewport: { width: 1280, height: 720 },
   });
+  await page.addInitScript(() => {
+    const errors = [];
+    window.__routeGraphicsWebGPUErrors = errors;
+    if (typeof GPUAdapter === "undefined") return;
+    const requestDevice = GPUAdapter.prototype.requestDevice;
+    GPUAdapter.prototype.requestDevice = async function (...args) {
+      const device = await requestDevice.apply(this, args);
+      device.addEventListener("uncapturederror", (event) => {
+        errors.push(`WebGPU validation: ${event.error.message}`);
+      });
+      return device;
+    };
+  });
   page.on("pageerror", (error) => browserErrors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") browserErrors.push(message.text());
+    if (message.type() === "error") {
+      browserErrors.push(message.text());
+      console.error(message.text());
+    }
   });
 
   await page.goto(origin, { waitUntil: "load" });
+  await page.waitForFunction(() => window.__routeGraphicsWebGPUTest, null, {
+    timeout: 30_000,
+  });
   const outcome = await page.evaluate(() => window.__routeGraphicsWebGPUTest);
   assert.equal(
     outcome.status,
@@ -367,19 +396,33 @@ try {
     outcome.error ?? "WebGPU browser fixture failed",
   );
   assert.equal(outcome.result.rendererType, "webgpu");
+  console.log(`WebGPU shader integration: Chromium ${browser.version()}`);
   const results = {};
   for (const name of outcome.result.caseNames) {
     await page.evaluate(
       (caseName) => window.__routeGraphicsWebGPUHarness.prepareCase(caseName),
       name,
     );
-    const initial = analyzeScreenshot(await page.screenshot());
+    const initial = analyzeScreenshot(
+      await page.screenshot({
+        path: path.join(outputRoot, `${name}-initial.png`),
+      }),
+    );
     const metadata = await page.evaluate(
       (caseName) => window.__routeGraphicsWebGPUHarness.sampleCase(caseName),
       name,
     );
-    const sampled = analyzeScreenshot(await page.screenshot());
+    const sampled = analyzeScreenshot(
+      await page.screenshot({
+        path: path.join(outputRoot, `${name}-sampled.png`),
+      }),
+    );
     results[name] = { initial, sampled, metadata };
+    console.log(name, JSON.stringify(results[name]));
+    await writeFile(
+      path.join(outputRoot, "results.json"),
+      JSON.stringify(results, null, 2),
+    );
     await page.evaluate(
       (caseName) => window.__routeGraphicsWebGPUHarness.cleanupCase(caseName),
       name,
@@ -392,6 +435,10 @@ try {
     assert.ok(
       sampled.center[3] > 200,
       `${name} produced a transparent center pixel`,
+    );
+    assert.ok(
+      sampled.mean.slice(0, 3).some((value) => value > 0),
+      `${name} produced an entirely black frame`,
     );
     const colorDelta = sampled.mean
       .slice(0, 3)

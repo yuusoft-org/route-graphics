@@ -17,6 +17,7 @@ import {
 } from "../timeline/index.js";
 import { cleanupParticlesInTree } from "../../elements/particles/particleRuntime.js";
 import { degreesToRadians } from "../../elements/util/transform.js";
+import { createGpuProgramOptions } from "../../../renderer/pixi/gpuProgramOptions.js";
 import {
   createShaderEffect,
   destroyShaderEffect,
@@ -955,16 +956,7 @@ const createMaskChannelFilter = (channelWeights, invert) => {
   });
 
   const filter = Filter.from({
-    gpu: {
-      vertex: {
-        source: MASK_CHANNEL_FILTER_WGSL,
-        entryPoint: "mainVertex",
-      },
-      fragment: {
-        source: MASK_CHANNEL_FILTER_WGSL,
-        entryPoint: "mainFragment",
-      },
-    },
+    gpu: createGpuProgramOptions(MASK_CHANNEL_FILTER_WGSL),
     gl: {
       vertex: REPLACE_MASK_FILTER_VERTEX,
       fragment: MASK_CHANNEL_FILTER_FRAGMENT,
@@ -1118,16 +1110,7 @@ const createReplaceMaskUniforms = ({ active = true } = {}) =>
 const createReplaceMaskFilter = ({ active = true } = {}) => {
   const replaceMaskUniforms = createReplaceMaskUniforms({ active });
   const filter = Filter.from({
-    gpu: {
-      vertex: {
-        source: REPLACE_MASK_FILTER_WGSL,
-        entryPoint: "mainVertex",
-      },
-      fragment: {
-        source: REPLACE_MASK_FILTER_WGSL,
-        entryPoint: "mainFragment",
-      },
-    },
+    gpu: createGpuProgramOptions(REPLACE_MASK_FILTER_WGSL),
     gl: {
       vertex: REPLACE_MASK_FILTER_VERTEX,
       fragment: REPLACE_MASK_FILTER_FRAGMENT,
@@ -1150,16 +1133,7 @@ const createReplaceMaskFilter = ({ active = true } = {}) => {
 const createMaskAccumulateFilter = ({ active = true } = {}) => {
   const replaceMaskUniforms = createReplaceMaskUniforms({ active });
   const filter = Filter.from({
-    gpu: {
-      vertex: {
-        source: MASK_ACCUMULATE_FILTER_WGSL,
-        entryPoint: "mainVertex",
-      },
-      fragment: {
-        source: MASK_ACCUMULATE_FILTER_WGSL,
-        entryPoint: "mainFragment",
-      },
-    },
+    gpu: createGpuProgramOptions(MASK_ACCUMULATE_FILTER_WGSL),
     gl: {
       vertex: REPLACE_MASK_FILTER_VERTEX,
       fragment: MASK_ACCUMULATE_FILTER_FRAGMENT,
