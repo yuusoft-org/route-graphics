@@ -342,10 +342,12 @@ const address = server.address();
 assert.ok(address && typeof address === "object");
 const origin = `http://127.0.0.1:${address.port}`;
 const browserErrors = [];
+const browserMessages = [];
 const browserExecutablePath =
   process.env.ROUTE_GRAPHICS_WEBGPU_EXECUTABLE_PATH ??
   process.env.ROUTE_GRAPHICS_TEST_BROWSER;
 let browser;
+let page;
 
 try {
   browser = await chromium.launch({
@@ -356,20 +358,35 @@ try {
       // Exercise WebGPU on a software adapter on GPU-less CI runners. Keep
       // Vulkan presentation enabled so browser screenshots contain the frame.
       "--use-angle=swiftshader",
+      "--use-vulkan=swiftshader",
+      "--use-webgpu-adapter=swiftshader",
       "--enable-features=Vulkan",
       "--enable-unsafe-webgpu",
       "--enable-unsafe-swiftshader",
     ],
   });
-  const page = await browser.newPage({
+  page = await browser.newPage({
     viewport: { width: 1280, height: 720 },
   });
   await page.addInitScript(() => {
     const errors = [];
     window.__routeGraphicsWebGPUErrors = errors;
+    window.__routeGraphicsWebGPUAdapters = [];
     if (typeof GPUAdapter === "undefined") return;
     const requestDevice = GPUAdapter.prototype.requestDevice;
     GPUAdapter.prototype.requestDevice = async function (...args) {
+      const {
+        vendor,
+        architecture,
+        device: deviceName,
+        description,
+      } = this.info;
+      window.__routeGraphicsWebGPUAdapters.push({
+        vendor,
+        architecture,
+        device: deviceName,
+        description,
+      });
       const device = await requestDevice.apply(this, args);
       device.addEventListener("uncapturederror", (event) => {
         errors.push(`WebGPU validation: ${event.error.message}`);
@@ -379,6 +396,7 @@ try {
   });
   page.on("pageerror", (error) => browserErrors.push(error.message));
   page.on("console", (message) => {
+    browserMessages.push({ type: message.type(), text: message.text() });
     if (message.type() === "error") {
       browserErrors.push(message.text());
       console.error(message.text());
@@ -397,6 +415,12 @@ try {
   );
   assert.equal(outcome.result.rendererType, "webgpu");
   console.log(`WebGPU shader integration: Chromium ${browser.version()}`);
+  console.log(
+    "WebGPU adapters:",
+    JSON.stringify(
+      await page.evaluate(() => window.__routeGraphicsWebGPUAdapters),
+    ),
+  );
   const results = {};
   for (const name of outcome.result.caseNames) {
     await page.evaluate(
@@ -473,6 +497,26 @@ try {
   console.log(
     `WebGPU shader integration passed (${Object.keys(cases).length} cases).`,
   );
+} catch (error) {
+  const diagnostics = await page
+    ?.evaluate(() => ({
+      adapters: window.__routeGraphicsWebGPUAdapters,
+      gpuErrors: window.__routeGraphicsWebGPUErrors,
+      outcome: window.__routeGraphicsWebGPUTest,
+    }))
+    .catch(() => undefined);
+  await writeFile(
+    path.join(outputRoot, "failure.json"),
+    JSON.stringify(
+      { error: error.stack, browserErrors, browserMessages, diagnostics },
+      null,
+      2,
+    ),
+  );
+  await page
+    ?.screenshot({ path: path.join(outputRoot, "failure.png"), timeout: 5_000 })
+    .catch(() => {});
+  throw error;
 } finally {
   if (browser) {
     const pages = browser.contexts().flatMap((context) => context.pages());
