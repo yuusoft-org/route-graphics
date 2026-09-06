@@ -75,6 +75,27 @@ const app = createRouteGraphics();
 await app.init({width: 100, height: 100, plugins: {elements: [rectPlugin]}});
 const state: RouteGraphicsState = {elements: [{id: "box", type: "rect", x: 5, width: 10, height: 10, fill: "#fff"}]};
 app.render(state);
+const portableState: RouteGraphicsState = {
+  elements: state.elements,
+  animations: [{ id: "portable-update", targetId: "box", type: "update", gsap: {
+    profile: "portable-v1",
+    defaults: { duration: 100, easing: "linear", overwrite: "error" },
+    targets: { boxes: { elements: ["box"] } },
+    steps: [{ kind: "sequence", repeat: 1, yoyo: true, steps: [
+      { kind: "set", targets: "boxes", values: { alpha: 0 } },
+      { kind: "to", targets: ["boxes"], values: { x: { by: 10 }, alpha: 1 }, duration: 100, stagger: { each: 10 } },
+      { kind: "emit", event: "ready", payload: { visible: true } },
+    ] }],
+  } }],
+};
+app.render(portableState);
+app.render({ animations: [{ id: "portable-inline", targetId: "box", type: "update", gsap: {
+  profile: "portable-v1", steps: [{ kind: "to", duration: 100, values: { x: 20 } }],
+} }] });
+createModularRouteGraphics().render({ animations: [{ id: "portable-transition", targetId: "box", type: "transition", gsap: {
+  profile: "portable-v1", targets: { incoming: { transitionSurface: "next" } },
+  steps: [{ kind: "fromTo", targets: "incoming", duration: 100, from: { alpha: 0 }, to: { alpha: 1 } }],
+} }] });
 await app.extractBase64();
 app.seekAnimation("move", 10);
 createModularRouteGraphics().render(state);
@@ -85,6 +106,12 @@ app.init({width: "100", height: 100});
 app.render({elements: [{id: "box", type: "rect", x: "bad"}]});
 // @ts-expect-error Unknown renderer preference.
 app.init({width: 100, height: 100, rendererPreference: "canvas"});
+// @ts-expect-error Only the portable profile is supported.
+app.render({animations: [{id: "bad-profile", targetId: "box", type: "update", gsap: {profile: "native", steps: []}}]});
+// @ts-expect-error Portable durations are numeric milliseconds.
+app.render({animations: [{id: "bad-duration", targetId: "box", type: "update", gsap: {profile: "portable-v1", steps: [{kind: "to", values: {x: 10}, duration: "100"}]}}]});
+// @ts-expect-error Portable values cannot contain callbacks.
+app.render({animations: [{id: "bad-value", targetId: "box", type: "update", gsap: {profile: "portable-v1", steps: [{kind: "to", values: {x: () => 10}, duration: 100}]}}]});
 `,
   );
   const program = ts.createProgram([consumerFile], {

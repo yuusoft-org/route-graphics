@@ -585,8 +585,8 @@ export const dispatchUpdateAnimationsNow = ({
     const isInfinite =
       animation.playback?.loop === true ||
       preparedTimeline?.duration === Infinity;
-    const trackCompletion =
-      animation.playback?.continuity !== "persistent" && !isInfinite;
+    const isPersistent = animation.playback?.continuity === "persistent";
+    const trackCompletion = !isPersistent && !isInfinite;
     const stateVersion = trackCompletion ? dispatchVersion : null;
 
     if (trackCompletion) {
@@ -608,7 +608,9 @@ export const dispatchUpdateAnimationsNow = ({
         if (
           !settlement.didSettle &&
           unsettled.size === 0 &&
-          completionTracker.getVersion() === dispatchVersion
+          // The bus retains compatible persistent players across render versions
+          // and cancels them when ownership changes. They still need to settle.
+          (isPersistent || completionTracker.getVersion() === dispatchVersion)
         ) {
           const operation = onComplete?.(animation);
           if (operation && typeof operation.then === "function") {

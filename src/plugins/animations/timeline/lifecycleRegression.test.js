@@ -145,6 +145,39 @@ describe("timeline composition regressions", () => {
     );
   });
 
+  it.each([
+    [0, true],
+    [50, true],
+    [100, true],
+    [200, false],
+    [201, false],
+  ])(
+    "checks a set at %s against repeated half-open intervals (collision: %s)",
+    (time, collision) => {
+      const point = {
+        kind: "set",
+        start: { time },
+        values: { x: 3 },
+        overwrite: "error",
+      };
+      const repeated = {
+        kind: "to",
+        values: { x: 1 },
+        duration: 100,
+        repeat: 1,
+        overwrite: "error",
+      };
+      for (const steps of [
+        [point, repeated],
+        [repeated, point],
+      ]) {
+        const bindActions = () => bind([{ kind: "parallel", steps }]);
+        if (collision) expect(bindActions).toThrow(/conflicts with/);
+        else expect(bindActions).not.toThrow();
+      }
+    },
+  );
+
   it("checks many disjoint repeated intervals without quadratic pair comparisons", () => {
     expect(() =>
       bind([

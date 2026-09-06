@@ -358,7 +358,14 @@ const segmentsOverlapAcrossOccurrences = (domains, left, right) => {
     ) {
       return true;
     }
-    if (leftInterval.end <= rightInterval.end) leftIndex++;
+    if (
+      leftInterval.end === rightInterval.end &&
+      leftInterval.start === leftInterval.end
+    ) {
+      // Keep a point at the excluded end of a nonzero interval: the next
+      // interval may start here and include the point.
+      rightIndex++;
+    } else if (leftInterval.end <= rightInterval.end) leftIndex++;
     else rightIndex++;
   }
   return false;

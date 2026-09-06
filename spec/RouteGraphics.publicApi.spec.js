@@ -2677,6 +2677,95 @@ describe("RouteGraphics public API", () => {
     });
   });
 
+  it.each(["tween", "gsap"])(
+    "reconciles finite persistent %s updates after compatible renders",
+    async (kind) => {
+      const eventHandler = vi.fn();
+      const { app, pixiMock } = await setupRouteGraphics({
+        initOptions: { eventHandler },
+        pluginsFactory: async () => ({
+          elements: [
+            (await import("../src/plugins/elements/rect/index.js")).rectPlugin,
+          ],
+        }),
+      });
+      const tick = getAutoAnimationTick(pixiMock);
+      const rect = (x, fill) => ({
+        id: "box",
+        type: "rect",
+        x,
+        y: 0,
+        width: 100,
+        height: 100,
+        fill,
+      });
+      const motion = (duration, values) =>
+        kind === "gsap"
+          ? {
+              gsap: {
+                profile: "portable-v1",
+                steps: [{ kind: "to", values, duration, easing: "linear" }],
+              },
+            }
+          : {
+              tween: Object.fromEntries(
+                Object.entries(values).map(([property, value]) => [
+                  property,
+                  { keyframes: [{ value, duration, easing: "linear" }] },
+                ]),
+              ),
+            };
+      const animations = [
+        {
+          id: "move-x",
+          type: "update",
+          targetId: "box",
+          playback: { continuity: "persistent" },
+          ...motion(100, { x: 100 }),
+        },
+        {
+          id: "move-y",
+          type: "update",
+          targetId: "box",
+          playback: { continuity: "persistent" },
+          ...motion(200, { y: 200 }),
+        },
+      ];
+      app.render({ id: "initial", elements: [rect(0, "#ff0000")] });
+      const target = { ...rect(100, "#00ff00"), y: 200 };
+      app.render({ id: "moving", elements: [target], animations });
+      tick({ deltaMS: 50 });
+      const live = app.findElementByLabel("box");
+      app.render({
+        id: "adopted",
+        elements: [target, { ...rect(0, "#0000ff"), id: "other" }],
+        animations,
+      });
+      expect(live.x).toBeCloseTo(50);
+      tick({ deltaMS: 50 });
+      expect(live.y).toBeCloseTo(100);
+      const eventCount = eventHandler.mock.calls.length;
+      tick({ deltaMS: 100 });
+      expect(live.x).toBe(100);
+      expect(live.y).toBe(200);
+      expect(live.lastFill).toBe("#00ff00");
+      expect(eventHandler.mock.calls).toHaveLength(eventCount);
+      // Canceling an adopted player must not later reconcile its old state.
+      app.render({ id: "restart", elements: [rect(0, "#ff0000")] });
+      app.render({ id: "moving-again", elements: [target], animations });
+      tick({ deltaMS: 50 });
+      app.render({
+        id: "adopted-again",
+        elements: [target, { ...rect(0, "#0000ff"), id: "other" }],
+        animations,
+      });
+      app.render({ id: "cancelled", elements: [rect(300, "#0000ff")] });
+      tick({ deltaMS: 200 });
+      expect(app.findElementByLabel("box").x).toBe(300);
+      expect(app.findElementByLabel("box").lastFill).toBe("#0000ff");
+    },
+  );
+
   it("continues persistent update animations across unrelated renders without restarting", async () => {
     const { app, pixiMock } = await setupRouteGraphics({
       pluginsFactory: async () => {
