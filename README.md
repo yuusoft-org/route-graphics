@@ -15,6 +15,10 @@ This README stays intentionally short. The hosted docs are the source of truth f
 bun install route-graphics
 ```
 
+The package includes TypeScript declarations. The default entry is a standalone
+browser bundle. Bundler applications that already use Pixi or GSAP can import
+`route-graphics/module` to share those dependencies; it exports the same API.
+
 ## Minimal Usage
 
 ```javascript
@@ -24,7 +28,6 @@ import createRouteGraphics, {
   rectPlugin,
   spritePlugin,
   containerPlugin,
-  tweenPlugin,
   soundPlugin,
 } from "route-graphics";
 
@@ -45,7 +48,6 @@ await app.init({
   rendererFallback: true,
   plugins: {
     elements: [textPlugin, rectPlugin, spritePlugin, containerPlugin],
-    animations: [tweenPlugin],
     audio: [soundPlugin],
   },
   eventHandler: (eventName, payload) => {
@@ -138,7 +140,7 @@ For complete usage details, go to:
 - [Shaders](http://route-graphics.routevn.com/docs/guides/shaders/)
 - [Custom Plugins](http://route-graphics.routevn.com/docs/guides/custom-plugins/)
 
-Design notes:
+Design notes (see the [documentation index](./docs/README.md) for current contracts and archived plans):
 
 - [Audio Effects](./docs/audio-effects.md)
 - [Command-Controlled Sound Playback](./docs/audio-playback-commands.md)

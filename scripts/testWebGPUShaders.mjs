@@ -333,7 +333,9 @@ const address = server.address();
 assert.ok(address && typeof address === "object");
 const origin = `http://127.0.0.1:${address.port}`;
 const browserErrors = [];
-const browserExecutablePath = process.env.ROUTE_GRAPHICS_WEBGPU_EXECUTABLE_PATH;
+const browserExecutablePath =
+  process.env.ROUTE_GRAPHICS_WEBGPU_EXECUTABLE_PATH ??
+  process.env.ROUTE_GRAPHICS_TEST_BROWSER;
 let browser;
 
 try {

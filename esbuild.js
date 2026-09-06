@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
+import { buildTypes } from "./scripts/buildTypes.mjs";
 
 // Route Graphics always uses the default Opus decoder without speech-quality
 // enhancement. Replace its unreachable optional import so the 4 MiB ML model
@@ -57,40 +58,67 @@ try {
     });
   };
 
-  await Promise.all([
-    buildCliBundle(),
-    buildBundle({
-      outdir: "./dist",
-      minify: true,
-      sourcemap: false,
-    }),
-    buildBundle({
-      outdir: "./playground/static",
-      minify: true,
-      sourcemap: false,
-    }),
-    buildBundle({
-      outdir: "./vt/static",
-      minify: false,
-      sourcemap: true,
-    }),
-  ]);
-
-  await rm("./.rettangoli/vt/_site/chunks", {
-    force: true,
-    recursive: true,
-  });
-  await mkdir("./.rettangoli/vt/_site", { recursive: true });
-  await Promise.all([
-    cp(
-      "./vt/static/RouteGraphics.js",
-      "./.rettangoli/vt/_site/RouteGraphics.js",
-    ),
-    cp(
-      "./vt/static/RouteGraphics.js.map",
-      "./.rettangoli/vt/_site/RouteGraphics.js.map",
-    ),
-  ]);
+  const target = process.argv[2] ?? "package";
+  if (!["package", "playground", "visual", "all"].includes(target)) {
+    throw new Error(`Unknown build target: ${target}`);
+  }
+  const packageBuild = target === "package" || target === "all";
+  const playgroundBuild = target === "playground" || target === "all";
+  const visualBuild = target === "visual" || target === "all";
+  const jobs = [];
+  if (packageBuild || playgroundBuild) {
+    jobs.push(
+      buildBundle({ outdir: "./dist", minify: true, sourcemap: false }).then(
+        async () => {
+          if (playgroundBuild) {
+            await mkdir("./playground/static", { recursive: true });
+            await cp(
+              "./dist/RouteGraphics.js",
+              "./playground/static/RouteGraphics.js",
+            );
+          }
+        },
+      ),
+    );
+  }
+  if (packageBuild) {
+    jobs.push(buildCliBundle());
+    jobs.push(
+      esbuild.build({
+        entryPoints: ["./src/index.js"],
+        bundle: true,
+        minify: true,
+        format: "esm",
+        // Keep decoder imports internal so the unused Opus ML payload stays excluded.
+        external: ["pixi.js", "gsap", "hotkeys-js"],
+        outfile: "./dist/RouteGraphics.module.js",
+        plugins: [excludeUnusedOpusMlPlugin],
+      }),
+    );
+  }
+  if (visualBuild) {
+    jobs.push(
+      buildBundle({
+        outdir: "./vt/static",
+        minify: false,
+        sourcemap: true,
+      }).then(async () => {
+        const site = "./.rettangoli/vt/_site";
+        await rm(path.join(site, "chunks"), { force: true, recursive: true });
+        await mkdir(site, { recursive: true });
+        await Promise.all(
+          ["RouteGraphics.js", "RouteGraphics.js.map"].map((name) =>
+            cp(path.join("./vt/static", name), path.join(site, name)),
+          ),
+        );
+      }),
+    );
+  }
+  await Promise.all(jobs);
+  if (packageBuild) {
+    await rm("./dist/types", { recursive: true, force: true });
+    buildTypes();
+  }
 } catch (error) {
   console.error(error);
   process.exit(1);

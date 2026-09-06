@@ -3,6 +3,102 @@ import { createAnimationBus } from "../../src/plugins/animations/animationBus.js
 import { applyElementTransform } from "../../src/plugins/elements/util/transform.js";
 
 describe("animationBus auto tween shorthand", () => {
+  it.each(["cancelAll", "cancelAllExcept", "destroy"])(
+    "%s during activation discards the rest of the captured queue",
+    (method) => {
+      const bus = createAnimationBus();
+      const applySecond = vi.fn();
+      const cancelSecond = vi.fn();
+      bus.on("started", () => bus[method]());
+      bus.dispatch({
+        type: "START",
+        payload: { id: "first", driver: "custom", duration: 100 },
+      });
+      bus.dispatch({
+        type: "START",
+        payload: {
+          id: "second",
+          driver: "custom",
+          duration: 100,
+          applyFrame: applySecond,
+          onCancel: cancelSecond,
+        },
+      });
+      bus.flush();
+      bus.tick(10);
+      expect(applySecond).not.toHaveBeenCalled();
+      expect(cancelSecond).toHaveBeenCalledTimes(1);
+      expect(bus.getState().activeCount).toBe(0);
+    },
+  );
+
+  it.each(["tick", "setTime"])(
+    "keeps a same-ID player created in a %s completion callback",
+    (method) => {
+      const bus = createAnimationBus();
+      const oldDispose = vi.fn();
+      const newDispose = vi.fn();
+      let restarted = false;
+      bus.on("completed", () => {
+        if (restarted) return;
+        restarted = true;
+        bus.dispatch({
+          type: "START",
+          payload: {
+            id: "same",
+            driver: "custom",
+            duration: 1000,
+            dispose: newDispose,
+          },
+        });
+        bus.flush();
+      });
+      bus.dispatch({
+        type: "START",
+        payload: {
+          id: "same",
+          driver: "custom",
+          duration: 100,
+          dispose: oldDispose,
+        },
+      });
+      bus.flush();
+      bus[method](100);
+      expect(bus.getState().activeCount).toBe(1);
+      expect(oldDispose).toHaveBeenCalledTimes(1);
+      expect(newDispose).not.toHaveBeenCalled();
+      bus.destroy();
+      expect(newDispose).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["cancelAll", "cancelAllExcept", "destroy"])(
+    "%s cancels starts before activation",
+    async (method) => {
+      const bus = createAnimationBus();
+      const onCancel = vi.fn();
+      const applyFrame = vi.fn();
+      bus.setTime(10);
+      bus.dispatch({
+        type: "START",
+        payload: {
+          id: "queued",
+          driver: "custom",
+          duration: 100,
+          applyFrame,
+          onCancel,
+        },
+      });
+      bus[method]();
+      await Promise.resolve();
+      bus.tick(10);
+      expect(bus.getState().activeCount).toBe(0);
+      expect(applyFrame).not.toHaveBeenCalled();
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      bus.destroy();
+    },
+  );
+
   it("holds auto tween values for the configured delay before interpolation", () => {
     const animationBus = createAnimationBus();
     const onComplete = vi.fn();

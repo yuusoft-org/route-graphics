@@ -1,4 +1,3 @@
-import { INPUT_RUNTIME } from "./inputShared.js";
 import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
 
 export const deleteInput = ({
@@ -18,18 +17,11 @@ export const deleteInput = ({
     );
   }
 
-  const runtime = inputContainer[INPUT_RUNTIME];
-
   const deleteElement = () => {
     if (inputContainer.destroyed) {
       return;
     }
 
-    if (runtime?.tickerListener) {
-      app.ticker?.remove?.(runtime.tickerListener);
-    }
-
-    app.inputDomBridge.unmount(element.id);
     inputContainer.destroy({ children: true });
   };
 

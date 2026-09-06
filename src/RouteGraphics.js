@@ -7,7 +7,18 @@ import {
   VideoSource,
   detectVideoAlphaMode,
 } from "pixi.js";
-import "@pixi/unsafe-eval";
+import "pixi.js/unsafe-eval";
+import {
+  sharedTextureAssetOwners,
+  sharedTextureAliasOwners,
+  sharedUrlTextureAssetOwners,
+  sharedPendingTextureLoads,
+  sharedAudioAssetOwners,
+  retainSharedOwnership,
+  retainSharedAsset,
+  releaseSharedAsset,
+  trackPendingLoad,
+} from "./assets/sharedAssetOwnership.js";
 import { createAudioStage } from "./AudioStage.js";
 import parseElements from "./plugins/elements/parseElements.js";
 import { AudioAsset } from "./AudioAsset.js";
@@ -43,19 +54,10 @@ import { createLayoutReport } from "./util/layoutReport.js";
 
 /**
  * @typedef {Object} ApplicationWithAudioStageOptions
- * @property {AudioStage} audioStage
+ * @property {ReturnType<typeof createAudioStage>} audioStage
  * @property {ReturnType<typeof createInputDomBridge>} [inputDomBridge]
  * @typedef {Application & ApplicationWithAudioStageOptions} ApplicationWithAudioStage
  */
-
-// Pixi's asset cache and AudioAsset are module-global. Keep ownership global as
-// well so separate Route Graphics instances and logical aliases cannot release
-// a resource that another instance still uses.
-const sharedTextureAssetOwners = new Map();
-const sharedTextureAliasOwners = new Map();
-const sharedUrlTextureAssetOwners = new Map();
-const sharedPendingTextureLoads = new Map();
-const sharedAudioAssetOwners = new Map();
 
 const createRouteGraphics = () => {
   const VIDEO_TEXTURE_UPDATE_FPS = 30;
@@ -275,6 +277,7 @@ const createRouteGraphics = () => {
    */
   const audioStage = createAudioStage();
 
+  let needsReconciliation = false;
   /**
    * @type {RouteGraphicsState}
    */
@@ -294,7 +297,6 @@ const createRouteGraphics = () => {
    * @type {RouteGraphicsPlugins & { parsers: Function[] }}
    */
   let plugins = {
-    animations: [],
     elements: [],
     audio: [],
     parsers: [],
@@ -741,123 +743,48 @@ const createRouteGraphics = () => {
     return record.value;
   };
 
-  const trackAssetLoad = (key, load) => {
-    const pendingLoad = pendingAssetLoads.get(key);
-    if (pendingLoad) {
-      return pendingLoad;
-    }
+  const trackAssetLoad = (key, load) =>
+    trackPendingLoad(pendingAssetLoads, key, load);
+  const trackSharedTextureLoad = (identity, load) =>
+    trackPendingLoad(sharedPendingTextureLoads, identity, load);
 
-    let resolveLoad;
-    let rejectLoad;
-    const loadPromise = new Promise((resolve, reject) => {
-      resolveLoad = resolve;
-      rejectLoad = reject;
+  const loadAudioRecord = async (key, loadSource) => {
+    const existingRecord = loadedAssetRecords.get(key);
+    if (existingRecord?.category === "audio") return existingRecord.value;
+    const cached = AudioAsset.getAsset(key);
+    const borrowed = !sharedAudioAssetOwners.has(key) && cached !== undefined;
+    // Retain before the first await: another instance may unload while this
+    // instance prepares decoders or awaits an already-cached audio buffer.
+    const ownership = retainSharedAsset({
+      registry: sharedAudioAssetOwners,
+      identity: key,
+      value: cached,
+      dispose: borrowed ? undefined : () => AudioAsset.unload(key),
     });
-
-    // Publish the operation before starting it, then invoke the loader
-    // synchronously so source-level ownership is reserved before loadAssets
-    // returns to its caller.
-    pendingAssetLoads.set(key, loadPromise);
-
-    const clearPendingLoad = () => {
-      if (pendingAssetLoads.get(key) === loadPromise) {
-        pendingAssetLoads.delete(key);
-      }
-    };
-    void loadPromise.then(clearPendingLoad, clearPendingLoad);
-
     try {
-      Promise.resolve(load()).then(resolveLoad, rejectLoad);
-    } catch (error) {
-      rejectLoad(error);
-    }
-
-    return loadPromise;
-  };
-
-  const trackSharedTextureLoad = (identity, load) => {
-    const pendingLoad = sharedPendingTextureLoads.get(identity);
-    if (pendingLoad) {
-      return pendingLoad;
-    }
-
-    let resolveLoad;
-    let rejectLoad;
-    const loadPromise = new Promise((resolve, reject) => {
-      resolveLoad = resolve;
-      rejectLoad = reject;
-    });
-    sharedPendingTextureLoads.set(identity, loadPromise);
-
-    const clearPendingLoad = () => {
-      if (sharedPendingTextureLoads.get(identity) === loadPromise) {
-        sharedPendingTextureLoads.delete(identity);
+      let value = cached;
+      if (value === undefined) {
+        const source = loadSource();
+        const asset =
+          source && typeof source.then === "function" ? await source : source;
+        assertAssetBuffer(asset, "Audio");
+        await AudioAsset.prepareDecoders?.({ [key]: asset });
+        value = await AudioAsset.load(key, asset.buffer, asset.type);
       }
-    };
-    void loadPromise.then(clearPendingLoad, clearPendingLoad);
-
-    try {
-      Promise.resolve(load()).then(resolveLoad, rejectLoad);
+      ownership.value = value;
+      return recordLoadedAsset(key, {
+        category: "audio",
+        value,
+        sharedOwnership: ownership,
+      });
     } catch (error) {
-      rejectLoad(error);
+      try {
+        await releaseSharedAsset(ownership);
+      } catch {
+        /* Preserve the load failure. */
+      }
+      throw error;
     }
-
-    return loadPromise;
-  };
-
-  const retainSharedOwnership = (ownership) => {
-    ownership.referenceCount += 1;
-    return ownership;
-  };
-
-  const retainSharedAsset = ({ registry, identity, dispose }) => {
-    let ownership = registry.get(identity);
-
-    if (!ownership) {
-      ownership = {
-        registry,
-        identity,
-        referenceCount: 0,
-        dispose,
-        unregister: () => {
-          if (registry.get(identity) === ownership) {
-            registry.delete(identity);
-          }
-        },
-      };
-      registry.set(identity, ownership);
-    }
-
-    return retainSharedOwnership(ownership);
-  };
-
-  const releaseSharedAsset = async (ownership) => {
-    ownership.referenceCount -= 1;
-    if (ownership.referenceCount > 0) {
-      return;
-    }
-
-    if (ownership.onZeroReferences) {
-      await ownership.onZeroReferences();
-      return;
-    }
-
-    ownership.unregister?.();
-    await ownership.dispose?.();
-  };
-
-  const recordLoadedAudio = (key, value, { dispose } = {}) => {
-    const record = {
-      category: "audio",
-      value,
-      sharedOwnership: retainSharedAsset({
-        registry: sharedAudioAssetOwners,
-        identity: key,
-        dispose,
-      }),
-    };
-
-    return recordLoadedAsset(key, record);
   };
 
   const getTexturePrimaryValue = (value) =>
@@ -880,6 +807,7 @@ const createRouteGraphics = () => {
       : retainSharedAsset({
           registry: sharedTextureAssetOwners,
           identity: record.value,
+          value: record.value,
           dispose,
         });
     ownership.aliasRecords ??= new Map();
@@ -1208,7 +1136,7 @@ const createRouteGraphics = () => {
    * @param {Function} handler
    */
   const renderInternal = (appInstance, parent, nextState, handler) => {
-    if (isDeepEqual(state, nextState)) {
+    if (!needsReconciliation && isDeepEqual(state, nextState)) {
       if (typeof appInstance.render === "function") {
         appInstance.render();
       }
@@ -1237,67 +1165,112 @@ const createRouteGraphics = () => {
 
     // Reset completion tracker for new state (emits aborted if previous had pending)
     completionTracker.reset(nextState.id);
+    if (signal.aborted) return;
+    const version = completionTracker.getVersion();
+    const previousState = state;
+    needsReconciliation = false;
+    const isCurrent = () =>
+      !signal.aborted && completionTracker.getVersion() === version;
+    const failRender = (error) => {
+      if (!isCurrent()) return;
+      needsReconciliation = true;
+      state = previousState;
+      completionTracker.fail(version, error);
+    };
+    // Hold a root reservation so a rejecting plugin cannot release its own
+    // reservation and announce success before its rejection reaches us.
+    completionTracker.track(version);
+    try {
+      applyGlobalObjects(appInstance, state.global, nextState.global);
 
-    applyGlobalObjects(appInstance, state.global, nextState.global);
+      // Cancel any running animation that is not explicitly continuing.
+      animationBus.cancelAllExcept(continuityPlan.continuedAnimationIds);
+      if (!isCurrent()) return;
 
-    // Cancel any running animation that is not explicitly continuing.
-    animationBus.cancelAllExcept(continuityPlan.continuedAnimationIds);
+      const renderOperation = renderElements({
+        app: appInstance,
+        parent,
+        prevComputedTree: state.elements,
+        nextComputedTree: nextState.elements,
+        animations: nextState.animations,
+        elementPlugins: plugins.elements,
+        animationBus,
+        completionTracker,
+        eventHandler: handler,
+        signal,
+        shaderTime: shaderTimeMS / 1000,
+        getShaderTime: () => shaderTimeMS / 1000,
+      });
 
-    // Render elements (now synchronous)
-    renderElements({
-      app: appInstance,
-      parent,
-      prevComputedTree: state.elements,
-      nextComputedTree: nextState.elements,
-      animations: nextState.animations,
-      elementPlugins: plugins.elements,
-      animationBus,
-      completionTracker,
-      eventHandler: handler,
-      signal,
-      shaderTime: shaderTimeMS / 1000,
-      getShaderTime: () => shaderTimeMS / 1000,
-    });
+      if (renderOperation && typeof renderOperation.then === "function")
+        void Promise.resolve(renderOperation).catch(() => {});
 
-    // Flush animation commands to apply initial values immediately
-    animationBus.flush();
+      if (!isCurrent()) return;
+      // Flush animation commands to apply initial values immediately
+      animationBus.flush();
+      if (!isCurrent()) return;
 
-    if (
-      animationPlaybackMode === "manual" &&
-      animationPlaybackTimeMS !== null
-    ) {
-      animationBus.setTime(animationPlaybackTimeMS);
-    }
-
-    // Render audio
-    renderAudio({
-      app: appInstance,
-      prevAudioTree: state.audio,
-      nextAudioTree: nextState.audio,
-      prevAudioEffects: state.audioEffects,
-      nextAudioEffects: nextState.audioEffects,
-      audioPlugins: plugins.audio,
-      eventHandler: handler,
-    });
-
-    // Present the updated stage immediately instead of relying on Pixi's
-    // implicit auto-render loop, which can fail in VT/manual browser runs.
-    if (typeof appInstance.render === "function") {
-      setShaderTimeInTree(appInstance.stage, shaderTimeMS / 1000);
-      appInstance.render();
-    }
-
-    // Commit logical state only after the renderer accepts the frame.
-    state = nextState;
-
-    // Fire stateComplete immediately if no animations/reveals to track
-    completionTracker.completeIfEmpty();
-
-    if (!hasRenderedOnce) {
-      hasRenderedOnce = true;
-      if (onFirstRenderCallback) {
-        onFirstRenderCallback();
+      if (
+        animationPlaybackMode === "manual" &&
+        animationPlaybackTimeMS !== null
+      ) {
+        animationBus.setTime(animationPlaybackTimeMS);
       }
+
+      if (!isCurrent()) return;
+      // Render audio
+      renderAudio({
+        app: appInstance,
+        prevAudioTree: state.audio,
+        nextAudioTree: nextState.audio,
+        prevAudioEffects: state.audioEffects,
+        nextAudioEffects: nextState.audioEffects,
+        audioPlugins: plugins.audio,
+        eventHandler: handler,
+      });
+
+      // Present the updated stage immediately instead of relying on Pixi's
+      // implicit auto-render loop, which can fail in VT/manual browser runs.
+      if (typeof appInstance.render === "function") {
+        setShaderTimeInTree(appInstance.stage, shaderTimeMS / 1000);
+        appInstance.render();
+      }
+
+      // Commit logical state only after the renderer accepts the frame.
+      if (!isCurrent()) return;
+      state = nextState;
+      if (renderOperation && typeof renderOperation.then === "function") {
+        void Promise.resolve(renderOperation)
+          .then(() => {
+            if (!isCurrent()) return;
+            animationBus.flush();
+            if (
+              animationPlaybackMode === "manual" &&
+              animationPlaybackTimeMS !== null
+            ) {
+              animationBus.setTime(animationPlaybackTimeMS);
+            }
+            if (!isCurrent()) return;
+            appInstance.render?.();
+            completionTracker.complete(version);
+          })
+          .catch(failRender);
+      } else {
+        completionTracker.complete(version);
+      }
+
+      // Fire stateComplete immediately if no animations/reveals to track
+      completionTracker.completeIfEmpty();
+
+      if (!hasRenderedOnce) {
+        hasRenderedOnce = true;
+        if (onFirstRenderCallback) {
+          onFirstRenderCallback();
+        }
+      }
+    } catch (error) {
+      failRender(error);
+      throw error;
     }
   };
 
@@ -1312,6 +1285,7 @@ const createRouteGraphics = () => {
       return app.canvas;
     },
 
+    /** @param {string} targetLabel @returns {import("pixi.js").Container | null} */
     findElementByLabel: (targetLabel) => {
       return app.stage.getChildByLabel(targetLabel, true) ?? null;
     },
@@ -1344,6 +1318,7 @@ const createRouteGraphics = () => {
         y,
       }),
 
+    /** @param {string} [label] @returns {Promise<string>} */
     extractBase64: async (label) => {
       if (typeof app.render === "function") {
         setShaderTimeInTree(app.stage, shaderTimeMS / 1000);
@@ -1425,7 +1400,7 @@ const createRouteGraphics = () => {
       return animationBus.reverse(animationId, direction === "reverse");
     },
 
-    seekAnimation: (animationId, timeMS, options) => {
+    seekAnimation: (animationId, timeMS, options = {}) => {
       const didSeek = animationBus.seek(animationId, timeMS, options);
       if (didSeek && typeof app.render === "function") {
         app.render();
@@ -1433,7 +1408,7 @@ const createRouteGraphics = () => {
       return didSeek;
     },
 
-    setAnimationProgress: (animationId, progress, options) => {
+    setAnimationProgress: (animationId, progress, options = {}) => {
       const didSeek = animationBus.setProgress(animationId, progress, options);
       if (didSeek && typeof app.render === "function") {
         app.render();
@@ -1496,7 +1471,6 @@ const createRouteGraphics = () => {
       });
 
       plugins = {
-        animations: pluginConfig?.animations ?? [],
         elements: pluginConfig?.elements ?? [],
         audio: pluginConfig?.audio ?? [],
         parsers: parserPlugins,
@@ -1504,7 +1478,14 @@ const createRouteGraphics = () => {
       eventHandler = handler;
 
       keyboardManager = createKeyboardManager(handler);
-      completionTracker = createCompletionTracker(handler);
+      completionTracker = createCompletionTracker((event, payload) => {
+        if (payload.failed) {
+          needsReconciliation = true;
+          renderAbortController?.abort();
+          animationBus.cancelAll();
+        }
+        handler?.(event, payload);
+      });
 
       /**
        * @type {ApplicationWithAudioStage}
@@ -1725,7 +1706,7 @@ const createRouteGraphics = () => {
         cleanupParticlesInTree({ app, root: app.stage });
       }
 
-      if (app) app.destroy();
+      if (app) app.destroy(false, { children: true });
       animationPlaybackMode = "auto";
       animationPlaybackTimeMS = null;
       shaderTimeMS = 0;
@@ -1758,11 +1739,6 @@ const createRouteGraphics = () => {
       }
 
       const audioAssets = Object.entries(assetsByType.audio);
-      const decoderPreparationPromise =
-        audioAssets.length > 0 &&
-        typeof AudioAsset.prepareDecoders === "function"
-          ? AudioAsset.prepareDecoders(assetsByType.audio)
-          : undefined;
       const loadJobs = [];
 
       audioAssets.forEach(([key, asset]) => {
@@ -1776,28 +1752,7 @@ const createRouteGraphics = () => {
                 phase: "decode",
                 asset,
               },
-              async () => {
-                const existingRecord = loadedAssetRecords.get(key);
-                if (existingRecord?.category === "audio") {
-                  return existingRecord.value;
-                }
-                assertAssetBuffer(asset, "Audio");
-                await decoderPreparationPromise;
-                const audioWasAlreadyLoaded =
-                  !sharedAudioAssetOwners.has(key) &&
-                  AudioAsset.getAsset(key) !== undefined;
-                const audioBuffer = await AudioAsset.load(
-                  key,
-                  asset.buffer,
-                  asset.type,
-                );
-
-                return recordLoadedAudio(key, audioBuffer, {
-                  dispose: audioWasAlreadyLoaded
-                    ? undefined
-                    : () => AudioAsset.unload(key),
-                });
-              },
+              () => loadAudioRecord(key, () => asset),
             ),
           ),
         });
@@ -2183,34 +2138,25 @@ const createRouteGraphics = () => {
       return unloadedAssetIds;
     },
 
-    loadAudioAssets: async (urls) => {
-      return Promise.all(
+    /** @deprecated Prefer loadAssets with explicit asset aliases and MIME types. */
+    loadAudioAssets: (urls) =>
+      Promise.all(
         urls.map((url) =>
-          trackAssetLoad(url, async () => {
-            const existingRecord = loadedAssetRecords.get(url);
-            if (existingRecord?.category === "audio") {
-              return existingRecord.value;
-            }
-
-            const cachedAudioBuffer = AudioAsset.getAsset(url);
-            if (cachedAudioBuffer !== undefined) {
-              return recordLoadedAudio(url, cachedAudioBuffer);
-            }
-
-            const response = await fetch(url);
-            const arrayBuffer = await response.arrayBuffer();
-            const type = inferAudioTypeFromUrl(url);
-            await AudioAsset.prepareDecoders?.({
-              [url]: { buffer: arrayBuffer, type },
-            });
-            const audioBuffer = await AudioAsset.load(url, arrayBuffer, type);
-            return recordLoadedAudio(url, audioBuffer, {
-              dispose: () => AudioAsset.unload(url),
-            });
-          }),
+          trackAssetLoad(url, () =>
+            loadAudioRecord(url, async () => {
+              const response = await fetch(url);
+              if (!response.ok)
+                throw new Error(
+                  `Could not load audio "${url}": HTTP ${response.status}.`,
+                );
+              return {
+                buffer: await response.arrayBuffer(),
+                type: inferAudioTypeFromUrl(url),
+              };
+            }),
+          ),
         ),
-      );
-    },
+      ),
 
     /**
      *

@@ -38,6 +38,24 @@ const createApp = () => {
 };
 
 describe("input plugin", () => {
+  it("releases native input and ticker ownership when an ancestor is destroyed", () => {
+    const root = new Container();
+    const parent = new Container();
+    root.addChild(parent);
+    const { app } = createApp();
+    const element = parseInput({
+      state: { id: "name", type: "input", width: 200, height: 44 },
+    });
+    addInput({ app, parent, element, zIndex: 0 });
+    const input = parent.getChildByLabel("name");
+    const listener = app.ticker.add.mock.calls[0][0];
+    root.destroy({ children: true });
+    expect(input.destroyed).toBe(true);
+    expect(app.ticker.remove).toHaveBeenCalledWith(listener);
+    expect(app.inputDomBridge.unmount).toHaveBeenCalledTimes(1);
+    expect(app.inputDomBridge.unmount.mock.calls[0][0]).toBe("name");
+  });
+
   it("installs shader filters before dispatching mount animations", () => {
     const parent = new Container();
     const { app } = createApp();
@@ -626,7 +644,10 @@ describe("input plugin", () => {
       animationBus.dispatch.mock.calls[0][0].payload.onComplete;
     onComplete();
 
-    expect(app.inputDomBridge.unmount).toHaveBeenCalledWith("name");
+    expect(app.inputDomBridge.unmount).toHaveBeenCalledWith(
+      "name",
+      expect.any(Object),
+    );
     expect(inputContainer.destroyed).toBe(true);
   });
 });

@@ -115,10 +115,10 @@ export const bindContainerInteractions = ({
   const scrollDownEvent = element?.scrollDown;
   const hasPointerInteraction = Boolean(
     hoverEvents ||
-    clickEvents ||
-    rightClickEvents ||
-    scrollUpEvent ||
-    scrollDownEvent,
+      clickEvents ||
+      rightClickEvents ||
+      scrollUpEvent ||
+      scrollDownEvent,
   );
 
   if (hasPointerInteraction) {

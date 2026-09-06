@@ -2,6 +2,7 @@ import { Sprite, Container } from "pixi.js";
 import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
 import {
   bindSliderInteractions,
+  destroySliderRuntime,
   getSliderLabels,
   getSliderTexture,
   resizeSliderThumb,
@@ -12,6 +13,7 @@ import {
   getElementTransformTargetState,
 } from "../util/transform.js";
 import { syncShaderFilters } from "../util/shaderFilterEffect.js";
+import { registerElementCleanup } from "../util/elementResources.js";
 
 /**
  * Add slider element to the stage
@@ -38,6 +40,9 @@ export const addSlider = ({
   applyElementTransform(sliderContainer, sliderComputedNode);
   sliderContainer.sortableChildren = true;
   sliderContainer.eventMode = "static";
+  registerElementCleanup(sliderContainer, () =>
+    destroySliderRuntime({ sliderContainer }),
+  );
 
   const labels = getSliderLabels(id);
 

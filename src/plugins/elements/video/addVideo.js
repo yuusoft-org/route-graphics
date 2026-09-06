@@ -1,5 +1,9 @@
 import { Texture, Sprite } from "pixi.js";
-import { syncVideoPlaybackTracking } from "./playbackTracking.js";
+import {
+  syncVideoPlaybackTracking,
+  disposeVideoPlayback,
+} from "./playbackTracking.js";
+import { registerElementCleanup } from "../util/elementResources.js";
 import { queueDeferredVideoPlay } from "../renderContext.js";
 import { normalizeVolume } from "../../../util/normalizeVolume.js";
 import {
@@ -60,6 +64,9 @@ export const addVideo = ({
   sprite._videoEndedListener = undefined;
   sprite._videoErrorListener = undefined;
   sprite._playbackStateVersion = null;
+  registerElementCleanup(sprite, () =>
+    disposeVideoPlayback(sprite, completionTracker),
+  );
 
   sprite.width = Math.round(width);
   sprite.height = Math.round(height);

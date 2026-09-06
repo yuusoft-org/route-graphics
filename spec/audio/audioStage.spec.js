@@ -160,6 +160,41 @@ const keyframePhase = (
 });
 
 describe("AudioStage graph rendering", () => {
+  it("destroys retired same-ID channels and their exit timers", async () => {
+    const { stage } = await setupAudioStage();
+    const audio = [
+      { id: "music", type: "audio-channel", volume: 100, children: [] },
+    ];
+    const effects = [
+      {
+        id: "fade",
+        type: "audio-transition",
+        targetId: "music",
+        properties: { volume: { exit: keyframePhase(0, 100000) } },
+      },
+    ];
+    stage.renderGraph({ nextAudio: audio });
+    const outgoing = stage._inspect().channels.get("music");
+    stage.renderGraph({
+      prevAudio: audio,
+      nextAudio: [],
+      nextAudioEffects: effects,
+    });
+    stage.renderGraph({
+      prevAudio: [],
+      nextAudio: audio,
+      prevAudioEffects: effects,
+      nextAudioEffects: effects,
+    });
+    const incoming = stage._inspect().channels.get("music");
+    expect(incoming).not.toBe(outgoing);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    stage.destroy();
+    expect(outgoing.gainNode.disconnect).toHaveBeenCalledTimes(1);
+    expect(incoming.gainNode.disconnect).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
   });

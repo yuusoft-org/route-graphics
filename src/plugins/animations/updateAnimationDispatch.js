@@ -574,6 +574,10 @@ export const dispatchUpdateAnimationsNow = ({
     throw error;
   }
 
+  const unsettled = new Set(
+    animationsToDispatch.map((animation) => animation.id),
+  );
+  const dispatchVersion = completionTracker.getVersion();
   for (const animation of animationsToDispatch) {
     const preparedTimeline = animation.gsap
       ? preparedGsap.get(animation.id)?.instance
@@ -583,9 +587,7 @@ export const dispatchUpdateAnimationsNow = ({
       preparedTimeline?.duration === Infinity;
     const trackCompletion =
       animation.playback?.continuity !== "persistent" && !isInfinite;
-    const stateVersion = trackCompletion
-      ? completionTracker.getVersion()
-      : null;
+    const stateVersion = trackCompletion ? dispatchVersion : null;
 
     if (trackCompletion) {
       completionTracker.track(stateVersion);
@@ -601,9 +603,34 @@ export const dispatchUpdateAnimationsNow = ({
     };
 
     const complete = () => {
+      unsettled.delete(animation.id);
+      try {
+        if (
+          !settlement.didSettle &&
+          unsettled.size === 0 &&
+          completionTracker.getVersion() === dispatchVersion
+        ) {
+          const operation = onComplete?.(animation);
+          if (operation && typeof operation.then === "function") {
+            void operation.then(releaseCompletion, (error) => {
+              completionTracker.fail?.(dispatchVersion, error);
+              releaseCompletion();
+            });
+            return;
+          }
+        }
+      } catch (error) {
+        completionTracker.fail?.(dispatchVersion, error);
+      }
       releaseCompletion();
-      if (!settlement.didSettle) {
-        onComplete?.(animation);
+    };
+    const cancel = () => {
+      unsettled.delete(animation.id);
+      releaseCompletion();
+    };
+    const fail = (error) => {
+      if (trackCompletion) {
+        completionTracker.fail?.(dispatchVersion, error);
       }
     };
 
@@ -649,8 +676,9 @@ export const dispatchUpdateAnimationsNow = ({
             }
           },
           onComplete: complete,
-          onCancel: releaseCompletion,
-          onReverseComplete: releaseCompletion,
+          onCancel: cancel,
+          onFailure: fail,
+          onReverseComplete: cancel,
         },
       });
       continue;
@@ -685,8 +713,9 @@ export const dispatchUpdateAnimationsNow = ({
         repeatDelay: animation.playback?.repeatDelay,
         yoyo: animation.playback?.yoyo,
         onComplete: complete,
-        onCancel: releaseCompletion,
-        onReverseComplete: releaseCompletion,
+        onCancel: cancel,
+        onFailure: fail,
+        onReverseComplete: cancel,
       },
     });
   }

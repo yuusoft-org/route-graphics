@@ -271,6 +271,12 @@ const normalizeBindingConfig = (config) => {
  */
 export const createKeyboardManager = (eventHandler) => {
   const registeredBindings = new Map();
+  const registeredHandlers = new Map();
+  const unbindOwned = (binding) => {
+    const handler = registeredHandlers.get(binding);
+    if (handler) hotkeys.unbind(binding, handler);
+    registeredHandlers.delete(binding);
+  };
   const bindingShortcuts = new Map();
   const activeKeyupShortcuts = new Map();
   const activeModifierShortcuts = new Map();
@@ -472,7 +478,7 @@ export const createKeyboardManager = (eventHandler) => {
         bindingsToAdd.push(binding);
       } else if (!isDeepEqual(active, config)) {
         bindingsToUpdate.push(binding);
-        hotkeys.unbind(binding);
+        unbindOwned(binding);
       }
     });
 
@@ -483,7 +489,7 @@ export const createKeyboardManager = (eventHandler) => {
     });
 
     bindingsToRemove.forEach((binding) => {
-      hotkeys.unbind(binding);
+      unbindOwned(binding);
       registeredBindings.delete(binding);
       clearBindingState(binding);
     });
@@ -498,7 +504,7 @@ export const createKeyboardManager = (eventHandler) => {
 
       // hotkeys-js is reliable for combo activation, but not for combo release
       // when modifiers are released before the final non-modifier key.
-      hotkeys(binding, (_event, handler) => {
+      const callback = (_event, handler) => {
         if (isEditableKeyboardEvent(_event)) {
           clearActiveKeyupBindings();
           return;
@@ -523,7 +529,9 @@ export const createKeyboardManager = (eventHandler) => {
         if (config.keydown) {
           emitKeyboardEvent("keydown", binding, config.keydown.payload);
         }
-      });
+      };
+      registeredHandlers.set(binding, callback);
+      hotkeys(binding, callback);
     });
   };
 
@@ -538,7 +546,7 @@ export const createKeyboardManager = (eventHandler) => {
     }
 
     for (const key of registeredBindings.keys()) {
-      hotkeys.unbind(key);
+      unbindOwned(key);
     }
     registeredBindings.clear();
     bindingShortcuts.clear();

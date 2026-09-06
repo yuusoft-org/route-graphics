@@ -1,8 +1,8 @@
 import { parseCommonObject } from "../util/parseCommonObject.js";
 import { normalizeBlurConfig } from "../util/blurEffect.js";
 /**
- *  @typedef {import('../../../types.js').BaseElement}
- *  @typedef {import('../../../types.js').VideoComputedNode}
+ *  @typedef {import('../../../types.js').BaseElement} BaseElement
+ *  @typedef {import('../../../types.js').VideoComputedNode} VideoComputedNode
  */
 
 /**

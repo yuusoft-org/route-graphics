@@ -410,7 +410,7 @@ describe("dispatchUpdateAnimations", () => {
   it("dispatches immediate update animations and completes tracked callbacks", () => {
     const animationBus = { dispatch: vi.fn() };
     const completionTracker = {
-      getVersion: vi.fn().mockReturnValueOnce(7).mockReturnValueOnce(8),
+      getVersion: vi.fn().mockReturnValue(7),
       track: vi.fn(),
       complete: vi.fn(),
     };
@@ -469,7 +469,7 @@ describe("dispatchUpdateAnimations", () => {
     expect(dispatched).toBe(true);
     expect(animationBus.dispatch).toHaveBeenCalledTimes(2);
     expect(completionTracker.track).toHaveBeenNthCalledWith(1, 7);
-    expect(completionTracker.track).toHaveBeenNthCalledWith(2, 8);
+    expect(completionTracker.track).toHaveBeenNthCalledWith(2, 7);
 
     const firstDispatch = animationBus.dispatch.mock.calls[0][0];
     const secondDispatch = animationBus.dispatch.mock.calls[1][0];
@@ -496,12 +496,12 @@ describe("dispatchUpdateAnimations", () => {
     );
 
     firstDispatch.payload.onComplete();
+    expect(onComplete).not.toHaveBeenCalled();
     secondDispatch.payload.onComplete();
 
     expect(completionTracker.complete).toHaveBeenNthCalledWith(1, 7);
-    expect(completionTracker.complete).toHaveBeenNthCalledWith(2, 8);
+    expect(completionTracker.complete).toHaveBeenNthCalledWith(2, 7);
     expect(onComplete.mock.calls.map(([animation]) => animation.id)).toEqual([
-      "child-update-position",
       "child-update-alpha",
     ]);
   });
@@ -542,7 +542,6 @@ describe("dispatchUpdateAnimations", () => {
     });
 
     expect(dispatched).toBe(true);
-    expect(completionTracker.getVersion).not.toHaveBeenCalled();
     expect(completionTracker.track).not.toHaveBeenCalled();
     expect(animationBus.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -613,7 +612,6 @@ describe("dispatchUpdateAnimations", () => {
     );
     expect(element.x).toBe(10);
     expect(element.y).toBe(40);
-    expect(completionTracker.getVersion).not.toHaveBeenCalled();
     expect(completionTracker.track).not.toHaveBeenCalled();
     expect(animationBus.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1051,7 +1049,6 @@ describe("dispatchUpdateAnimations", () => {
 
     flushDeferredMountOperations(renderContext);
 
-    expect(completionTracker.getVersion).not.toHaveBeenCalled();
     expect(completionTracker.track).not.toHaveBeenCalled();
     expect(animationBus.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({

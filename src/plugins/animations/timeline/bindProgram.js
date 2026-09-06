@@ -336,16 +336,32 @@ const segmentsOverlapAcrossOccurrences = (domains, left, right) => {
     commonDomain,
   );
 
-  return leftIntervals.some((leftInterval) =>
-    rightIntervals.some((rightInterval) =>
+  const byStart = (left, right) =>
+    left.start - right.start || left.end - right.end;
+  leftIntervals.sort(byStart);
+  rightIntervals.sort(byStart);
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (
+    leftIndex < leftIntervals.length &&
+    rightIndex < rightIntervals.length
+  ) {
+    const leftInterval = leftIntervals[leftIndex];
+    const rightInterval = rightIntervals[rightIndex];
+    if (
       intervalsOverlap(
         leftInterval.start,
         leftInterval.end,
         rightInterval.start,
         rightInterval.end,
-      ),
-    ),
-  );
+      )
+    ) {
+      return true;
+    }
+    if (leftInterval.end <= rightInterval.end) leftIndex++;
+    else rightIndex++;
+  }
+  return false;
 };
 
 const expressionContainsKind = (expression, kind) => {
@@ -408,7 +424,7 @@ const configureTrackRefreshResolvers = (instance, track) => {
         ? iteration - (iteration % 2)
         : iteration;
 
-    const ensureIteration = (iteration) => {
+    const resolveIteration = (iteration) => {
       if (segments[0].refreshTemplate.valueCache.has(iteration)) return;
       if (resolving.has(iteration)) {
         throw new Error(
@@ -417,7 +433,6 @@ const configureTrackRefreshResolvers = (instance, track) => {
       }
       resolving.add(iteration);
       const previousIteration = iteration - step;
-      ensureIteration(previousIteration);
       const iterationBase = getTerminal(previousIteration);
       const occurrenceIterations = new Map([[refreshDomainId, iteration]]);
 
@@ -445,6 +460,20 @@ const configureTrackRefreshResolvers = (instance, track) => {
         segment.refreshTemplate.valueCache.set(iteration, values);
       }
       resolving.delete(iteration);
+    };
+
+    const ensureIteration = (iteration) => {
+      const missing = [];
+      const cache = segments[0].refreshTemplate.valueCache;
+      for (let current = iteration; !cache.has(current); current -= step) {
+        if (current < 0)
+          throw new Error("Repeat-refresh requires an initial iteration.");
+        missing.push(current);
+      }
+      // Fill predecessors first without nesting one stack frame per repeat.
+      for (let index = missing.length - 1; index >= 0; index--) {
+        resolveIteration(missing[index]);
+      }
     };
 
     const getTerminal = (iteration) => {
@@ -621,10 +650,23 @@ export const bindTimelineProgram = (rawProgram, context) => {
     limits: Object.freeze({ ...limits }),
   };
   const tracks = new Map();
+  // sourcePath identifies an authored action; its property clips are siblings.
+  // Programs without source metadata retain independent clip semantics.
+  const actionKeyFor = (clip) =>
+    JSON.stringify([clip.domain, clip.sourcePath ?? clip.id]);
+  const actionPriorities = new Map();
+  for (const clip of program.clipTemplates) {
+    const key = actionKeyFor(clip);
+    actionPriorities.set(
+      key,
+      Math.min(actionPriorities.get(key) ?? Infinity, clip.priority),
+    );
+  }
 
   for (const clip of [...program.clipTemplates].sort(
     (left, right) => left.priority - right.priority,
   )) {
+    const actionKey = actionKeyFor(clip);
     const targets = resolvedTargets.get(clip.targets);
     const offsets = clip.fanout?.stagger
       ? calculateStaggerOffsets(targets.length, clip.fanout.stagger, {
@@ -693,6 +735,7 @@ export const bindTimelineProgram = (rawProgram, context) => {
         captureRootTime,
         {
           maximumPriority: clip.priority - 1,
+          ignoreTrimsAtOrAfterPriority: actionPriorities.get(actionKey),
         },
       );
 
@@ -721,6 +764,7 @@ export const bindTimelineProgram = (rawProgram, context) => {
           for (const segment of candidate.segments) {
             if (
               segment.priority < clip.priority &&
+              segment.actionKey !== actionKey &&
               (segment.trimRootAt === undefined ||
                 rootStart < segment.trimRootAt)
             ) {
@@ -786,6 +830,7 @@ export const bindTimelineProgram = (rawProgram, context) => {
       track.segments.push({
         id: `${clip.id}@${targetIndex}`,
         sourcePath: clip.sourcePath,
+        actionKey,
         domain: clip.domain,
         start,
         duration,

@@ -1,6 +1,8 @@
 import { Rectangle } from "pixi.js";
+import { registerElementCleanup } from "./elementResources.js";
 
 const SCROLL_HANDLED = "__rtglScrollHandled";
+const CLEANUP_REGISTERED = Symbol("scrollCleanupRegistered");
 
 const getPayload = (eventConfig) =>
   eventConfig?.payload && typeof eventConfig.payload === "object"
@@ -108,6 +110,12 @@ export const setupScrollInteraction = ({
     }
     delete displayObject._cleanupScrollInteraction;
   };
+  if (!displayObject[CLEANUP_REGISTERED]) {
+    displayObject[CLEANUP_REGISTERED] = true;
+    registerElementCleanup(displayObject, () =>
+      displayObject._cleanupScrollInteraction?.(),
+    );
+  }
 };
 
 export const cleanupScrollInteractionsInTree = ({ root }) => {

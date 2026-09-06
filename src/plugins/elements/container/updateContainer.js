@@ -101,6 +101,7 @@ export const updateContainer = ({
   });
 
   const updateElement = () => {
+    let childOperation;
     if (!isDeepEqual(prevElement, nextElement)) {
       containerElement.label = nextElement.id;
       containerElement.alpha = alpha;
@@ -184,7 +185,7 @@ export const updateContainer = ({
 
     // Render children if definition changed OR animation targets children
     if (childrenChanged || hasChildAnimation || hasChildShaderProgressReset) {
-      renderElements({
+      childOperation = renderElements({
         app,
         parent: renderParent,
         nextComputedTree: nextElement.children,
@@ -211,8 +212,14 @@ export const updateContainer = ({
       });
     }
 
-    setElementRenderState(containerElement, nextElement);
-    commitRenderState?.(containerElement);
+    const commit = () => {
+      if (signal?.aborted || containerElement.destroyed) return;
+      setElementRenderState(containerElement, nextElement);
+      commitRenderState?.(containerElement);
+    };
+    if (childOperation && typeof childOperation.then === "function")
+      return childOperation.then(commit);
+    commit();
   };
 
   const dispatched = dispatchLiveAnimations({
@@ -231,14 +238,12 @@ export const updateContainer = ({
       }),
     },
     targetStates: collectDescendantTargetStates(nextElement.children),
-    onComplete: () => {
-      updateElement();
-    },
+    onComplete: updateElement,
   });
 
   if (!dispatched) {
     // No animations, update immediately
-    updateElement();
+    return updateElement();
   } else {
     deferRenderStateCommit?.();
   }

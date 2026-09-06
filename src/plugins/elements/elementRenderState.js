@@ -99,8 +99,19 @@ const markMountedElement = (
 
 export const addElementWithRenderState = ({ plugin, ...options }) => {
   const childrenBefore = new Set(options.parent.children);
-  const operation = plugin.add(options);
   const { parent, element } = options;
+  const discardPartialMount = () => {
+    if (options.signal?.aborted || parent.destroyed) return;
+    const child = getAddedChild(parent, element, childrenBefore);
+    if (child) child.destroy({ children: true });
+  };
+  let operation;
+  try {
+    operation = plugin.add(options);
+  } catch (error) {
+    discardPartialMount();
+    throw error;
+  }
   let mountedChild = getAddedChild(parent, element, childrenBefore);
   markMountedElement(mountedChild, element, {
     animations: options.animations,
@@ -112,16 +123,22 @@ export const addElementWithRenderState = ({ plugin, ...options }) => {
     return operation;
   }
 
-  return operation.then(() => {
-    if (!mountedChild || mountedChild.destroyed) {
-      mountedChild = getAddedChild(parent, element, childrenBefore);
-    }
-    markMountedElement(mountedChild, element, {
-      animations: options.animations,
-      shaderTime: options.shaderTime,
-      getShaderTime: options.getShaderTime,
-    });
-  });
+  return operation.then(
+    () => {
+      if (!mountedChild || mountedChild.destroyed) {
+        mountedChild = getAddedChild(parent, element, childrenBefore);
+      }
+      markMountedElement(mountedChild, element, {
+        animations: options.animations,
+        shaderTime: options.shaderTime,
+        getShaderTime: options.getShaderTime,
+      });
+    },
+    (error) => {
+      discardPartialMount();
+      throw error;
+    },
+  );
 };
 
 export const updateElementWithRenderState = ({ plugin, ...options }) => {
@@ -292,6 +309,7 @@ const beginRootRender = (
     nextComputedTree,
     lifecycle.rootOwnerElementId,
   );
+  pruneElementRenderState(lifecycle);
 
   for (const replacement of lifecycle.pendingReplacements.values()) {
     reserveCompletion(replacement, renderSnapshot);
@@ -395,6 +413,22 @@ const isInLifecycleTree = (displayObject, rootParent) => {
     current = current.parent;
   }
   return false;
+};
+
+export const pruneElementRenderState = (lifecycle) => {
+  for (const [key, parent] of lifecycle.renderParents) {
+    if (
+      lifecycle.desiredElements.has(key) ||
+      lifecycle.pendingReplacements.has(key)
+    )
+      continue;
+    const [, id] = JSON.parse(key);
+    const mounted =
+      !parent.destroyed &&
+      isInLifecycleTree(parent, lifecycle.rootParent) &&
+      parent.children?.some((child) => !child.destroyed && child.label === id);
+    if (!mounted) lifecycle.renderParents.delete(key);
+  }
 };
 
 const findMountedParent = (parent, id) => {

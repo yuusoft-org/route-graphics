@@ -1,8 +1,12 @@
+import { trackPendingLoad } from "../assets/sharedAssetOwnership.js";
+
 /**
  * Asset buffer manager for caching loaded assets
  */
 const createAssetBufferManager = () => {
   const cache = new Map();
+  const pending = new Map();
+  let generation = 0;
   const isBlobUrl = (url) => typeof url === "string" && url.startsWith("blob:");
   const getErrorMessage = (error) => {
     if (!error) return "Unknown error";
@@ -79,6 +83,7 @@ const createAssetBufferManager = () => {
    * @returns {Promise<void>} Promise that resolves when all assets are loaded
    */
   const load = async (assets) => {
+    const loadGeneration = generation;
     const toFetch = [];
 
     // Check what needs to be fetched
@@ -91,40 +96,42 @@ const createAssetBufferManager = () => {
     // Fetch uncached assets
     if (toFetch.length > 0) {
       await Promise.all(
-        toFetch.map(async ([key, value]) => {
-          try {
-            if (!value?.url) {
-              throw new Error("Asset URL is missing.");
-            }
+        toFetch.map(([key, value]) =>
+          trackPendingLoad(pending, key, async () => {
+            try {
+              if (!value?.url) {
+                throw new Error("Asset URL is missing.");
+              }
 
-            if (shouldCacheByUrl(value)) {
-              cache.set(key, {
-                url: value.url,
+              if (shouldCacheByUrl(value)) {
+                cache.set(key, {
+                  url: value.url,
+                  type: value.type,
+                  source: "url",
+                });
+                return;
+              }
+
+              const resp = await fetch(value.url);
+              if (!resp.ok) {
+                throw new Error(
+                  `HTTP ${resp.status}${resp.statusText ? ` ${resp.statusText}` : ""}`,
+                );
+              }
+              const buffer = await resp.arrayBuffer();
+              const bufferData = {
+                buffer,
                 type: value.type,
-                source: "url",
-              });
-              return;
-            }
+                source: "buffer",
+              };
 
-            const resp = await fetch(value.url);
-            if (!resp.ok) {
-              throw new Error(
-                `HTTP ${resp.status}${resp.statusText ? ` ${resp.statusText}` : ""}`,
-              );
+              // Cache the result
+              if (generation === loadGeneration) cache.set(key, bufferData);
+            } catch (error) {
+              throw createAssetFetchError({ key, value, error });
             }
-            const buffer = await resp.arrayBuffer();
-            const bufferData = {
-              buffer,
-              type: value.type,
-              source: "buffer",
-            };
-
-            // Cache the result
-            cache.set(key, bufferData);
-          } catch (error) {
-            throw createAssetFetchError({ key, value, error });
-          }
-        }),
+          }),
+        ),
       );
     }
   };
@@ -134,18 +141,17 @@ const createAssetBufferManager = () => {
    * @returns {Object<string, {buffer: ArrayBuffer, type: string}>} Buffer map with all loaded assets - keys map to objects with {buffer: ArrayBuffer, type: string}
    */
   const getBufferMap = () => {
-    const bufferMap = {};
-    for (const [key, value] of cache.entries()) {
-      bufferMap[key] = value;
-    }
-
-    return bufferMap;
+    return Object.fromEntries(cache);
   };
 
   /**
    * Clear the cache
    */
-  const clear = () => cache.clear();
+  const clear = () => {
+    generation++;
+    cache.clear();
+    pending.clear();
+  };
 
   /**
    * Get cache size

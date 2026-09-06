@@ -44,6 +44,7 @@ Options:
 PNG options:
   --state <index>                  State index when YAML contains multiple states
   --time <ms>                      Sample animations at a manual time
+  --layout-report <path>           Write a JSON layout snapshot beside the PNG
   --wait-for-render-complete       Wait for renderComplete before capture
 
 MP4 options:
@@ -68,7 +69,12 @@ Timeline inspection options:
 
 const renderCommandUsage = usage;
 
-const PNG_ONLY_OPTIONS = ["stateIndex", "timeMS", "waitForRenderComplete"];
+const PNG_ONLY_OPTIONS = [
+  "stateIndex",
+  "timeMS",
+  "waitForRenderComplete",
+  "layoutReportPath",
+];
 
 const MP4_ONLY_OPTIONS = [
   "stateSelection",
@@ -84,6 +90,7 @@ const toOptionName = (propertyName) =>
   ({
     stateIndex: "--state",
     timeMS: "--time",
+    layoutReportPath: "--layout-report",
     waitForRenderComplete: "--wait-for-render-complete",
     stateSelection: "--states",
     fps: "--fps",
@@ -305,6 +312,10 @@ export const parseRouteGraphicsCliArgs = (argv) => {
         break;
       case "--states":
         options.stateSelection = readOptionValue(rest, index, token);
+        index += 1;
+        break;
+      case "--layout-report":
+        options.layoutReportPath = readOptionValue(rest, index, token);
         index += 1;
         break;
       case "--time":
@@ -615,6 +626,7 @@ const capturePng = async ({
   waitForRenderComplete,
   timeoutMS,
   browserExecutablePath,
+  includeLayoutReport = false,
 }) => {
   const browser = await chromium.launch(
     getRendererBrowserLaunchOptions(browserExecutablePath),
@@ -637,7 +649,7 @@ const capturePng = async ({
       waitUntil: "domcontentloaded",
     });
 
-    const base64 = await page.evaluate(
+    const capture = await page.evaluate(
       async ({ moduleUrl, renderPayload }) => {
         const nextFrame = async (count = 2) => {
           await new Promise((resolve) => {
@@ -675,18 +687,22 @@ const capturePng = async ({
         const app = createRouteGraphics();
         const assetBufferManager = createAssetBufferManager();
         let renderCompleteResolve = () => {};
+        let renderCompleteReject = () => {};
+        let renderFailure;
         let renderTimeoutId = null;
         let renderCompletePromise = Promise.resolve(null);
 
         if (renderPayload.waitForRenderComplete) {
           renderCompletePromise = new Promise((resolve, reject) => {
             renderCompleteResolve = resolve;
+            renderCompleteReject = reject;
             renderTimeoutId = window.setTimeout(() => {
               reject(new Error("Timed out waiting for renderComplete."));
             }, renderPayload.timeoutMS);
           });
         }
 
+        void renderCompletePromise.catch(() => {});
         try {
           await app.init({
             width: renderPayload.width,
@@ -711,6 +727,10 @@ const capturePng = async ({
               audio: [soundPlugin].filter(Boolean),
             },
             eventHandler: (eventName, payload) => {
+              if (eventName === "renderComplete" && payload?.failed) {
+                renderFailure = payload.error ?? new Error("Render failed.");
+                renderCompleteReject(renderFailure);
+              }
               if (eventName === "renderComplete" && payload?.aborted !== true) {
                 renderCompleteResolve(payload);
               }
@@ -741,7 +761,12 @@ const capturePng = async ({
 
           await nextFrame(2);
 
-          return await app.extractBase64();
+          if (renderFailure) throw renderFailure;
+          const image = app.extractBase64();
+          const layoutReport = renderPayload.includeLayoutReport
+            ? app.getLayoutReport()
+            : null;
+          return { base64: await image, layoutReport };
         } finally {
           if (renderTimeoutId !== null) {
             window.clearTimeout(renderTimeoutId);
@@ -760,6 +785,7 @@ const capturePng = async ({
           timeMS: timeMS ?? null,
           waitForRenderComplete,
           timeoutMS,
+          includeLayoutReport,
         },
       },
     );
@@ -768,7 +794,7 @@ const capturePng = async ({
       throw new Error(pageErrors.join("\n"));
     }
 
-    return base64;
+    return capture;
   } finally {
     await browser.close();
   }
@@ -793,7 +819,7 @@ const renderPng = async ({
 
   const settings = normalizeRenderSettings({ cliOptions, definition });
   const renderStartedAt = performance.now();
-  const base64 = await capturePng({
+  const { base64, layoutReport } = await capturePng({
     origin,
     width: settings.width,
     height: settings.height,
@@ -804,11 +830,21 @@ const renderPng = async ({
     waitForRenderComplete: cliOptions.waitForRenderComplete,
     timeoutMS: cliOptions.timeoutMS,
     browserExecutablePath: cliOptions.browserExecutablePath,
+    includeLayoutReport: Boolean(cliOptions.layoutReportPath),
   });
   const renderDurationMS = performance.now() - renderStartedAt;
 
   const writeStartedAt = performance.now();
   await writePngOutput(outputPath, base64);
+  if (cliOptions.layoutReportPath) {
+    await fsPromises.mkdir(path.dirname(cliOptions.layoutReportPath), {
+      recursive: true,
+    });
+    await fsPromises.writeFile(
+      cliOptions.layoutReportPath,
+      `${JSON.stringify(layoutReport, null, 2)}\n`,
+    );
+  }
   const writeDurationMS = performance.now() - writeStartedAt;
 
   return {
@@ -841,6 +877,20 @@ const runRender = async ({ cliOptions, cwd }) => {
     format,
   });
 
+  if (cliOptions.layoutReportPath) {
+    cliOptions = {
+      ...cliOptions,
+      layoutReportPath: path.resolve(cwd, cliOptions.layoutReportPath),
+    };
+    if (
+      cliOptions.layoutReportPath === inputPath ||
+      cliOptions.layoutReportPath === outputPath
+    ) {
+      throw new Error(
+        "Layout report path must differ from the input and PNG output paths.",
+      );
+    }
+  }
   await ensureBundleExists();
 
   const yamlSource = await fsPromises.readFile(inputPath, "utf8");

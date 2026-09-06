@@ -46,6 +46,12 @@ PNG-only options:
 | `--state <index>`            | Select one zero-based state. Default: `0`.                        |
 | `--time <ms>`                | Sample animations in manual mode at a specific timeline position. |
 | `--wait-for-render-complete` | Wait for `renderComplete` before capture.                         |
+| `--layout-report <path>`     | Write a JSON layout report for the captured state.                |
+
+The layout report path must differ from both the YAML input and image output.
+For example: `route-graphics render scene.yaml -o frame.png --layout-report layout.json`.
+The legacy `bin/route-graphics-render.js` forwards to this same implementation
+with the `render` subcommand. Existing PNG flags remain supported.
 
 ## MP4
 

@@ -1,11 +1,13 @@
+import {
+  getEasingFunction,
+  SUPPORTED_EASING_NAMES,
+} from "../../src/util/animationTimeline.js";
 import { describe, expect, it } from "vitest";
 import {
-  SUPPORTED_EASING_NAMES,
   buildTimeline,
   calculateMaxDuration,
-  getEasingFunction,
   getValueAtTime,
-} from "../../src/util/animationTimeline.js";
+} from "../support/legacyAnimationTimeline.js";
 
 describe("animationTimeline easings", () => {
   it("resolves all supported easing names", () => {

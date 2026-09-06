@@ -38,6 +38,61 @@ const createApp = () => {
 };
 
 describe("inputDomBridge", () => {
+  const options = (callbacks = {}) => ({
+    value: "",
+    padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    callbacks,
+  });
+
+  it("leaves composing Enter and Escape to the IME", () => {
+    const { app } = createApp();
+    const bridge = createInputDomBridge({ app });
+    const onSubmit = vi.fn();
+    const input = bridge.mount("name", options({ onSubmit }));
+    input.focus();
+    input.dispatchEvent(new CompositionEvent("compositionstart"));
+    for (const key of ["Enter", "Escape"]) {
+      const event = new KeyboardEvent("keydown", {
+        key,
+        isComposing: true,
+        cancelable: true,
+      });
+      input.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(input);
+    }
+    expect(onSubmit).not.toHaveBeenCalled();
+    input.dispatchEvent(new CompositionEvent("compositionend"));
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    bridge.destroy();
+  });
+
+  it("drops queued and reentrant callbacks after unmount or replacement", async () => {
+    const { app } = createApp();
+    const bridge = createInputDomBridge({ app });
+    const onSelectionChange = vi.fn();
+    const input = bridge.mount("name", options({ onSelectionChange }));
+    input.value = "old";
+    input.dispatchEvent(new KeyboardEvent("keyup", { key: "a" }));
+    bridge.unmount("name");
+    const replacement = bridge.mount("name", options());
+    await Promise.resolve();
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(replacement.value).toBe("");
+    bridge.update(
+      "name",
+      options({
+        onValueChange: () => bridge.unmount("name"),
+        onSelectionChange,
+      }),
+    );
+    replacement.value = "new";
+    replacement.dispatchEvent(new Event("input"));
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    bridge.destroy();
+  });
+
   afterEach(() => {
     document.body.innerHTML = "";
   });

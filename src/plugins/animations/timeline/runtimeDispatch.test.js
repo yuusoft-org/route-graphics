@@ -27,6 +27,82 @@ const display = (label, children = []) => ({
 });
 
 describe("portable GSAP update runtime integration", () => {
+  it("settles all properties before notifying a reentrant renderComplete handler", () => {
+    const element = display("box");
+    const tracker = createCompletionTracker((event, payload) => {
+      if (event === "renderComplete" && !payload.aborted) element.x = 200;
+    });
+    tracker.reset("first");
+    const bus = createAnimationBus();
+    dispatchUpdateAnimationsNow({
+      animations: normalizeAnimations([
+        {
+          id: "x",
+          type: "update",
+          targetId: "box",
+          tween: { x: { auto: { duration: 100 } } },
+        },
+      ]),
+      animationBus: bus,
+      completionTracker: tracker,
+      element,
+      targetState: { x: 100 },
+      onComplete: () => {
+        element.x = 100;
+      },
+    });
+    bus.flush();
+    tracker.completeIfEmpty();
+    bus.tick(100);
+    expect(element.x).toBe(200);
+    bus.destroy();
+  });
+
+  it.each([false, true])(
+    "waits for all element channels before reconciliation (reverse order: %s)",
+    (reverse) => {
+      const element = display("box");
+      const tracker = createCompletionTracker();
+      tracker.reset("both");
+      const bus = createAnimationBus();
+      const animations = normalizeAnimations([
+        {
+          id: "y",
+          type: "update",
+          targetId: "box",
+          tween: { y: { auto: { duration: 200 } } },
+        },
+        {
+          id: "x",
+          type: "update",
+          targetId: "box",
+          tween: { x: { auto: { duration: 100 } } },
+        },
+      ]);
+      const settle = vi.fn(() => {
+        element.x = 100;
+        element.y = 200;
+      });
+      dispatchUpdateAnimationsNow({
+        animations: reverse ? animations.reverse() : animations,
+        animationBus: bus,
+        completionTracker: tracker,
+        element,
+        targetState: { x: 100, y: 200 },
+        onComplete: settle,
+      });
+      bus.flush();
+      bus.tick(100);
+      expect(element.y).toBeCloseTo(100);
+      expect(settle).not.toHaveBeenCalled();
+      bus.tick(1);
+      expect(element.y).toBeCloseTo(101);
+      bus.tick(99);
+      expect(settle).toHaveBeenCalledTimes(1);
+      bus.destroy();
+    },
+  );
+
   it("keeps an explicitly normalized speed when activating a pending transition", () => {
     const bus = createAnimationBus();
     const frames = [];
@@ -372,7 +448,9 @@ describe("portable GSAP update runtime integration", () => {
     expect(onComplete).not.toHaveBeenCalled();
     expect(eventHandler).toHaveBeenCalledWith("renderComplete", {
       id: "failing-frame-state",
-      aborted: false,
+      aborted: true,
+      failed: true,
+      error: expect.any(Error),
     });
   });
 
@@ -547,7 +625,8 @@ describe("portable GSAP update runtime integration", () => {
         },
       },
     ]);
-    const tracker = createCompletionTracker();
+    const events = vi.fn();
+    const tracker = createCompletionTracker(events);
     tracker.reset("adapter-failure");
     const bus = createAnimationBus();
 
@@ -570,6 +649,11 @@ describe("portable GSAP update runtime integration", () => {
     expect(first.x).toBe(0);
     expect(second.x).toBe(0);
     expect(bus.getState().activeCount).toBe(0);
+    tracker.completeIfEmpty();
+    expect(events).toHaveBeenCalledWith(
+      "renderComplete",
+      expect.objectContaining({ aborted: true, failed: true }),
+    );
   });
 
   it("runs through the shared bus/evaluator for owner and descendant targets", () => {

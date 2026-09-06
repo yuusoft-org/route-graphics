@@ -113,8 +113,15 @@ const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
       this.parent?.removeChild(this);
     }
 
-    destroy() {
+    destroy(options) {
       this.destroyed = true;
+      if (options === true || options?.children) {
+        // Destruction detaches children while this snapshot is traversed.
+        // eslint-disable-next-line unicorn/no-useless-spread
+        for (const child of [...this.children]) child.destroy?.(options);
+      }
+      this.removeFromParent();
+      this.children = [];
     }
 
     on() {
@@ -347,7 +354,9 @@ const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
       this.renderer.background.color = backgroundColor;
     }
 
-    destroy() {}
+    destroy(_rendererOptions, options) {
+      this.stage.destroy(options);
+    }
   }
 
   return {
@@ -483,8 +492,9 @@ const setupRouteGraphics = async ({
         animations: [],
         audio: [],
       };
-  const { default: createRouteGraphics } =
-    await import("../src/RouteGraphics.js");
+  const { default: createRouteGraphics } = await import(
+    "../src/RouteGraphics.js"
+  );
 
   const app = createRouteGraphics();
   await app.init({
@@ -514,6 +524,71 @@ const findTransitionOverlay = (pixiMock) =>
     ) ?? null;
 
 describe("RouteGraphics public API", () => {
+  it("reports asynchronous mount failure, discards partial children, and retries identical state", async () => {
+    const events = vi.fn();
+    let attempts = 0;
+    const { app } = await setupRouteGraphics({
+      initOptions: { eventHandler: events },
+      pluginsFactory: ({ pixiMock }) => ({
+        elements: [
+          {
+            type: "async-node",
+            parse: ({ state }) => state,
+            add: ({ parent, element, completionTracker }) => {
+              attempts++;
+              const child = new pixiMock.Container();
+              child.label = element.id;
+              parent.addChild(child);
+              const version = completionTracker.getVersion();
+              completionTracker.track(version);
+              return (
+                attempts === 1
+                  ? Promise.reject(new Error("mount failed"))
+                  : Promise.resolve()
+              ).finally(() => completionTracker.complete(version));
+            },
+            update: vi.fn(),
+            delete: vi.fn(),
+          },
+        ],
+        animations: [],
+        audio: [],
+      }),
+    });
+    const state = {
+      id: "retry",
+      elements: [{ id: "node", type: "async-node" }],
+    };
+    app.render(state);
+    await vi.waitFor(() =>
+      expect(events).toHaveBeenCalledWith(
+        "renderComplete",
+        expect.objectContaining({ id: "retry", aborted: true, failed: true }),
+      ),
+    );
+    expect(app.findElementByLabel("node")).toBeNull();
+    expect(
+      events.mock.calls.some(([, payload]) => payload.aborted === false),
+    ).toBe(false);
+    app.render(state);
+    await vi.waitFor(() =>
+      expect(events).toHaveBeenCalledWith("renderComplete", {
+        id: "retry",
+        aborted: false,
+      }),
+    );
+    expect(attempts).toBe(2);
+    expect(app.findElementByLabel("node")).not.toBeNull();
+  });
+
+  it("destroys display descendants during application teardown", async () => {
+    const { app, pixiMock } = await setupRouteGraphics();
+    const child = new pixiMock.Container();
+    pixiMock.__getLastApplication().stage.addChild(child);
+    app.destroy();
+    expect(child.destroyed).toBe(true);
+  });
+
   afterEach(() => {
     currentApp?.destroy();
     currentApp = null;
@@ -579,8 +654,9 @@ describe("RouteGraphics public API", () => {
     const { app } = await setupRouteGraphics({
       rendererOverrides: { gl },
       pluginsFactory: async () => {
-        const { rectPlugin } =
-          await import("../src/plugins/elements/rect/index.js");
+        const { rectPlugin } = await import(
+          "../src/plugins/elements/rect/index.js"
+        );
         return {
           elements: [rectPlugin],
           animations: [],
@@ -697,8 +773,9 @@ describe("RouteGraphics public API", () => {
       const { app } = await setupRouteGraphics({
         rendererOverrides: { gl },
         pluginsFactory: async () => {
-          const { rectPlugin } =
-            await import("../src/plugins/elements/rect/index.js");
+          const { rectPlugin } = await import(
+            "../src/plugins/elements/rect/index.js"
+          );
           return {
             elements: [rectPlugin],
             animations: [],
@@ -751,8 +828,9 @@ describe("RouteGraphics public API", () => {
     const { app } = await setupRouteGraphics({
       rendererOverrides: { gl },
       pluginsFactory: async () => {
-        const { rectPlugin } =
-          await import("../src/plugins/elements/rect/index.js");
+        const { rectPlugin } = await import(
+          "../src/plugins/elements/rect/index.js"
+        );
         return {
           elements: [rectPlugin],
           animations: [],
@@ -1193,6 +1271,36 @@ describe("RouteGraphics public API", () => {
     }
   });
 
+  it("returns the shared texture for sequential buffer loads", async () => {
+    const {
+      app: firstApp,
+      pixiMock,
+      createRouteGraphics,
+    } = await setupRouteGraphics();
+    const secondApp = createRouteGraphics();
+    await secondApp.init({ width: 320, height: 240 });
+    const bitmap = { width: 8, height: 6, close: vi.fn() };
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue(bitmap));
+    const asset = {
+      buffer: new Uint8Array([1, 2, 3]).buffer,
+      type: "image/png",
+    };
+    try {
+      const [firstTexture] = await firstApp.loadAssets({ portrait: asset });
+      await expect(secondApp.loadAssets({ portrait: asset })).resolves.toEqual([
+        firstTexture,
+      ]);
+      await firstApp.unloadAssets(["portrait"]);
+      expect(pixiMock.Assets.cache.get("portrait")).toBe(firstTexture);
+      expect(firstTexture.destroy).not.toHaveBeenCalled();
+      await secondApp.unloadAssets(["portrait"]);
+      expect(firstTexture.destroy).toHaveBeenCalledTimes(1);
+      expect(bitmap.close).toHaveBeenCalledTimes(1);
+    } finally {
+      secondApp.destroy();
+    }
+  });
+
   it("unloads audio and font assets", async () => {
     const audioAsset = {
       load: vi.fn().mockResolvedValue({ decoded: true }),
@@ -1284,6 +1392,49 @@ describe("RouteGraphics public API", () => {
       ]);
       expect(audioAsset.unload).toHaveBeenCalledTimes(1);
       expect(audioAsset.unload).toHaveBeenCalledWith("click");
+    } finally {
+      secondApp.destroy();
+    }
+  });
+
+  it("reserves shared audio before a concurrent owner can unload it", async () => {
+    const decoded = { decoded: true };
+    let cached;
+    let finishDecode;
+    const decode = new Promise((resolve) => {
+      finishDecode = resolve;
+    });
+    const audioAsset = {
+      load: vi.fn(async () => {
+        await decode;
+        cached = decoded;
+        return decoded;
+      }),
+      getAsset: vi.fn(() => cached),
+      unload: vi.fn(() => {
+        cached = undefined;
+        return true;
+      }),
+    };
+    const { app: firstApp, createRouteGraphics } = await setupRouteGraphics({
+      audioAsset,
+    });
+    const secondApp = createRouteGraphics();
+    await secondApp.init({ width: 320, height: 240 });
+    const asset = {
+      buffer: new Uint8Array([1, 2, 3]).buffer,
+      type: "audio/mpeg",
+    };
+    try {
+      const firstLoad = firstApp.loadAssets({ click: asset });
+      const secondLoad = secondApp.loadAssets({ click: asset });
+      const firstUnload = firstApp.unloadAssets(["click"]);
+      finishDecode();
+      await Promise.all([firstLoad, secondLoad, firstUnload]);
+      expect(audioAsset.getAsset("click")).toBe(decoded);
+      expect(audioAsset.unload).not.toHaveBeenCalled();
+      await secondApp.unloadAssets(["click"]);
+      expect(audioAsset.unload).toHaveBeenCalledTimes(1);
     } finally {
       secondApp.destroy();
     }
@@ -1762,8 +1913,9 @@ describe("RouteGraphics public API", () => {
         eventHandler,
       },
       pluginsFactory: async () => {
-        const { videoPlugin } =
-          await import("../src/plugins/elements/video/index.js");
+        const { videoPlugin } = await import(
+          "../src/plugins/elements/video/index.js"
+        );
 
         return {
           elements: [videoPlugin],
@@ -1856,8 +2008,9 @@ describe("RouteGraphics public API", () => {
   it("updates lazy video texture when first mounted after frame data is ready", async () => {
     const { app, pixiMock } = await setupRouteGraphics({
       pluginsFactory: async () => {
-        const { videoPlugin } =
-          await import("../src/plugins/elements/video/index.js");
+        const { videoPlugin } = await import(
+          "../src/plugins/elements/video/index.js"
+        );
 
         return {
           elements: [videoPlugin],
@@ -1962,8 +2115,9 @@ describe("RouteGraphics public API", () => {
   it("preserves video sprite dimensions when lazy frame data resizes the texture", async () => {
     const { app, pixiMock } = await setupRouteGraphics({
       pluginsFactory: async () => {
-        const { videoPlugin } =
-          await import("../src/plugins/elements/video/index.js");
+        const { videoPlugin } = await import(
+          "../src/plugins/elements/video/index.js"
+        );
 
         return {
           elements: [videoPlugin],
@@ -3901,8 +4055,9 @@ describe("RouteGraphics public API", () => {
 
     const { app } = await setupRouteGraphics({
       pluginsFactory: async ({ pixiMock }) => {
-        const { containerPlugin } =
-          await import("../src/plugins/elements/container/index.js");
+        const { containerPlugin } = await import(
+          "../src/plugins/elements/container/index.js"
+        );
         const createChild = (parent, element) => {
           const child = new pixiMock.Container();
           child.label = element.id;

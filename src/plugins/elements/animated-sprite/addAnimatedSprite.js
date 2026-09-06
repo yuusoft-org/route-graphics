@@ -1,5 +1,6 @@
 import { AnimatedSprite, Spritesheet, Texture } from "pixi.js";
-import { setupDebugMode } from "./util/debugUtils.js";
+import { setupDebugMode, cleanupDebugMode } from "./util/debugUtils.js";
+import { registerElementCleanup } from "../util/elementResources.js";
 import { queueDeferredAnimatedSpritePlay } from "../renderContext.js";
 import { dispatchLiveAnimations } from "../../animations/planAnimations.js";
 import {
@@ -75,6 +76,10 @@ export const addAnimatedSprite = async ({
     });
 
     const animatedSprite = new AnimatedSprite(frameTextures);
+    registerElementCleanup(animatedSprite, () => {
+      cleanupDebugMode(animatedSprite);
+      animatedSprite.stop();
+    });
     animatedSprite.label = id;
     animatedSprite.zIndex = zIndex;
 

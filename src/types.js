@@ -425,7 +425,7 @@
 /**
  * @typedef {Object} SetupScrollingOptions
  * @property {Container} container - The PIXI Container to enable scrolling on
- * @property {ContainerContainerElement} element - The container element
+ * @property {ContainerElement} element - The container element
  * @property {boolean} [interactive] - Enable wheel interaction when viewport is active
  * @property {boolean} [allowViewportWithoutScroll] - Allow masked viewport without scroll=true
  * @property {{ scrollXOffset?: number, scrollYOffset?: number, wasAtHorizontalEnd?: boolean, wasAtVerticalEnd?: boolean } | null} [previousState]
@@ -434,7 +434,7 @@
 /**
  * @typedef {Object} SetupClipping
  * @property {Container} container - The PIXI Container to enable scrolling on
- * @property {ContainerContainerElement} element - The container element
+ * @property {ContainerElement} element - The container element
  */
 
 /**
@@ -450,7 +450,7 @@
 
 /**
  * @typedef {Object} AnimateElementsOptions
- * @property {import('./RouteGraphics').ApplicationWithSoundStage} app
+ * @property {import('./RouteGraphics.js').ApplicationWithAudioStage} app
  * @property {Container} parent
  * @property {SpriteComputedNode} spriteComputedNode
  * @property {Object[]} animations
@@ -1009,14 +1009,19 @@ export const DEFAULT_TEXT_STYLE = {
  */
 
 /**
- * @template {BaseElement} E
- * @template {BaseAnimation} T
+ * Authoring state supports plugin-specific properties alongside typed common fields.
+ * @typedef {BaseElement & {x?: number, y?: number, width?: number, height?: number, alpha?: number, anchorX?: number, anchorY?: number, children?: ElementState[]} & Object<string, unknown>} ElementState
+ */
+
+/**
+ * @template {BaseElement} [E=ElementState]
+ * @template {BaseAnimation} [T=BaseAnimation]
  * @typedef {Object} RouteGraphicsState
- * @property {string} id - ID
- * @property {E[]} elements - Array of elements
- * @property {T[]} animations - Array of animations
- * @property {(SoundElement|AudioChannelElement)[]} audio - Array of audio nodes
- * @property {AudioTransition[]} audioEffects - Array of audio effects
+ * @property {string} [id] - ID
+ * @property {E[]} [elements] - Array of elements
+ * @property {T[]} [animations] - Array of animations
+ * @property {(SoundElement|AudioChannelElement)[]} [audio] - Array of audio nodes
+ * @property {AudioTransition[]} [audioEffects] - Array of audio effects
  * @property {GlobalConfiguration} [global] - Global configuration options
  */
 
@@ -1057,9 +1062,9 @@ export const DEFAULT_TEXT_STYLE = {
 
 /**
  * @typedef {Object} RouteGraphicsPlugins
- * @property {import('./plugins/elements/elementPlugin').ElementPlugin[]} [elements]
- * @property {import('./plugins/animations/animationPlugin').AnimationPlugin[]} [animations]
- * @property {import('./plugins/audio/audioPlugin').AudioPlugin[]} [audio]
+ * @property {import('./plugins/elements/elementPlugin.js').ElementPlugin[]} [elements]
+ * @property {import('./plugins/animations/animationPlugin.js').AnimationPlugin[]} [animations] - Deprecated compatibility option; built-in animation execution does not require registration.
+ * @property {import('./plugins/audio/audioPlugin.js').AudioPlugin[]} [audio]
  */
 
 /**
@@ -1164,7 +1169,7 @@ export class BaseRendererPlugin {
 
   /**
    * Adds an element to the application stage
-   * @param {import('./RouteGraphics').ApplicationWithSoundStage} app - The PixiJS application instance
+   * @param {import('./RouteGraphics.js').ApplicationWithAudioStage} app - The PixiJS application instance
    * @param {Object} options
    * @param {Container} options.parent - The parent container to add the element to
    * @param {E} options.element - The sprite element to add
@@ -1180,10 +1185,9 @@ export class BaseRendererPlugin {
 
   /**
    * Removes an element from the application stage
-   * @param {import('./RouteGraphics').ApplicationWithSoundStage} app - The PixiJS application instance
+   * @param {import('./RouteGraphics.js').ApplicationWithAudioStage} app - The PixiJS application instance
    * @param {Object} options
    * @param {Container} options.parent
-   * @param {Object} options.element - The sprite element to remove
    * @param {E} options.element - The element to remove
    * @param {T[]} [options.animations=[]] - Array of animations
    * @param {Function} options.getAnimationByType - Function to get an animation helper by type
@@ -1196,7 +1200,7 @@ export class BaseRendererPlugin {
 
   /**
    * Updates an element on the application stage
-   * @param {import('./RouteGraphics').ApplicationWithSoundStage} app - The PixiJS application instance
+   * @param {import('./RouteGraphics.js').ApplicationWithAudioStage} app - The PixiJS application instance
    * @param {Object} options
    * @param {Container} options.parent
    * @param {E} options.prevElement - The previous state of the sprite element

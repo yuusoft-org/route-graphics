@@ -8,6 +8,7 @@ import { runReplaceAnimation } from "../animations/replace/runReplaceAnimation.j
 import {
   addElementWithRenderState,
   prepareElementRenderState,
+  pruneElementRenderState,
   registerPendingElementReplacement,
   updateElementWithRenderState,
 } from "./elementRenderState.js";
@@ -51,7 +52,11 @@ export const renderElements = ({
   const pendingOperations = [];
   const collectOperation = (operation) => {
     if (operation && typeof operation.then === "function") {
-      pendingOperations.push(operation);
+      const observed = Promise.resolve(operation);
+      pendingOperations.push(observed);
+      // A later synchronous plugin failure can exit this render before its
+      // aggregate is returned; the original operation must still be observed.
+      void observed.catch(() => {});
     }
   };
 
@@ -466,8 +471,11 @@ export const renderElements = ({
   }
 
   if (pendingOperations.length === 0) {
+    pruneElementRenderState(lifecycle);
     return undefined;
   }
 
-  return Promise.all(pendingOperations).then(() => undefined);
+  return Promise.all(pendingOperations)
+    .then(() => undefined)
+    .finally(() => pruneElementRenderState(lifecycle));
 };

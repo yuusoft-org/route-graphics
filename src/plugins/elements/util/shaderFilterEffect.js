@@ -1,3 +1,4 @@
+import { registerElementCleanup } from "./elementResources.js";
 import {
   Filter,
   Geometry,
@@ -594,18 +595,15 @@ const installShaderFilterDestroyCleanup = (displayObject) => {
     return;
   }
 
-  const baseDestroy = displayObject.destroy;
-
   Object.defineProperty(displayObject, SHADER_DESTROY_CLEANUP_KEY, {
     value: true,
     enumerable: false,
     configurable: true,
   });
 
-  displayObject.destroy = function destroyWithShaderFilterCleanup(...args) {
-    clearShaderFilters(this);
-    return baseDestroy.apply(this, args);
-  };
+  registerElementCleanup(displayObject, () =>
+    clearShaderFilters(displayObject),
+  );
 };
 
 const applyProgressToFilters = (displayObject, progress) => {

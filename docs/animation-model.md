@@ -733,3 +733,16 @@ The complete shader contract is in `docs/shader-interface.md`.
 - keep `mask` as a transition-only primitive
 - keep transition `compositor` transition-only as well
 - allow filter and compositor parameters to use the animation timeline model
+
+## Completion and compatibility
+
+Whole-element reconciliation waits until every update record for that element
+has settled. Completing a shorter record preserves other records' sampled
+properties. Failed finite render work emits `renderComplete` with
+`aborted: true`, `failed: true`, and the original `error`; a superseded render
+continues to emit only `aborted: true`.
+
+`plugins.animations`, `tweenPlugin`, and `createAnimationPlugin` remain accepted
+for compatibility and are deprecated. Animation execution is built in; new
+applications can omit animation plugin registration. Element and audio plugin
+registration is unchanged.
