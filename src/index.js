@@ -54,6 +54,3 @@ export {
   renderElements,
   renderAudio,
 };
-
-/** @typedef {import("./types.js").RouteGraphicsState} RouteGraphicsState */
-/** @typedef {import("./types.js").RouteGraphicsInitOptions} RouteGraphicsInitOptions */

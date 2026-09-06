@@ -28,7 +28,7 @@ jobs:
       - name: Build
         run: bun run build
 
-      - name: Check package contents and declarations
+      - name: Check package contents and CLI entry points
         run: bun run test:package
 
       # Setup .npmrc file to publish to npm

@@ -80,7 +80,6 @@
     "pngjs": "^7.0.0",
     "prettier": "3.6.2",
     "puty": "^0.1.2",
-    "typescript": "5.9.3",
     "vitest": "^4.0.8"
   },
   "lint-staged": {
@@ -88,19 +87,5 @@
       "oxlint",
       "bunx prettier --write"
     ]
-  },
-  "types": "./dist/types/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/RouteGraphics.js"
-    },
-    "./module": {
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/RouteGraphics.module.js"
-    },
-    "./package.json": "./package.json",
-    "./dist/*": "./dist/*",
-    "./bin/*": "./bin/*"
   }
 }

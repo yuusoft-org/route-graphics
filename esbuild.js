@@ -1,7 +1,6 @@
 import esbuild from "esbuild";
 import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
-import { buildTypes } from "./scripts/buildTypes.mjs";
 
 // Route Graphics always uses the default Opus decoder without speech-quality
 // enhancement. Replace its unreachable optional import so the 4 MiB ML model
@@ -65,6 +64,9 @@ try {
   const packageBuild = target === "package" || target === "all";
   const playgroundBuild = target === "playground" || target === "all";
   const visualBuild = target === "visual" || target === "all";
+  if (packageBuild) {
+    await rm("./dist", { force: true, recursive: true });
+  }
   const jobs = [];
   if (packageBuild || playgroundBuild) {
     jobs.push(
@@ -83,18 +85,6 @@ try {
   }
   if (packageBuild) {
     jobs.push(buildCliBundle());
-    jobs.push(
-      esbuild.build({
-        entryPoints: ["./src/index.js"],
-        bundle: true,
-        minify: true,
-        format: "esm",
-        // Keep decoder imports internal so the unused Opus ML payload stays excluded.
-        external: ["pixi.js", "gsap", "hotkeys-js"],
-        outfile: "./dist/RouteGraphics.module.js",
-        plugins: [excludeUnusedOpusMlPlugin],
-      }),
-    );
   }
   if (visualBuild) {
     jobs.push(
@@ -115,10 +105,6 @@ try {
     );
   }
   await Promise.all(jobs);
-  if (packageBuild) {
-    await rm("./dist/types", { recursive: true, force: true });
-    buildTypes();
-  }
 } catch (error) {
   console.error(error);
   process.exit(1);

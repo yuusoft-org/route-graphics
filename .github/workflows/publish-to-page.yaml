@@ -11,8 +11,6 @@ on:
       - "package.json"
       - "bun.lock"
       - "esbuild.js"
-      - "scripts/buildTypes.mjs"
-      - "tsconfig.types.json"
       - ".github/workflows/publish-to-page.yaml"
 
   # Allows you to run this workflow manually from the Actions tab

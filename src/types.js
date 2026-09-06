@@ -975,110 +975,12 @@ export const DEFAULT_TEXT_STYLE = {
 };
 
 /**
- * Serializable channel values, portable expressions, and event payloads.
- * @typedef {null | boolean | number | string | PortableGsapValue[] | {[key: string]: PortableGsapValue}} PortableGsapValue
- */
-
-/**
- * @typedef {Object} PortableGsapEasingDescriptor
- * @property {"linear" | "power" | "sine" | "expo" | "circ" | "back" | "bounce" | "elastic" | "steps" | "cubicBezier" | "sampled"} kind
- * @property {"in" | "out" | "inOut"} [direction]
- * @property {number} [exponent]
- * @property {number} [overshoot]
- * @property {number} [amplitude]
- * @property {number} [period]
- * @property {number} [count]
- * @property {"start" | "end"} [position]
- * @property {[number, number, number, number]} [points]
- * @property {[number, number][]} [samples]
- */
-
-/** @typedef {string | PortableGsapEasingDescriptor} PortableGsapEasing */
-
-/**
- * @typedef {Object} PortableGsapDefaults
- * @property {number} [duration] - Duration in milliseconds
- * @property {PortableGsapEasing} [easing]
- * @property {"auto" | "all" | "none" | "error"} [overwrite]
- * @property {number | "infinite"} [repeat]
- * @property {number} [repeatDelay]
- * @property {boolean} [yoyo]
- * @property {boolean} [repeatRefresh]
- */
-
-/**
- * @typedef {{element: string} | {elements: string[]} | {textUnits: {elementId: string, unit: "grapheme" | "word" | "line", order?: "logical" | "visual", allowEmpty?: boolean}} | {transitionSurface: "prev" | "next"} | {transitionMask: true | number} | {transitionCompositor: true}} PortableGsapTarget
- * @typedef {{time: number} | {anchor: string, edge?: "start" | "end", offset?: number}} PortableGsapStart
- * @typedef {{kind: "snap", increment: number} | {kind: "snap", values: number[]} | {kind: "round", precision: number} | {kind: "clamp" | "wrap" | "wrapYoyo", min: number, max: number}} PortableGsapModifier
- */
-
-/**
- * @typedef {Object} PortableGsapStaggerOptions
- * @property {number | "start" | "center" | "end" | "edges" | "random"} [from]
- * @property {PortableGsapEasing} [easing]
- * @property {{columns: number}} [grid]
- * @property {"x" | "y"} [axis]
- */
-
-/** @typedef {PortableGsapStaggerOptions & ({each: number, amount?: never} | {amount: number, each?: never})} PortableGsapStagger */
-
-/**
- * @typedef {Object} PortableGsapFrame
- * @property {{[channel: string]: PortableGsapValue}} values
- * @property {number} duration
- * @property {number} [delay]
- * @property {PortableGsapEasing} [easing]
- */
-
-/**
- * Portable timeline authoring fields. Required fields and supported combinations
- * for each kind are checked by the runtime normalizer.
- * @typedef {Object} PortableGsapStep
- * @property {"set" | "to" | "from" | "fromTo" | "keyframes" | "sequence" | "parallel" | "wait" | "mark" | "emit"} kind
- * @property {string} [id]
- * @property {number} [delay]
- * @property {number} [overlap]
- * @property {PortableGsapStart} [start]
- * @property {string | string[]} [targets] - Names from the target alias map
- * @property {{[channel: string]: PortableGsapValue}} [values]
- * @property {{[channel: string]: PortableGsapValue}} [from]
- * @property {{[channel: string]: PortableGsapValue}} [to]
- * @property {number} [duration]
- * @property {PortableGsapEasing} [easing]
- * @property {PortableGsapStagger} [stagger]
- * @property {"auto" | "all" | "none" | "error"} [overwrite]
- * @property {Object<string, PortableGsapModifier[]>} [modifiers]
- * @property {number | "infinite"} [repeat]
- * @property {number} [repeatDelay]
- * @property {boolean} [yoyo]
- * @property {boolean} [repeatRefresh]
- * @property {number} [speed]
- * @property {PortableGsapFrame[]} [frames]
- * @property {PortableGsapStep[]} [steps]
- * @property {PortableGsapDefaults} [defaults]
- * @property {string} [name]
- * @property {string} [event]
- * @property {PortableGsapValue} [payload]
- * @property {"forward" | "reverse" | "both"} [direction]
- * @property {"once" | "eachIteration"} [occurrence]
- * @property {"suppress" | "crossed"} [seekPolicy]
- */
-
-/**
- * @typedef {Object} PortableGsapConfig
- * @property {"portable-v1"} profile
- * @property {PortableGsapDefaults} [defaults]
- * @property {Object<string, PortableGsapTarget>} [targets]
- * @property {PortableGsapStep[]} steps
- */
-
-/**
  * @typedef {Object} BaseAnimation
  * @property {string} id - Unique animation id
  * @property {string} targetId - ID of the element
  * @property {AnimationType[keyof AnimationType]} type - Animation structure
  * @property {AnimationPlayback} [playback] - Playback behavior
- * @property {PortableGsapConfig} [gsap] - Portable GSAP timeline authoring configuration
+ * @property {Object} [gsap] - Portable GSAP timeline authoring configuration
  * @property {Object & {filters?: Object<string, ShaderTween>}} [tween] - Standard update properties plus filter parameter timelines grouped by filter id
  * @property {Object} [prev] - Previous transition surface motion
  * @property {Object} [next] - Next transition surface motion
@@ -1108,13 +1010,8 @@ export const DEFAULT_TEXT_STYLE = {
  */
 
 /**
- * Authoring state supports plugin-specific properties alongside typed common fields.
- * @typedef {BaseElement & {x?: number, y?: number, width?: number, height?: number, alpha?: number, anchorX?: number, anchorY?: number, children?: ElementState[]} & Object<string, unknown>} ElementState
- */
-
-/**
- * @template {BaseElement} [E=ElementState]
- * @template {BaseAnimation} [T=BaseAnimation]
+ * @template {BaseElement} E
+ * @template {BaseAnimation} T
  * @typedef {Object} RouteGraphicsState
  * @property {string} [id] - ID
  * @property {E[]} [elements] - Array of elements

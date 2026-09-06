@@ -15,10 +15,6 @@ This README stays intentionally short. The hosted docs are the source of truth f
 bun install route-graphics
 ```
 
-The package includes TypeScript declarations. The default entry is a standalone
-browser bundle. Bundler applications that already use Pixi or GSAP can import
-`route-graphics/module` to share those dependencies; it exports the same API.
-
 ## Minimal Usage
 
 ```javascript
