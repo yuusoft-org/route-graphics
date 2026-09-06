@@ -1167,14 +1167,14 @@ const createRouteGraphics = () => {
     completionTracker.reset(nextState.id);
     if (signal.aborted) return;
     const version = completionTracker.getVersion();
-    const previousState = state;
     needsReconciliation = false;
     const isCurrent = () =>
       !signal.aborted && completionTracker.getVersion() === version;
     const failRender = (error) => {
       if (!isCurrent()) return;
       needsReconciliation = true;
-      state = previousState;
+      // Keep the last applied frame as the diff baseline. Async mount failure
+      // does not undo changes already presented to existing elements or cursors.
       completionTracker.fail(version, error);
     };
     // Hold a root reservation so a rejecting plugin cannot release its own

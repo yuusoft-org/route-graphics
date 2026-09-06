@@ -479,8 +479,6 @@ export const runReplaceAnimation = ({
         cleanupParticlesInTree({ app, root: nextDisplayObject });
         nextDisplayObject.destroy({ children: true });
       }
-
-      completeTransition();
     };
 
     cleanupPreparedResources = cleanupPreparedTransition;
@@ -489,6 +487,7 @@ export const runReplaceAnimation = ({
       const currentParent = getCurrentParent();
       if (transitionSignal?.aborted || !currentParent) {
         cleanupPreparedTransition();
+        completeTransition();
         return;
       }
 
@@ -616,13 +615,9 @@ export const runReplaceAnimation = ({
     const deleteOperation = deletePreviousSnapshot();
 
     if (deleteOperation && typeof deleteOperation.then === "function") {
-      return deleteOperation.then(
-        () => installTransition({ activateImmediately: true }),
-        (error) => {
-          cleanupPreparedTransition();
-          throw error;
-        },
-      );
+      return deleteOperation
+        .then(() => installTransition({ activateImmediately: true }))
+        .catch(failPreparation);
     }
 
     return installTransition({
@@ -640,10 +635,11 @@ export const runReplaceAnimation = ({
         cleanupParticlesInTree({ app, root: transitionMountParent });
         transitionMountParent.destroy({ children: true });
       }
-      // Mark failure before helpers release completion, but only after hidden
-      // resources have been discarded. The public render observes rejection.
-      if (trackCompletion) completionTracker.fail?.(stateVersion, error);
       cleanupPreparedResources?.();
+      // A failure handler may immediately render a fallback with the same ID.
+      // Discard prepared objects before exposing them to that render, and do
+      // not release completion until failure has prevented a success event.
+      if (trackCompletion) completionTracker.fail?.(stateVersion, error);
       completeTransition();
     }
     throw error;

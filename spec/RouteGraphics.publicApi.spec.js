@@ -524,6 +524,176 @@ const findTransitionOverlay = (pixiMock) =>
     ) ?? null;
 
 describe("RouteGraphics public API", () => {
+  it.each([false, true])(
+    "recovers applied elements and cursors after an asynchronous mount fails (reentrant: %s)",
+    async (reentrant) => {
+      let rejectMount;
+      const mount = new Promise((_, reject) => {
+        rejectMount = reject;
+      });
+      const baseline = {
+        id: "baseline",
+        global: { cursorStyles: { default: "crosshair", hover: "help" } },
+        elements: [
+          { id: "box", type: "rect", width: 20, height: 20, fill: "#ff0000" },
+        ],
+      };
+      const events = vi.fn((event, payload) => {
+        if (reentrant && event === "renderComplete" && payload.failed)
+          app.render(baseline);
+      });
+      const { app, pixiMock } = await setupRouteGraphics({
+        initOptions: { eventHandler: events },
+        pluginsFactory: async ({ pixiMock }) => ({
+          elements: [
+            (await import("../src/plugins/elements/rect/index.js")).rectPlugin,
+            {
+              type: "async-node",
+              parse: ({ state }) => state,
+              add: ({ parent, element }) => {
+                const child = new pixiMock.Container();
+                child.label = element.id;
+                parent.addChild(child);
+                return mount;
+              },
+            },
+          ],
+        }),
+      });
+      app.render(baseline);
+      events.mockClear();
+      app.render({
+        id: "failed",
+        global: { cursorStyles: { default: "wait", hover: "progress" } },
+        elements: [
+          { ...baseline.elements[0], fill: "#00ff00" },
+          { id: "broken", type: "async-node" },
+        ],
+      });
+      expect(app.findElementByLabel("box").lastFill).toBe("#00ff00");
+      rejectMount(new Error("mount failed"));
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith(
+          "renderComplete",
+          expect.objectContaining({ id: "failed", failed: true }),
+        ),
+      );
+      if (!reentrant) app.render(baseline);
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith("renderComplete", {
+          id: "baseline",
+          aborted: false,
+        }),
+      );
+      expect(app.findElementByLabel("box").lastFill).toBe("#ff0000");
+      expect(app.findElementByLabel("broken")).toBeNull();
+      const pixiApp = pixiMock.__getLastApplication();
+      expect(pixiApp.renderer.events.cursorStyles).toEqual(
+        baseline.global.cursorStyles,
+      );
+      expect(pixiApp.canvas.style.cursor).toBe("crosshair");
+    },
+  );
+
+  it.each(["sync", "async mount", "async delete"])(
+    "preserves a fallback rendered inside a transition failure handler (%s)",
+    async (preparation) => {
+      const fallback = {
+        id: "fallback",
+        elements: [
+          { id: "box", type: "rect", width: 20, height: 20, fill: "#0000ff" },
+        ],
+      };
+      const events = vi.fn((event, payload) => {
+        if (event === "renderComplete" && payload.failed) app.render(fallback);
+      });
+      const { app } = await setupRouteGraphics({
+        initOptions: { eventHandler: events },
+        pluginsFactory: async () => {
+          const { rectPlugin } = await import(
+            "../src/plugins/elements/rect/index.js"
+          );
+          return {
+            elements: [
+              {
+                ...rectPlugin,
+                add: (options) => {
+                  const operation = rectPlugin.add(options);
+                  return preparation === "async mount" &&
+                    options.renderContext?.suppressAnimations
+                    ? Promise.resolve(operation)
+                    : operation;
+                },
+                delete: (options) =>
+                  preparation === "async delete"
+                    ? Promise.resolve().then(() => rectPlugin.delete(options))
+                    : rectPlugin.delete(options),
+              },
+            ],
+          };
+        },
+      });
+      app.render({
+        id: "initial",
+        elements: [{ ...fallback.elements[0], fill: "#ff0000" }],
+      });
+      const surfaces = await import(
+        "../src/plugins/animations/replace/transitionSurfaces.js"
+      );
+      const failure = new Error("overlay construction failed");
+      let prepared;
+      vi.spyOn(surfaces, "createReplaceOverlay").mockImplementationOnce(() => {
+        prepared = app.findElementByLabel("box");
+        expect(prepared).not.toBeNull();
+        throw failure;
+      });
+      const render = () =>
+        app.render({
+          id: "failed",
+          elements: [{ ...fallback.elements[0], fill: "#00ff00" }],
+          animations: [
+            {
+              id: "replace",
+              targetId: "box",
+              type: "transition",
+              next: {
+                tween: {
+                  alpha: {
+                    initialValue: 0,
+                    keyframes: [{ value: 1, duration: 100 }],
+                  },
+                },
+              },
+            },
+          ],
+        });
+      if (preparation !== "sync") render();
+      else expect(render).toThrow(failure);
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith("renderComplete", {
+          id: "fallback",
+          aborted: false,
+        }),
+      );
+      expect(events).toHaveBeenCalledWith("renderComplete", {
+        id: "failed",
+        aborted: true,
+        failed: true,
+        error: failure,
+      });
+      expect(events).not.toHaveBeenCalledWith("renderComplete", {
+        id: "failed",
+        aborted: false,
+      });
+      expect(prepared.destroyed).toBe(true);
+      const live = app.findElementByLabel("box");
+      expect(live).not.toBeNull();
+      expect(live.destroyed).not.toBe(true);
+      expect(live.visible).not.toBe(false);
+      expect(live.lastFill).toBe("#0000ff");
+    },
+  );
+
   it("reports asynchronous mount failure, discards partial children, and retries identical state", async () => {
     const events = vi.fn();
     let attempts = 0;
@@ -2676,6 +2846,86 @@ describe("RouteGraphics public API", () => {
       width: 4,
     });
   });
+
+  it.each([
+    ["tween", false],
+    ["tween", true],
+    ["gsap", false],
+    ["gsap", true],
+  ])(
+    "reconciles mixed-direction %s updates (reverse finishes last: %s)",
+    async (kind, reverseLast) => {
+      let fillAtCompletion;
+      const events = vi.fn((event, payload) => {
+        if (event === "renderComplete" && payload.id === "moving") {
+          fillAtCompletion = app.findElementByLabel("box").lastFill;
+        }
+      });
+      const { app, pixiMock } = await setupRouteGraphics({
+        initOptions: { eventHandler: events },
+        pluginsFactory: async () => ({
+          elements: [
+            (await import("../src/plugins/elements/rect/index.js")).rectPlugin,
+          ],
+        }),
+      });
+      const rect = {
+        id: "box",
+        type: "rect",
+        width: 20,
+        height: 20,
+        x: 0,
+        y: 0,
+        fill: "#ff0000",
+      };
+      app.render({ id: "initial", elements: [rect] });
+      app.render({
+        id: "moving",
+        elements: [{ ...rect, x: 100, y: 200, fill: "#00ff00" }],
+        animations: ["x", "y"].map((property) => ({
+          id: property,
+          targetId: "box",
+          type: "update",
+          ...(kind === "gsap"
+            ? {
+                gsap: {
+                  profile: "portable-v1",
+                  steps: [
+                    {
+                      kind: "to",
+                      values: { [property]: property === "x" ? 100 : 200 },
+                      duration: property === "x" ? 100 : 200,
+                      easing: "linear",
+                    },
+                  ],
+                },
+              }
+            : {
+                tween: {
+                  [property]: {
+                    auto: { duration: property === "x" ? 100 : 200 },
+                  },
+                },
+              }),
+        })),
+      });
+      const tick = getAutoAnimationTick(pixiMock);
+      const elapsed = reverseLast ? 100 : 25;
+      tick({ deltaMS: elapsed });
+      expect(app.findElementByLabel("box").lastFill).toBe("#ff0000");
+      expect(app.reverseAnimation("y")).toBe(true);
+      tick({ deltaMS: elapsed });
+      if (!reverseLast) tick({ deltaMS: 50 });
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith("renderComplete", {
+          id: "moving",
+          aborted: false,
+        }),
+      );
+      expect(fillAtCompletion).toBe("#00ff00");
+      expect(app.findElementByLabel("box").lastFill).toBe("#00ff00");
+    },
+  );
 
   it.each(["tween", "gsap"])(
     "reconciles finite persistent %s updates after compatible renders",

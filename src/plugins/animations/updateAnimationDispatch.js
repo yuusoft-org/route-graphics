@@ -577,6 +577,7 @@ export const dispatchUpdateAnimationsNow = ({
   const unsettled = new Set(
     animationsToDispatch.map((animation) => animation.id),
   );
+  let completedAnimation;
   const dispatchVersion = completionTracker.getVersion();
   for (const animation of animationsToDispatch) {
     const preparedTimeline = animation.gsap
@@ -602,17 +603,22 @@ export const dispatchUpdateAnimationsNow = ({
       }
     };
 
-    const complete = () => {
+    const complete = (reversed = false) => {
       unsettled.delete(animation.id);
+      if (!reversed) completedAnimation = animation;
       try {
         if (
+          completedAnimation &&
           !settlement.didSettle &&
           unsettled.size === 0 &&
           // The bus retains compatible persistent players across render versions
           // and cancels them when ownership changes. They still need to settle.
-          (isPersistent || completionTracker.getVersion() === dispatchVersion)
+          (completedAnimation.playback?.continuity === "persistent" ||
+            completionTracker.getVersion() === dispatchVersion)
         ) {
-          const operation = onComplete?.(animation);
+          // A reverse boundary can release the last player after another
+          // player finished forward. Preserve that deferred reconciliation.
+          const operation = onComplete?.(completedAnimation);
           if (operation && typeof operation.then === "function") {
             void operation.then(releaseCompletion, (error) => {
               completionTracker.fail?.(dispatchVersion, error);
@@ -680,7 +686,7 @@ export const dispatchUpdateAnimationsNow = ({
           onComplete: complete,
           onCancel: cancel,
           onFailure: fail,
-          onReverseComplete: cancel,
+          onReverseComplete: () => complete(true),
         },
       });
       continue;
@@ -717,7 +723,7 @@ export const dispatchUpdateAnimationsNow = ({
         onComplete: complete,
         onCancel: cancel,
         onFailure: fail,
-        onReverseComplete: cancel,
+        onReverseComplete: () => complete(true),
       },
     });
   }
