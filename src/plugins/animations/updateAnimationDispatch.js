@@ -574,6 +574,11 @@ export const dispatchUpdateAnimationsNow = ({
     throw error;
   }
 
+  const unsettled = new Set(
+    animationsToDispatch.map((animation) => animation.id),
+  );
+  let completedAnimation;
+  const dispatchVersion = completionTracker.getVersion();
   for (const animation of animationsToDispatch) {
     const preparedTimeline = animation.gsap
       ? preparedGsap.get(animation.id)?.instance
@@ -581,11 +586,9 @@ export const dispatchUpdateAnimationsNow = ({
     const isInfinite =
       animation.playback?.loop === true ||
       preparedTimeline?.duration === Infinity;
-    const trackCompletion =
-      animation.playback?.continuity !== "persistent" && !isInfinite;
-    const stateVersion = trackCompletion
-      ? completionTracker.getVersion()
-      : null;
+    const isPersistent = animation.playback?.continuity === "persistent";
+    const trackCompletion = !isPersistent && !isInfinite;
+    const stateVersion = trackCompletion ? dispatchVersion : null;
 
     if (trackCompletion) {
       completionTracker.track(stateVersion);
@@ -600,10 +603,42 @@ export const dispatchUpdateAnimationsNow = ({
       }
     };
 
-    const complete = () => {
+    const complete = (reversed = false) => {
+      unsettled.delete(animation.id);
+      if (!reversed) completedAnimation = animation;
+      try {
+        if (
+          completedAnimation &&
+          !settlement.didSettle &&
+          unsettled.size === 0 &&
+          // The bus retains compatible persistent players across render versions
+          // and cancels them when ownership changes. They still need to settle.
+          (completedAnimation.playback?.continuity === "persistent" ||
+            completionTracker.getVersion() === dispatchVersion)
+        ) {
+          // A reverse boundary can release the last player after another
+          // player finished forward. Preserve that deferred reconciliation.
+          const operation = onComplete?.(completedAnimation);
+          if (operation && typeof operation.then === "function") {
+            void operation.then(releaseCompletion, (error) => {
+              completionTracker.fail?.(dispatchVersion, error);
+              releaseCompletion();
+            });
+            return;
+          }
+        }
+      } catch (error) {
+        completionTracker.fail?.(dispatchVersion, error);
+      }
       releaseCompletion();
-      if (!settlement.didSettle) {
-        onComplete?.(animation);
+    };
+    const cancel = () => {
+      unsettled.delete(animation.id);
+      releaseCompletion();
+    };
+    const fail = (error) => {
+      if (trackCompletion) {
+        completionTracker.fail?.(dispatchVersion, error);
       }
     };
 
@@ -649,8 +684,9 @@ export const dispatchUpdateAnimationsNow = ({
             }
           },
           onComplete: complete,
-          onCancel: releaseCompletion,
-          onReverseComplete: releaseCompletion,
+          onCancel: cancel,
+          onFailure: fail,
+          onReverseComplete: () => complete(true),
         },
       });
       continue;
@@ -685,8 +721,9 @@ export const dispatchUpdateAnimationsNow = ({
         repeatDelay: animation.playback?.repeatDelay,
         yoyo: animation.playback?.yoyo,
         onComplete: complete,
-        onCancel: releaseCompletion,
-        onReverseComplete: releaseCompletion,
+        onCancel: cancel,
+        onFailure: fail,
+        onReverseComplete: () => complete(true),
       },
     });
   }

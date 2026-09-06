@@ -1,3 +1,5 @@
+import { registerElementCleanup } from "../util/elementResources.js";
+import { cleanupParticlesRuntime } from "./particleRuntime.js";
 import { Container, Texture, Graphics } from "pixi.js";
 import { Emitter } from "./emitter/index.js";
 import { getTexture } from "./util/registries.js";
@@ -122,6 +124,9 @@ export const addParticle = ({
   zIndex,
 }) => {
   const container = new Container();
+  registerElementCleanup(container, () =>
+    cleanupParticlesRuntime({ app, particleElement: container }),
+  );
   container.label = element.id;
   container.zIndex = zIndex;
   parent.addChild(container);

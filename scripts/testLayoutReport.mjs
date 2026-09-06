@@ -33,7 +33,9 @@ await new Promise((resolve, reject) => {
 });
 let browser;
 try {
-  browser = await chromium.launch({ executablePath: process.argv[2] });
+  browser = await chromium.launch({
+    executablePath: process.argv[2] ?? process.env.ROUTE_GRAPHICS_TEST_BROWSER,
+  });
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -171,7 +173,8 @@ try {
           return ["left", "center", "right"].every((align) => {
             const run = get(`scaled-${scaleX}-${align}`).textRuns[0];
             const ratio = align === "center" ? 0.5 : align === "right" ? 1 : 0;
-            const expected = left.display.worldTransform.tx +
+            const expected =
+              left.display.worldTransform.tx +
               Math.max(0, 180 - run.metrics.width) * ratio * scaleX;
             return Math.abs(run.display.worldTransform.tx - expected) < 1e-6;
           });

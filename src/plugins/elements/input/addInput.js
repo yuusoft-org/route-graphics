@@ -14,6 +14,7 @@ import {
   getElementTransformTargetState,
 } from "../util/transform.js";
 import { syncShaderFilters } from "../util/shaderFilterEffect.js";
+import { registerElementCleanup } from "../util/elementResources.js";
 
 const emitInputEvent = ({
   eventHandler,
@@ -227,6 +228,11 @@ export const addInput = ({
   };
 
   app.ticker?.add?.(runtime.tickerListener);
+  registerElementCleanup(container, () => {
+    app.ticker?.remove?.(runtime.tickerListener);
+    runtime.tickerListener = null;
+    app.inputDomBridge.unmount(element.id, runtime);
+  });
 
   const syncSelectionToDom = ({ start, end, shouldFocus = false }) => {
     if (shouldFocus) {
@@ -333,6 +339,7 @@ export const addInput = ({
 
   app.inputDomBridge.mount(element.id, {
     ...element,
+    owner: runtime,
     value: runtime.value,
     callbacks: createCallbacks({
       element,

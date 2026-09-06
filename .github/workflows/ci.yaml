@@ -2,66 +2,82 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # Setup Bun
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.5
-
-      # Install dependencies from root
-      - name: Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Lint
-        run: bun run lint
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.5
-
-      - name: Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Install Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-
-      - name: Run unit tests
-        run: bun run test
-
-      - name: Run Deterministic Audio Tests
-        run: bun run avt:report
-
-      - name: Upload AVT Artifacts
-        uses: actions/upload-artifact@v4
-        if: failure()
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run build:all
+      - run: bun run test:package
+      - uses: actions/upload-artifact@v4
         with:
-          name: avt-audio-${{ github.run_number }}
-          path: avt/output/
-          retention-days: 30
-
-      - name: Run Visual Tests (Docker)
+          name: build
+          path: |
+            dist/
+            vt/static/RouteGraphics.js*
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [unit, audio, browser, visual, webgpu]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+      - run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: .
+      - name: Install Chromium
+        if: matrix.suite != 'visual'
+        run: bunx playwright install --with-deps chromium
+      - name: Unit and CLI tests
+        if: matrix.suite == 'unit'
+        env:
+          VITEST_MAX_WORKERS: 2
+        run: bun run test
+      - name: Deterministic audio rendering
+        if: matrix.suite == 'audio'
+        run: node scripts/audioVisualTest.mjs report
+      - name: Browser integration
+        if: matrix.suite == 'browser'
+        run: |
+          node scripts/testRuntimeLifecycle.mjs
+          node scripts/testLayoutReport.mjs
+      - name: WebGPU integration
+        if: matrix.suite == 'webgpu'
+        run: node scripts/testWebGPUShaders.mjs
+      - name: Visual regression
+        if: matrix.suite == 'visual'
         env:
           RTGL_VT_DEBUG: true
           RTGL_VT_CONCURRENCY: 4
-        run: bun run vt:report
-
-      - name: Upload VT Images as Artifacts
-        uses: actions/upload-artifact@v4
+        run: bun run vt:report:built
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: vt-images-${{ github.run_number }}
-          path: .rettangoli/
+          name: failures-${{ matrix.suite }}-${{ github.run_number }}
+          path: |
+            avt/output/
+            .rettangoli/
           include-hidden-files: true
-          retention-days: 30
+          retention-days: 14

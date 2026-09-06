@@ -2,8 +2,8 @@ import { parseCommonObject } from "../util/parseCommonObject.js";
 import { normalizeBlurConfig } from "../util/blurEffect.js";
 import { normalizeCornerRadius, validateRectState } from "./rectConfig.js";
 /**
- *  @typedef {import('../../../types.js').BaseElement}
- *  @typedef {import('../../../types.js').RectComputedNode}
+ *  @typedef {import('../../../types.js').BaseElement} BaseElement
+ *  @typedef {import('../../../types.js').RectComputedNode} RectComputedNode
  */
 
 /**

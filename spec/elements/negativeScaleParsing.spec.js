@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseContainerForTesting } from "../../src/plugins/elements/container/parseContainerForTestingPurposes.js";
+import { parseContainerForTesting } from "../support/parseContainer.js";
 import { parseRect } from "../../src/plugins/elements/rect/parseRect.js";
 import { parseSprite } from "../../src/plugins/elements/sprite/parseSprite.js";
 import { parseCommonObject } from "../../src/plugins/elements/util/parseCommonObject.js";

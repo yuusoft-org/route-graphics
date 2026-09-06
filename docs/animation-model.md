@@ -5,7 +5,6 @@ Last updated: 2026-08-06
 See also:
 
 - `docs/animation-type-semantics.md`
-- `docs/animation-implementation-plan.md`
 - `docs/keyframe-start-value-design.md`
 - `docs/portable-gsap-timelines.md`
 - `docs/shader-interface.md`
@@ -34,9 +33,6 @@ The runtime now exposes:
 - independently targeted shader parameter timelines
 - inline single-pass and multi-pass transition compositors
 - composable mask plus compositor transitions
-
-Current known runtime limitations are tracked in
-`docs/animation-implementation-plan.md`.
 
 ## Naming
 
@@ -111,8 +107,7 @@ handoff, including masked reveals, dissolves, exits, and replacements.
 
 Some current element plugins still dispatch `update` animations during add and
 delete paths for legacy compatibility. New authoring should not rely on that
-behavior; lifecycle tightening remains tracked in
-`docs/animation-implementation-plan.md`.
+behavior.
 
 `update` supports:
 
@@ -733,3 +728,16 @@ The complete shader contract is in `docs/shader-interface.md`.
 - keep `mask` as a transition-only primitive
 - keep transition `compositor` transition-only as well
 - allow filter and compositor parameters to use the animation timeline model
+
+## Completion and compatibility
+
+Whole-element reconciliation waits until every update record for that element
+has settled. Completing a shorter record preserves other records' sampled
+properties. Failed finite render work emits `renderComplete` with
+`aborted: true`, `failed: true`, and the original `error`; a superseded render
+continues to emit only `aborted: true`.
+
+`plugins.animations`, `tweenPlugin`, and `createAnimationPlugin` remain accepted
+for compatibility and are deprecated. Animation execution is built in; new
+applications can omit animation plugin registration. Element and audio plugin
+registration is unchanged.

@@ -229,16 +229,17 @@ export const createLegacyTimelineContext = ({
 /**
  * Creates an animation bus that manages all active animations centrally.
  * It supports both update property animations and custom transition runners.
- * @returns {AnimationBus}
  */
 export const createAnimationBus = () => {
   const commandQueue = [];
+  const processingCommands = new Set();
   const activeAnimations = new Map();
   const pendingAnimations = new Map();
   const listeners = new Map();
   let stateVersion = 0;
   let sampledTime = null;
   let hasDeferredQueueProcessing = false;
+  let destroyed = false;
 
   const clampAnimationTime = (time, duration) => {
     return Math.min(Math.max(time, 0), Math.max(duration ?? 0, 0));
@@ -289,35 +290,35 @@ export const createAnimationBus = () => {
     listeners.get(event)?.forEach((cb) => {
       try {
         cb(data);
-      } catch (_error) {
+      } catch {
         // Listener errors should not break animation processing.
       }
     });
   };
 
-  const fireCompleteEvent = (context) => {
-    emit("completed", { id: context.id });
-
-    if (context.onComplete) {
-      try {
-        context.onComplete();
-      } catch (_error) {
-        // Completion callbacks are best-effort.
-      }
-    }
+  const detachContext = (context) => {
+    if (activeAnimations.get(context.id) === context)
+      activeAnimations.delete(context.id);
+    if (pendingAnimations.get(context.id) === context)
+      pendingAnimations.delete(context.id);
   };
 
-  const fireReverseCompleteEvent = (context) => {
-    emit("reverseCompleted", { id: context.id });
-
-    if (context.onReverseComplete) {
-      try {
-        context.onReverseComplete();
-      } catch {
-        // Reverse-completion callbacks are best-effort.
-      }
+  const finishContext = (context, reverse = false) => {
+    if (context.terminated) return;
+    context.terminated = true;
+    detachContext(context);
+    try {
+      if (reverse) context.onReverseComplete?.();
+      else context.onComplete?.();
+    } catch {
+      /* A consumer callback cannot retain the completed player. */
+    } finally {
+      disposeContext(context);
     }
+    emit(reverse ? "reverseCompleted" : "completed", { id: context.id });
   };
+  const fireCompleteEvent = (context) => finishContext(context);
+  const fireReverseCompleteEvent = (context) => finishContext(context, true);
 
   const attachAnimationMetadata = (context, metadata = {}) => {
     context.animationType = metadata.animationType ?? context.animationType;
@@ -332,6 +333,7 @@ export const createAnimationBus = () => {
       metadata.loop ?? context.loop,
       context.id,
     );
+    context.onFailure = metadata.onFailure ?? context.onFailure;
     context.onContinuationUpdate =
       metadata.onContinuationUpdate ?? context.onContinuationUpdate;
     context.paused = context.paused ?? false;
@@ -362,6 +364,8 @@ export const createAnimationBus = () => {
       },
     );
     for (const event of events) {
+      if (context.terminated || activeAnimations.get(context.id) !== context)
+        break;
       if (event.occurrence === "once") {
         context.emittedTimelineEvents.add(event.onceKey);
       } else {
@@ -427,7 +431,6 @@ export const createAnimationBus = () => {
     if (completed) {
       fireCompleteEvent(context);
       disposeContext(context);
-      activeAnimations.delete(context.id);
     }
   };
 
@@ -567,7 +570,7 @@ export const createAnimationBus = () => {
                     : group.subjectState,
                   value,
                 });
-              } catch (_error) {
+              } catch {
                 // Skip properties that fail to apply.
               }
             }
@@ -681,17 +684,20 @@ export const createAnimationBus = () => {
     startPropertyAnimation(payload);
   };
 
-  const applyCancellation = (context) => {
+  const applyCancellation = (context, { settle = true } = {}) => {
+    if (!context || context.terminated) return;
+    context.terminated = true;
+    detachContext(context);
     try {
-      context.applyTargetState?.();
-    } catch (_error) {
+      if (settle) context.applyTargetState?.();
+    } catch {
       // Best-effort cancellation.
     }
 
     if (context.onCancel) {
       try {
         context.onCancel();
-      } catch (_error) {
+      } catch {
         // Best-effort cancellation callback.
       }
     }
@@ -704,7 +710,6 @@ export const createAnimationBus = () => {
     if (!context) return;
 
     applyCancellation(context);
-    pendingAnimations.delete(id);
     emit("cancelled", { id });
   };
 
@@ -719,8 +724,36 @@ export const createAnimationBus = () => {
     }
   };
 
+  const discardCommand = (command, error) => {
+    if (command.cancelled) return;
+    command.cancelled = true;
+    if (command.type !== "START") return;
+    try {
+      if (error) command.payload.onFailure?.(error);
+    } catch {
+      /* Continue cleanup. */
+    }
+    try {
+      command.payload.onCancel?.();
+    } catch {
+      /* Continue cleanup. */
+    }
+    try {
+      command.payload.dispose?.();
+    } catch {
+      /* Continue cleanup. */
+    }
+    try {
+      command.payload.bindingContext?.rollback?.();
+    } catch {
+      /* Continue cleanup. */
+    }
+  };
+
   const processQueue = () => {
+    if (destroyed) return;
     const commands = commandQueue.splice(0);
+    for (const command of commands) processingCommands.add(command);
     const activeBefore = new Map(activeAnimations);
     const predictedInstances = new Map(
       [...activeAnimations]
@@ -756,11 +789,16 @@ export const createAnimationBus = () => {
       for (const bindingContext of stagedBindingContexts) {
         bindingContext.rollback?.();
       }
+      for (const command of commands) {
+        processingCommands.delete(command);
+        discardCommand(command, error);
+      }
       throw error;
     }
     try {
       for (const command of commands) {
-        executeCommand(command);
+        processingCommands.delete(command);
+        if (!command.cancelled && !destroyed) executeCommand(command);
       }
     } catch (error) {
       for (let index = commands.length - 1; index >= 0; index--) {
@@ -794,6 +832,10 @@ export const createAnimationBus = () => {
       for (const bindingContext of stagedBindingContexts) {
         bindingContext.rollback?.();
       }
+      for (const command of commands) {
+        processingCommands.delete(command);
+        discardCommand(command, error);
+      }
       throw error;
     }
   };
@@ -823,54 +865,71 @@ export const createAnimationBus = () => {
     }
 
     applyCancellation(context);
-    activeAnimations.delete(id);
     emit("cancelled", { id });
   };
 
   const dispatch = (command) => {
+    if (command.type === "START") {
+      const original = command.payload;
+      let cancelled = false;
+      let disposed = false;
+      command = {
+        ...command,
+        payload: {
+          ...original,
+          onCancel: () => {
+            if (cancelled) return;
+            cancelled = true;
+            original.onCancel?.();
+          },
+          dispose:
+            original.dispose &&
+            (() => {
+              if (disposed) return;
+              disposed = true;
+              original.dispose();
+            }),
+        },
+      };
+    }
+    if (destroyed) {
+      discardCommand(command);
+      return;
+    }
     commandQueue.push(command);
     scheduleDeferredQueueProcessing();
   };
 
+  const cancelMatching = (shouldCancel) => {
+    const queued = [...commandQueue.splice(0), ...processingCommands];
+    const canceledCommands = [];
+    for (const command of queued) {
+      const id = command.type === "START" ? command.payload.id : command.id;
+      if (shouldCancel(id)) canceledCommands.push(command);
+      else if (!processingCommands.has(command)) commandQueue.push(command);
+    }
+    const contexts = [
+      ...activeAnimations.values(),
+      ...pendingAnimations.values(),
+    ].filter((context) => shouldCancel(context.id));
+    // Remove ownership before callbacks may enqueue or install replacements.
+    for (const context of contexts) detachContext(context);
+    for (const command of canceledCommands) discardCommand(command);
+    for (const context of contexts) {
+      applyCancellation(context);
+      emit("cancelled", { id: context.id });
+    }
+  };
+
   const cancelAll = () => {
-    for (const [id, context] of activeAnimations) {
-      applyCancellation(context);
-      emit("cancelled", { id });
-    }
-
-    for (const [id, context] of pendingAnimations) {
-      applyCancellation(context);
-      emit("cancelled", { id });
-    }
-
-    activeAnimations.clear();
-    pendingAnimations.clear();
     stateVersion++;
+    cancelMatching(() => true);
   };
 
   const cancelAllExcept = (idsToKeep = new Set()) => {
     const keepIds =
       idsToKeep instanceof Set ? idsToKeep : new Set(idsToKeep ?? []);
-
-    for (const [id, context] of activeAnimations) {
-      if (keepIds.has(id)) {
-        continue;
-      }
-
-      applyCancellation(context);
-      activeAnimations.delete(id);
-      emit("cancelled", { id });
-    }
-
-    for (const [id, context] of pendingAnimations) {
-      if (keepIds.has(id)) {
-        continue;
-      }
-
-      applyCancellation(context);
-      pendingAnimations.delete(id);
-      emit("cancelled", { id });
-    }
+    cancelMatching((id) => !keepIds.has(id));
   };
 
   const tick = (deltaMS) => {
@@ -888,16 +947,19 @@ export const createAnimationBus = () => {
 
     const toRemove = [];
 
-    for (const [id, context] of activeAnimations) {
+    // A callback can replace a player; only visit the contexts owned at entry.
+    // eslint-disable-next-line unicorn/no-useless-spread
+    for (const [id, context] of [...activeAnimations]) {
+      if (context.terminated || activeAnimations.get(id) !== context) continue;
       if (context.stateVersion !== stateVersion) {
-        toRemove.push(id);
+        toRemove.push(context);
         continue;
       }
 
       if (!context.isValid()) {
         applyCancellation(context);
         emit("cancelled", { id, reason: "invalid-target" });
-        toRemove.push(id);
+        toRemove.push(context);
         continue;
       }
 
@@ -905,7 +967,7 @@ export const createAnimationBus = () => {
 
       if (context.pendingCompletion) {
         fireCompleteEvent(context);
-        toRemove.push(id);
+        toRemove.push(context);
         continue;
       }
 
@@ -929,9 +991,10 @@ export const createAnimationBus = () => {
           context.applyFrame(context.duration);
           deliverTimelineEvents(context, previousTime, context.duration);
         } catch (error) {
+          context.onFailure?.(error);
           applyCancellation(context);
           emit("failed", { id, error });
-          toRemove.push(id);
+          toRemove.push(context);
           continue;
         }
 
@@ -944,7 +1007,7 @@ export const createAnimationBus = () => {
         }
 
         fireCompleteEvent(context);
-        toRemove.push(id);
+        toRemove.push(context);
         continue;
       }
 
@@ -957,13 +1020,14 @@ export const createAnimationBus = () => {
           context.applyFrame(0);
           deliverTimelineEvents(context, previousTime, 0);
         } catch (error) {
+          context.onFailure?.(error);
           applyCancellation(context);
           emit("failed", { id, error });
-          toRemove.push(id);
+          toRemove.push(context);
           continue;
         }
         fireReverseCompleteEvent(context);
-        toRemove.push(id);
+        toRemove.push(context);
         continue;
       }
 
@@ -971,15 +1035,16 @@ export const createAnimationBus = () => {
         context.applyFrame(context.currentTime);
         deliverTimelineEvents(context, previousTime, context.currentTime);
       } catch (error) {
+        context.onFailure?.(error);
         applyCancellation(context);
         emit("failed", { id, error });
-        toRemove.push(id);
+        toRemove.push(context);
       }
     }
 
-    for (const id of toRemove) {
-      disposeContext(activeAnimations.get(id));
-      activeAnimations.delete(id);
+    for (const context of toRemove) {
+      detachContext(context);
+      disposeContext(context);
     }
   };
 
@@ -989,34 +1054,38 @@ export const createAnimationBus = () => {
 
     const toRemove = [];
 
-    for (const [id, context] of activeAnimations) {
+    // A callback can replace a player; only visit the contexts owned at entry.
+    // eslint-disable-next-line unicorn/no-useless-spread
+    for (const [id, context] of [...activeAnimations]) {
+      if (context.terminated || activeAnimations.get(id) !== context) continue;
       if (context.stateVersion !== stateVersion) {
-        toRemove.push(id);
+        toRemove.push(context);
         continue;
       }
 
       if (!context.isValid()) {
         applyCancellation(context);
         emit("cancelled", { id, reason: "invalid-target" });
-        toRemove.push(id);
+        toRemove.push(context);
         continue;
       }
 
       try {
         if (applyTimeToContext(context, timeMS)) {
           fireCompleteEvent(context);
-          toRemove.push(id);
+          toRemove.push(context);
         }
       } catch (error) {
+        context.onFailure?.(error);
         applyCancellation(context);
         emit("failed", { id, error });
-        toRemove.push(id);
+        toRemove.push(context);
       }
     }
 
-    for (const id of toRemove) {
-      disposeContext(activeAnimations.get(id));
-      activeAnimations.delete(id);
+    for (const context of toRemove) {
+      detachContext(context);
+      disposeContext(context);
     }
   };
 
@@ -1121,6 +1190,10 @@ export const createAnimationBus = () => {
   };
 
   const registerPending = (payload) => {
+    if (destroyed) {
+      payload.onCancel?.();
+      return;
+    }
     const context = attachAnimationMetadata(
       {
         id: payload.id,
@@ -1133,6 +1206,7 @@ export const createAnimationBus = () => {
     );
 
     pendingAnimations.set(context.id, context);
+    return context;
   };
 
   const activatePending = (id, payload) => {
@@ -1158,7 +1232,9 @@ export const createAnimationBus = () => {
     return true;
   };
 
-  const removePending = (id) => {
+  const removePending = (id, expectedContext) => {
+    if (expectedContext && pendingAnimations.get(id) !== expectedContext)
+      return;
     pendingAnimations.delete(id);
   };
 
@@ -1192,7 +1268,7 @@ export const createAnimationBus = () => {
 
     try {
       context.onContinuationUpdate(payload);
-    } catch (_error) {
+    } catch {
       // Continuation updates are best-effort.
     }
   };
@@ -1224,6 +1300,8 @@ export const createAnimationBus = () => {
   const isAnimating = (id) => activeAnimations.has(id);
 
   const destroy = () => {
+    destroyed = true;
+    sampledTime = null;
     cancelAll();
     listeners.clear();
   };

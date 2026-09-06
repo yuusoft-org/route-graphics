@@ -5,8 +5,8 @@ import {
 } from "./audio/oggDecoderFallback.js";
 import { getAudioContext } from "./audioContext.js";
 
-const loadedAssets = {};
-const loadingAssets = {};
+const loadedAssets = Object.create(null);
+const loadingAssets = Object.create(null);
 
 const prepareDecoders = async (assetMap) => {
   await prepareOggDecoders(assetMap);

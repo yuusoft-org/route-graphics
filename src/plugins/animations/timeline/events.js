@@ -52,12 +52,16 @@ const liftOccurrences = (
   }) => {
     if (stopped) return;
     const domain = instance.domains[path[pathIndex]];
+    const unbounded = domain.parent === null && instance.unboundedRoot;
+    // An infinite descendant makes the root's cycle duration bookkeeping,
+    // rather than a clipping boundary. Only the current crossing bounds it.
+    const cycleDuration = unbounded ? Infinity : domain.cycleDuration;
     const occupiedCycle = domain.cycleDuration + domain.iterationGap;
     const scaledLower = (parentLower - domain.start) * domain.rate;
     const scaledUpper = (parentUpper - domain.start) * domain.rate;
     let firstIteration;
     let lastIteration;
-    if (occupiedCycle === 0) {
+    if (unbounded || occupiedCycle === 0) {
       firstIteration = 0;
       lastIteration = 0;
     } else {
@@ -91,7 +95,7 @@ const liftOccurrences = (
       const iterationOffset = iteration * occupiedCycle;
       const activeStart = domain.start + iterationOffset / domain.rate;
       const activeEnd =
-        domain.start + (iterationOffset + domain.cycleDuration) / domain.rate;
+        domain.start + (iterationOffset + cycleDuration) / domain.rate;
       const intersectionStart = Math.max(parentLower, activeStart);
       const intersectionEnd = Math.min(parentUpper, activeEnd);
       if (intersectionStart > intersectionEnd) continue;
@@ -115,7 +119,7 @@ const liftOccurrences = (
       const lastLocal = toLocalTime(intersectionEnd);
       const localLower = Math.max(0, Math.min(firstLocal, lastLocal));
       const localUpper = Math.min(
-        domain.cycleDuration,
+        cycleDuration,
         Math.max(firstLocal, lastLocal),
       );
       const toRoot = (localTime) => parentToRoot(toParentTime(localTime));

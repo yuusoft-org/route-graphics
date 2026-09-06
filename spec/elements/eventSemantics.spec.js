@@ -864,6 +864,26 @@ describe("event semantics", () => {
     });
   });
 
+  it("updating and destroying one keyboard manager preserves other owners", () => {
+    const first = createKeyboardManager(vi.fn());
+    const secondEvents = vi.fn();
+    const second = createKeyboardManager(secondEvents);
+    const host = vi.fn();
+    const config = { a: { keydown: { payload: { owner: "first" } } } };
+    first.registerHotkeys(config);
+    second.registerHotkeys(config);
+    hotkeys("a", host);
+    first.registerHotkeys({
+      a: { keydown: { payload: { owner: "updated" } } },
+    });
+    first.destroy();
+    hotkeys.trigger("a");
+    expect(secondEvents).toHaveBeenCalledTimes(1);
+    expect(host).toHaveBeenCalledTimes(1);
+    second.destroy();
+    hotkeys.unbind("a", host);
+  });
+
   it("keyboard manager emits keydown and keyup payloads for registered keys", () => {
     const eventHandler = vi.fn();
     const keyboardManager = createKeyboardManager(eventHandler);

@@ -24,7 +24,6 @@ import createRouteGraphics, {
   rectPlugin,
   spritePlugin,
   containerPlugin,
-  tweenPlugin,
   soundPlugin,
 } from "route-graphics";
 
@@ -45,7 +44,6 @@ await app.init({
   rendererFallback: true,
   plugins: {
     elements: [textPlugin, rectPlugin, spritePlugin, containerPlugin],
-    animations: [tweenPlugin],
     audio: [soundPlugin],
   },
   eventHandler: (eventName, payload) => {
@@ -138,7 +136,7 @@ For complete usage details, go to:
 - [Shaders](http://route-graphics.routevn.com/docs/guides/shaders/)
 - [Custom Plugins](http://route-graphics.routevn.com/docs/guides/custom-plugins/)
 
-Design notes:
+Design notes (see the [documentation index](./docs/README.md) for current contracts):
 
 - [Audio Effects](./docs/audio-effects.md)
 - [Command-Controlled Sound Playback](./docs/audio-playback-commands.md)

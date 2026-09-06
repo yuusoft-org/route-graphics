@@ -6,20 +6,20 @@ import { createDeterministicAudioRuntime } from "./audio/deterministicAudioRunti
 import { createElementPlugin } from "./plugins/elements/elementPlugin.js";
 import { createAnimationPlugin } from "./plugins/animations/animationPlugin.js";
 import { createAudioPlugin } from "./plugins/audio/audioPlugin.js";
-import { textPlugin } from "./plugins/elements/text";
-import { rectPlugin } from "./plugins/elements/rect";
-import { spritePlugin } from "./plugins/elements/sprite";
-import { videoPlugin } from "./plugins/elements/video";
-import { sliderPlugin } from "./plugins/elements/slider";
-import { inputPlugin } from "./plugins/elements/input";
-import { containerPlugin } from "./plugins/elements/container";
-import { textRevealingPlugin } from "./plugins/elements/text-revealing";
+import { textPlugin } from "./plugins/elements/text/index.js";
+import { rectPlugin } from "./plugins/elements/rect/index.js";
+import { spritePlugin } from "./plugins/elements/sprite/index.js";
+import { videoPlugin } from "./plugins/elements/video/index.js";
+import { sliderPlugin } from "./plugins/elements/slider/index.js";
+import { inputPlugin } from "./plugins/elements/input/index.js";
+import { containerPlugin } from "./plugins/elements/container/index.js";
+import { textRevealingPlugin } from "./plugins/elements/text-revealing/index.js";
 import {
   animatedSpritePlugin,
   spritesheetAnimationPlugin,
-} from "./plugins/elements/animated-sprite";
-import { tweenPlugin } from "./plugins/animations/tween";
-import { soundPlugin } from "./plugins/audio/sound";
+} from "./plugins/elements/animated-sprite/index.js";
+import { tweenPlugin } from "./plugins/animations/tween/index.js";
+import { soundPlugin } from "./plugins/audio/sound/index.js";
 import { particlesPlugin } from "./plugins/elements/particles/index.js";
 import { renderElements } from "./plugins/elements/renderElements.js";
 import { renderAudio } from "./plugins/audio/renderAudio.js";

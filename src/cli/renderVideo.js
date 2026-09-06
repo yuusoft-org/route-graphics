@@ -321,7 +321,7 @@ const captureVideoWebm = async ({
 
                 const waiterIndex = pendingRenderWaiters.findIndex(
                   (waiter) =>
-                    payload?.aborted !== true &&
+                    (payload?.failed === true || payload?.aborted !== true) &&
                     (waiter.stateId === payload?.id ||
                       waiter.stateId === undefined),
                 );
@@ -331,7 +331,11 @@ const captureVideoWebm = async ({
                 }
 
                 const [waiter] = pendingRenderWaiters.splice(waiterIndex, 1);
-                waiter.resolve(payload);
+                if (payload?.failed) {
+                  waiter.reject(payload.error ?? new Error("Render failed."));
+                } else {
+                  waiter.resolve(payload);
+                }
               },
               debug: false,
             });
@@ -389,6 +393,7 @@ const captureVideoWebm = async ({
                 const stateIndex = renderPayload.stateIndexes[renderIndex];
                 const state = renderPayload.states[stateIndex];
                 const waitForComplete = createRenderCompleteWaiter(state.id);
+                void waitForComplete.catch(() => {});
 
                 debug("render state start", state.id);
                 app.render(state);

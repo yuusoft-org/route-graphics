@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { addContainer } from "../../src/plugins/elements/container/addContainer.js";
 import { updateContainer } from "../../src/plugins/elements/container/updateContainer.js";
 import { containerPlugin } from "../../src/plugins/elements/container/index.js";
-import { parseContainerForTesting } from "../../src/plugins/elements/container/parseContainerForTestingPurposes.js";
+import { parseContainerForTesting } from "../support/parseContainer.js";
 import { sliderPlugin } from "../../src/plugins/elements/slider/index.js";
 import { getSliderParts } from "../../src/plugins/elements/slider/sliderRuntime.js";
 import { spritePlugin } from "../../src/plugins/elements/sprite/index.js";

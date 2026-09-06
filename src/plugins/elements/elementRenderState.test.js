@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { normalizeElementShaderFilters } from "./util/shaderConfig.js";
-import { updateElementWithRenderState } from "./elementRenderState.js";
+import {
+  prepareElementRenderState,
+  pruneElementRenderState,
+  updateElementWithRenderState,
+} from "./elementRenderState.js";
 
 const shaderSource = {
   webgl: {
@@ -61,6 +65,22 @@ const getFilterTime = (child) =>
   child.filters[0].resources.shaderUniforms.uniforms.uTime;
 
 describe("element render state shader time", () => {
+  it("prunes historical parent registrations while preserving desired identities", () => {
+    const parent = { children: [], destroyed: false };
+    let lifecycle;
+    for (let index = 0; index < 1000; index++) {
+      ({ lifecycle } = prepareElementRenderState({
+        parent,
+        prevComputedTree: [],
+        nextComputedTree: [{ id: `scene-${index}`, type: "test" }],
+        renderContext: {},
+        renderSnapshot: {},
+      }));
+      pruneElementRenderState(lifecycle);
+      expect(lifecycle.renderParents.size).toBe(1);
+    }
+  });
+
   it("keeps the live shader clock when an immediate update commits", () => {
     const child = createMountedChild();
     const parent = { children: [child], destroyed: false };

@@ -1456,6 +1456,111 @@ describe("runReplaceAnimation", () => {
     expect(tracker.complete).toHaveBeenCalledWith(11);
   });
 
+  it.each([false, true])(
+    "cleans rejected transition preparation (persistent: %s)",
+    async (persistent) => {
+      const bus = createAnimationBus();
+      const tracker = {
+        getVersion: () => 1,
+        track: vi.fn(),
+        complete: vi.fn(),
+        fail: vi.fn(),
+      };
+      let hidden;
+      let child;
+      const plugin = {
+        add: ({ parent }) => {
+          hidden = parent;
+          child = new Container({ label: "next" });
+          parent.addChild(child);
+          return Promise.reject(new Error("mount failed"));
+        },
+      };
+      await expect(
+        runReplaceAnimation({
+          app: { renderer: { width: 100, height: 100 } },
+          parent: new Container(),
+          prevElement: null,
+          nextElement: { id: "next", type: "test" },
+          animation: {
+            id: "replace",
+            targetId: "next",
+            type: "transition",
+            playback: { continuity: persistent ? "persistent" : "render" },
+          },
+          animations: [],
+          animationBus: bus,
+          completionTracker: tracker,
+          elementPlugins: [plugin],
+          plugin,
+          zIndex: 0,
+        }),
+      ).rejects.toThrow("mount failed");
+      expect(hidden.destroyed).toBe(true);
+      expect(child.destroyed).toBe(true);
+      expect(bus.getState().pendingCount).toBe(0);
+      if (!persistent) expect(tracker.complete).toHaveBeenCalledTimes(1);
+      bus.destroy();
+    },
+  );
+
+  it("releases an earlier snapshot when preparation of the next snapshot throws", () => {
+    const previous = createDisplayObject("node");
+    const next = createDisplayObject("node");
+    const parent = createParent(previous);
+    previous.parent = parent;
+    const texture = RenderTexture.create({ width: 100, height: 100 });
+    const destroyTexture = vi.spyOn(texture, "destroy");
+    const error = new Error("snapshot failed");
+    const tracker = {
+      getVersion: () => 1,
+      track: vi.fn(),
+      complete: vi.fn(),
+      fail: vi.fn(),
+    };
+    const nextPlugin = { add: ({ parent }) => parent.addChild(next) };
+    const bus = { dispatch: vi.fn() };
+    expect(() =>
+      runReplaceAnimation({
+        app: {
+          renderer: {
+            width: 100,
+            height: 100,
+            generateTexture: vi
+              .fn()
+              .mockReturnValueOnce(texture)
+              .mockImplementationOnce(() => {
+                throw error;
+              }),
+          },
+        },
+        parent,
+        prevElement: { id: "node", type: "test" },
+        nextElement: { id: "node", type: "test" },
+        animation: {
+          id: "replace",
+          targetId: "node",
+          type: "transition",
+          prev: {},
+          next: {},
+        },
+        animations: [],
+        animationBus: bus,
+        completionTracker: tracker,
+        prevPlugin: { delete: vi.fn() },
+        nextPlugin,
+        elementPlugins: [nextPlugin],
+        zIndex: 0,
+      }),
+    ).toThrow(error);
+    expect(destroyTexture).toHaveBeenCalledTimes(1);
+    expect(next.destroyed).toBe(true);
+    expect(previous.destroyed).not.toBe(true);
+    expect(tracker.fail).toHaveBeenCalledWith(1, error);
+    expect(tracker.complete).toHaveBeenCalledTimes(1);
+    expect(bus.dispatch).not.toHaveBeenCalled();
+  });
+
   it("tracks async transition mounts before the next element promise resolves", async () => {
     const parent = createParent();
     const nextDisplayObject = createDisplayObject("scene-root");
@@ -1763,6 +1868,7 @@ describe("runReplaceAnimation", () => {
       getVersion: () => 11,
       track: vi.fn(),
       complete: vi.fn(),
+      fail: vi.fn(),
     };
     const animationBus = { dispatch: vi.fn() };
 
@@ -1803,6 +1909,7 @@ describe("runReplaceAnimation", () => {
     cleanup.reject(error);
 
     await expect(completionOperation).rejects.toBe(error);
+    expect(tracker.fail).toHaveBeenCalledWith(11, error);
     expect(tracker.complete).toHaveBeenCalledWith(11);
     expect(overlay.destroyed).toBe(true);
     expect(nextDisplayObject.parent).toBe(parent);

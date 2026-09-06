@@ -21,7 +21,7 @@ import {
 import {
   buildTimeline,
   getValueAtTime,
-} from "../../../util/animationTimeline.js";
+} from "../../../../spec/support/legacyAnimationTimeline.js";
 
 const makeAdapter = (property, valueType = "scalar") => ({
   property,

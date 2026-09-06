@@ -32,6 +32,18 @@ export const clearVideoPlaybackTracking = ({ videoElement, video }) => {
   }
 };
 
+export const disposeVideoPlayback = (videoElement, completionTracker) => {
+  if (videoElement._playbackDisposed) return;
+  videoElement._playbackDisposed = true;
+  const version = videoElement._playbackStateVersion;
+  const video = videoElement.texture?.source?.resource;
+  clearVideoPlaybackTracking({ videoElement, video });
+  video?.pause?.();
+  unregisterManagedVideoSprite(videoElement);
+  if (version !== null && version !== undefined)
+    completionTracker?.complete?.(version);
+};
+
 export const syncVideoPlaybackTracking = ({
   videoElement,
   video,
@@ -61,3 +73,4 @@ export const syncVideoPlaybackTracking = ({
   videoElement._videoErrorListener = completePlayback;
   videoElement._playbackStateVersion = playbackStateVersion;
 };
+import { unregisterManagedVideoSprite } from "./managedVideoTextureSizing.js";

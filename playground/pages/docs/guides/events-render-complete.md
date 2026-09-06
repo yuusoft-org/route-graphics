@@ -73,6 +73,15 @@ If a new render interrupts a previous one before its tracked work finishes, the 
 }
 ```
 
+A failed render emits `{ id, aborted: true, failed: true, error }`. This includes
+rejected asynchronous plugin mounts and animation activation or frame failures.
+The renderer releases the failed operation's resources and allows an identical
+state to be retried. Handle `failed` before treating an aborted render as an
+ordinary state change. Successful event payloads remain `{ id, aborted: false }`.
+
+Handlers may synchronously call `render()`. Completion retires the previous
+operation before invoking the handler, including when a render is aborted.
+
 ## Recommendations
 
 - Give states stable `id` values if you plan to react to `renderComplete`.

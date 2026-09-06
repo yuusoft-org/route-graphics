@@ -1,4 +1,3 @@
-import { collectAllElementIds } from "./collectElementIds.js";
 import { isDeepEqual } from "./isDeepEqual.js";
 
 /**
@@ -17,6 +16,18 @@ import { isDeepEqual } from "./isDeepEqual.js";
  * @returns {DiffElementResult}
  */
 export const diffElements = (prevElements, nextElements, animations = []) => {
+  const animationTargets = new Set(
+    animations instanceof Map
+      ? animations.keys()
+      : animations.map((animation) => animation.targetId),
+  );
+  const hasAnimatedDescendant = (element) => {
+    if (animationTargets.has(element.id)) return true;
+    return (
+      Array.isArray(element.children) &&
+      element.children.some(hasAnimatedDescendant)
+    );
+  };
   const allIdSet = new Set();
   const prevElementMap = new Map();
   const nextElementMap = new Map();
@@ -46,15 +57,10 @@ export const diffElements = (prevElements, nextElements, animations = []) => {
       // Element is deleted
       toDeleteElement.push(prevEl);
     } else {
-      const allIds = collectAllElementIds(nextEl);
-      const hasAnimation =
-        animations instanceof Map
-          ? Array.from(animations.keys()).some((targetId) =>
-              allIds.has(targetId),
-            )
-          : animations.find((transition) => allIds.has(transition.targetId));
-
-      if (!isDeepEqual(prevEl, nextEl) || hasAnimation) {
+      if (
+        !isDeepEqual(prevEl, nextEl) ||
+        (animationTargets.size > 0 && hasAnimatedDescendant(nextEl))
+      ) {
         // Update element - definition changed or has animations targeting it or children
         toUpdateElement.push({
           prev: prevEl,

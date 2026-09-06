@@ -19,7 +19,7 @@ jobs:
       # Setup Bun
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.2.2
+          bun-version: 1.3.5
 
       # Install dependencies from root
       - name: Install Dependencies
@@ -27,6 +27,9 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Check package contents and CLI entry points
+        run: bun run test:package
 
       # Setup .npmrc file to publish to npm
       - uses: actions/setup-node@v6

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeline, getValueAtTime } from "./animationTimeline.js";
+import {
+  buildTimeline,
+  getValueAtTime,
+} from "../../spec/support/legacyAnimationTimeline.js";
 
 describe("animationTimeline numeric arrays", () => {
   it("interpolates vector and matrix-shaped values component by component", () => {

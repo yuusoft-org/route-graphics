@@ -138,6 +138,10 @@ export const createInputDomBridge = ({ app }) => {
   const entries = new Map();
   let root;
   let activeId = null;
+  const isLive = (entry) => !entry.disposed && entries.get(entry.id) === entry;
+  const notifyEntry = (entry, name, ...args) => {
+    if (isLive(entry)) return entry.callbacks[name]?.(...args);
+  };
 
   const ensureRoot = () => {
     if (!root) {
@@ -160,6 +164,7 @@ export const createInputDomBridge = ({ app }) => {
   };
 
   const notifySnapshot = (entry, previousSnapshot = entry.lastSnapshot) => {
+    if (!isLive(entry)) return;
     const snapshot = getSnapshot(entry);
 
     if (snapshot.focused && activeId !== entry.id) {
@@ -171,7 +176,7 @@ export const createInputDomBridge = ({ app }) => {
     applyPointerInteractivity(entry, activeId);
 
     if (previousSnapshot?.value !== snapshot.value) {
-      entry.callbacks.onValueChange?.(snapshot);
+      notifyEntry(entry, "onValueChange", snapshot);
     }
 
     if (
@@ -180,7 +185,7 @@ export const createInputDomBridge = ({ app }) => {
       previousSnapshot?.focused !== snapshot.focused ||
       previousSnapshot?.composing !== snapshot.composing
     ) {
-      entry.callbacks.onSelectionChange?.(snapshot);
+      notifyEntry(entry, "onSelectionChange", snapshot);
     }
 
     entry.lastSnapshot = snapshot;
@@ -349,12 +354,17 @@ export const createInputDomBridge = ({ app }) => {
 
   const attachListeners = (entry) => {
     const { id, element } = entry;
+    const isCurrentControl = () => isLive(entry) && entry.element === element;
+    const listen = (type, callback) =>
+      element.addEventListener(type, (event) => {
+        if (isCurrentControl()) callback(event);
+      });
 
     const syncFromDom = () => {
-      notifySnapshot(entry);
+      if (isCurrentControl()) notifySnapshot(entry);
     };
 
-    element.addEventListener("focus", () => {
+    listen("focus", () => {
       if (entry.pendingBlurTimer) {
         clearTimeout(entry.pendingBlurTimer);
         entry.pendingBlurTimer = null;
@@ -363,17 +373,18 @@ export const createInputDomBridge = ({ app }) => {
       applyPointerInteractivity(entry, activeId);
       const snapshot = getSnapshot(entry);
       entry.lastSnapshot = snapshot;
-      entry.callbacks.onFocus?.(snapshot);
-      entry.callbacks.onSelectionChange?.(snapshot);
+      notifyEntry(entry, "onFocus", snapshot);
+      notifyEntry(entry, "onSelectionChange", snapshot);
     });
 
-    element.addEventListener("blur", () => {
+    listen("blur", () => {
       if (activeId === id) {
         activeId = null;
       }
       applyPointerInteractivity(entry, activeId);
       entry.pendingBlurTimer = setTimeout(() => {
         entry.pendingBlurTimer = null;
+        if (!isCurrentControl()) return;
         const snapshot = getSnapshot(entry);
 
         if (snapshot.focused) {
@@ -381,23 +392,24 @@ export const createInputDomBridge = ({ app }) => {
           return;
         }
         entry.lastSnapshot = snapshot;
-        entry.callbacks.onBlur?.(snapshot);
-        entry.callbacks.onSelectionChange?.(snapshot);
+        notifyEntry(entry, "onBlur", snapshot);
+        notifyEntry(entry, "onSelectionChange", snapshot);
       }, 0);
     });
 
-    element.addEventListener("input", syncFromDom);
-    element.addEventListener("select", syncFromDom);
-    element.addEventListener("click", () => queueMicrotask(syncFromDom));
-    element.addEventListener("keyup", (event) => {
+    listen("input", syncFromDom);
+    listen("select", syncFromDom);
+    listen("click", () => queueMicrotask(syncFromDom));
+    listen("keyup", (event) => {
       event.stopPropagation();
       event.stopImmediatePropagation?.();
       queueMicrotask(syncFromDom);
     });
-    element.addEventListener("keydown", (event) => {
+    listen("keydown", (event) => {
       event.stopPropagation();
       event.stopImmediatePropagation?.();
 
+      if (entry.composing || event.isComposing || event.keyCode === 229) return;
       const submitOnEnter = entry.options.submitOnEnter !== false;
       const shouldConsumeEnter = entry.options.submitOnEnter === false;
       const hasSubmitCallback = typeof entry.callbacks.onSubmit === "function";
@@ -423,7 +435,7 @@ export const createInputDomBridge = ({ app }) => {
       }
 
       if (shouldSubmitSingleLine || shouldSubmitMultiline) {
-        entry.callbacks.onSubmit(getSnapshot(entry), event);
+        notifyEntry(entry, "onSubmit", getSnapshot(entry), event);
       }
 
       if (event.key === "Escape") {
@@ -432,23 +444,23 @@ export const createInputDomBridge = ({ app }) => {
 
       queueMicrotask(syncFromDom);
     });
-    element.addEventListener("compositionstart", () => {
+    listen("compositionstart", () => {
       entry.composing = true;
       const snapshot = getSnapshot(entry);
       entry.lastSnapshot = snapshot;
-      entry.callbacks.onCompositionStart?.(snapshot);
-      entry.callbacks.onSelectionChange?.(snapshot);
+      notifyEntry(entry, "onCompositionStart", snapshot);
+      notifyEntry(entry, "onSelectionChange", snapshot);
     });
-    element.addEventListener("compositionupdate", () => {
+    listen("compositionupdate", () => {
       const snapshot = getSnapshot(entry);
       entry.lastSnapshot = snapshot;
-      entry.callbacks.onCompositionUpdate?.(snapshot);
-      entry.callbacks.onSelectionChange?.(snapshot);
+      notifyEntry(entry, "onCompositionUpdate", snapshot);
+      notifyEntry(entry, "onSelectionChange", snapshot);
     });
-    element.addEventListener("compositionend", () => {
+    listen("compositionend", () => {
       entry.composing = false;
       syncFromDom();
-      entry.callbacks.onCompositionEnd?.(getSnapshot(entry));
+      notifyEntry(entry, "onCompositionEnd", getSnapshot(entry));
     });
   };
 
@@ -462,6 +474,7 @@ export const createInputDomBridge = ({ app }) => {
 
     if (existingEntry) {
       existingEntry.options = options;
+      existingEntry.owner = options.owner;
       existingEntry.callbacks = options.callbacks ?? {};
       updateElementAttributes(existingEntry);
       syncGeometry(existingEntry);
@@ -477,6 +490,7 @@ export const createInputDomBridge = ({ app }) => {
 
     const entry = {
       id,
+      owner: options.owner,
       element: createControlElement({ id, options }),
       options,
       callbacks: options.callbacks ?? {},
@@ -537,8 +551,11 @@ export const createInputDomBridge = ({ app }) => {
       entry.lastSnapshot = getSnapshot(entry);
 
       if (wasFocused && !options.disabled) {
+        const control = entry.element;
         queueMicrotask(() => {
-          entry.element.focus();
+          if (!isLive(entry) || entry.element !== control) return;
+          control.focus();
+          if (!isLive(entry) || entry.element !== control) return;
           setSelection(
             entry.element,
             previousSelectionStart,
@@ -565,6 +582,7 @@ export const createInputDomBridge = ({ app }) => {
     return entry.element;
   };
 
+  /** @param {string} id @param {{selectAll?: boolean, selectionStart?: number, selectionEnd?: number}} [options] */
   const focus = (
     id,
     { selectAll = false, selectionStart, selectionEnd } = {},
@@ -630,10 +648,10 @@ export const createInputDomBridge = ({ app }) => {
     entry?.element.blur();
   };
 
-  const unmount = (id) => {
+  const unmount = (id, owner) => {
     const entry = entries.get(id);
 
-    if (!entry) return;
+    if (!entry || (owner !== undefined && entry.owner !== owner)) return;
     if (activeId === id) {
       activeId = null;
     }
@@ -643,8 +661,9 @@ export const createInputDomBridge = ({ app }) => {
       entry.pendingBlurTimer = null;
     }
 
-    entry.element.remove();
+    entry.disposed = true;
     entries.delete(id);
+    entry.element.remove();
 
     if (entries.size === 0) {
       root?.remove();
@@ -656,6 +675,7 @@ export const createInputDomBridge = ({ app }) => {
     app.ticker?.remove?.(tick);
 
     for (const entry of entries.values()) {
+      entry.disposed = true;
       if (entry.pendingBlurTimer) {
         clearTimeout(entry.pendingBlurTimer);
         entry.pendingBlurTimer = null;

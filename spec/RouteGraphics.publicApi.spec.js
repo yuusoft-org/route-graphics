@@ -113,8 +113,15 @@ const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
       this.parent?.removeChild(this);
     }
 
-    destroy() {
+    destroy(options) {
       this.destroyed = true;
+      if (options === true || options?.children) {
+        // Destruction detaches children while this snapshot is traversed.
+        // eslint-disable-next-line unicorn/no-useless-spread
+        for (const child of [...this.children]) child.destroy?.(options);
+      }
+      this.removeFromParent();
+      this.children = [];
     }
 
     on() {
@@ -347,7 +354,9 @@ const createPixiModuleMock = ({ rendererOverrides = {} } = {}) => {
       this.renderer.background.color = backgroundColor;
     }
 
-    destroy() {}
+    destroy(_rendererOptions, options) {
+      this.stage.destroy(options);
+    }
   }
 
   return {
@@ -462,8 +471,8 @@ const setupRouteGraphics = async ({
   },
 } = {}) => {
   const pixiMock = createPixiModuleMock({ rendererOverrides });
-  const { Color } = await vi.importActual("pixi.js");
-  pixiMock.Color = Color;
+  const { Color, GlUboSystem, GpuUboSystem } = await vi.importActual("pixi.js");
+  Object.assign(pixiMock, { Color, GlUboSystem, GpuUboSystem });
 
   vi.doMock("pixi.js", () => pixiMock);
   vi.doMock("../src/AudioStage.js", () => ({
@@ -483,8 +492,9 @@ const setupRouteGraphics = async ({
         animations: [],
         audio: [],
       };
-  const { default: createRouteGraphics } =
-    await import("../src/RouteGraphics.js");
+  const { default: createRouteGraphics } = await import(
+    "../src/RouteGraphics.js"
+  );
 
   const app = createRouteGraphics();
   await app.init({
@@ -514,6 +524,241 @@ const findTransitionOverlay = (pixiMock) =>
     ) ?? null;
 
 describe("RouteGraphics public API", () => {
+  it.each([false, true])(
+    "recovers applied elements and cursors after an asynchronous mount fails (reentrant: %s)",
+    async (reentrant) => {
+      let rejectMount;
+      const mount = new Promise((_, reject) => {
+        rejectMount = reject;
+      });
+      const baseline = {
+        id: "baseline",
+        global: { cursorStyles: { default: "crosshair", hover: "help" } },
+        elements: [
+          { id: "box", type: "rect", width: 20, height: 20, fill: "#ff0000" },
+        ],
+      };
+      const events = vi.fn((event, payload) => {
+        if (reentrant && event === "renderComplete" && payload.failed)
+          app.render(baseline);
+      });
+      const { app, pixiMock } = await setupRouteGraphics({
+        initOptions: { eventHandler: events },
+        pluginsFactory: async ({ pixiMock }) => ({
+          elements: [
+            (await import("../src/plugins/elements/rect/index.js")).rectPlugin,
+            {
+              type: "async-node",
+              parse: ({ state }) => state,
+              add: ({ parent, element }) => {
+                const child = new pixiMock.Container();
+                child.label = element.id;
+                parent.addChild(child);
+                return mount;
+              },
+            },
+          ],
+        }),
+      });
+      app.render(baseline);
+      events.mockClear();
+      app.render({
+        id: "failed",
+        global: { cursorStyles: { default: "wait", hover: "progress" } },
+        elements: [
+          { ...baseline.elements[0], fill: "#00ff00" },
+          { id: "broken", type: "async-node" },
+        ],
+      });
+      expect(app.findElementByLabel("box").lastFill).toBe("#00ff00");
+      rejectMount(new Error("mount failed"));
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith(
+          "renderComplete",
+          expect.objectContaining({ id: "failed", failed: true }),
+        ),
+      );
+      if (!reentrant) app.render(baseline);
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith("renderComplete", {
+          id: "baseline",
+          aborted: false,
+        }),
+      );
+      expect(app.findElementByLabel("box").lastFill).toBe("#ff0000");
+      expect(app.findElementByLabel("broken")).toBeNull();
+      const pixiApp = pixiMock.__getLastApplication();
+      expect(pixiApp.renderer.events.cursorStyles).toEqual(
+        baseline.global.cursorStyles,
+      );
+      expect(pixiApp.canvas.style.cursor).toBe("crosshair");
+    },
+  );
+
+  it.each(["sync", "async mount", "async delete"])(
+    "preserves a fallback rendered inside a transition failure handler (%s)",
+    async (preparation) => {
+      const fallback = {
+        id: "fallback",
+        elements: [
+          { id: "box", type: "rect", width: 20, height: 20, fill: "#0000ff" },
+        ],
+      };
+      const events = vi.fn((event, payload) => {
+        if (event === "renderComplete" && payload.failed) app.render(fallback);
+      });
+      const { app } = await setupRouteGraphics({
+        initOptions: { eventHandler: events },
+        pluginsFactory: async () => {
+          const { rectPlugin } = await import(
+            "../src/plugins/elements/rect/index.js"
+          );
+          return {
+            elements: [
+              {
+                ...rectPlugin,
+                add: (options) => {
+                  const operation = rectPlugin.add(options);
+                  return preparation === "async mount" &&
+                    options.renderContext?.suppressAnimations
+                    ? Promise.resolve(operation)
+                    : operation;
+                },
+                delete: (options) =>
+                  preparation === "async delete"
+                    ? Promise.resolve().then(() => rectPlugin.delete(options))
+                    : rectPlugin.delete(options),
+              },
+            ],
+          };
+        },
+      });
+      app.render({
+        id: "initial",
+        elements: [{ ...fallback.elements[0], fill: "#ff0000" }],
+      });
+      const surfaces = await import(
+        "../src/plugins/animations/replace/transitionSurfaces.js"
+      );
+      const failure = new Error("overlay construction failed");
+      let prepared;
+      vi.spyOn(surfaces, "createReplaceOverlay").mockImplementationOnce(() => {
+        prepared = app.findElementByLabel("box");
+        expect(prepared).not.toBeNull();
+        throw failure;
+      });
+      const render = () =>
+        app.render({
+          id: "failed",
+          elements: [{ ...fallback.elements[0], fill: "#00ff00" }],
+          animations: [
+            {
+              id: "replace",
+              targetId: "box",
+              type: "transition",
+              next: {
+                tween: {
+                  alpha: {
+                    initialValue: 0,
+                    keyframes: [{ value: 1, duration: 100 }],
+                  },
+                },
+              },
+            },
+          ],
+        });
+      if (preparation !== "sync") render();
+      else expect(render).toThrow(failure);
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith("renderComplete", {
+          id: "fallback",
+          aborted: false,
+        }),
+      );
+      expect(events).toHaveBeenCalledWith("renderComplete", {
+        id: "failed",
+        aborted: true,
+        failed: true,
+        error: failure,
+      });
+      expect(events).not.toHaveBeenCalledWith("renderComplete", {
+        id: "failed",
+        aborted: false,
+      });
+      expect(prepared.destroyed).toBe(true);
+      const live = app.findElementByLabel("box");
+      expect(live).not.toBeNull();
+      expect(live.destroyed).not.toBe(true);
+      expect(live.visible).not.toBe(false);
+      expect(live.lastFill).toBe("#0000ff");
+    },
+  );
+
+  it("reports asynchronous mount failure, discards partial children, and retries identical state", async () => {
+    const events = vi.fn();
+    let attempts = 0;
+    const { app } = await setupRouteGraphics({
+      initOptions: { eventHandler: events },
+      pluginsFactory: ({ pixiMock }) => ({
+        elements: [
+          {
+            type: "async-node",
+            parse: ({ state }) => state,
+            add: ({ parent, element, completionTracker }) => {
+              attempts++;
+              const child = new pixiMock.Container();
+              child.label = element.id;
+              parent.addChild(child);
+              const version = completionTracker.getVersion();
+              completionTracker.track(version);
+              return (
+                attempts === 1
+                  ? Promise.reject(new Error("mount failed"))
+                  : Promise.resolve()
+              ).finally(() => completionTracker.complete(version));
+            },
+            update: vi.fn(),
+            delete: vi.fn(),
+          },
+        ],
+        animations: [],
+        audio: [],
+      }),
+    });
+    const state = {
+      id: "retry",
+      elements: [{ id: "node", type: "async-node" }],
+    };
+    app.render(state);
+    await vi.waitFor(() =>
+      expect(events).toHaveBeenCalledWith(
+        "renderComplete",
+        expect.objectContaining({ id: "retry", aborted: true, failed: true }),
+      ),
+    );
+    expect(app.findElementByLabel("node")).toBeNull();
+    expect(
+      events.mock.calls.some(([, payload]) => payload.aborted === false),
+    ).toBe(false);
+    app.render(state);
+    await vi.waitFor(() =>
+      expect(events).toHaveBeenCalledWith("renderComplete", {
+        id: "retry",
+        aborted: false,
+      }),
+    );
+    expect(attempts).toBe(2);
+    expect(app.findElementByLabel("node")).not.toBeNull();
+  });
+
+  it("destroys display descendants during application teardown", async () => {
+    const { app, pixiMock } = await setupRouteGraphics();
+    const child = new pixiMock.Container();
+    pixiMock.__getLastApplication().stage.addChild(child);
+    app.destroy();
+    expect(child.destroyed).toBe(true);
+  });
+
   afterEach(() => {
     currentApp?.destroy();
     currentApp = null;
@@ -579,8 +824,9 @@ describe("RouteGraphics public API", () => {
     const { app } = await setupRouteGraphics({
       rendererOverrides: { gl },
       pluginsFactory: async () => {
-        const { rectPlugin } =
-          await import("../src/plugins/elements/rect/index.js");
+        const { rectPlugin } = await import(
+          "../src/plugins/elements/rect/index.js"
+        );
         return {
           elements: [rectPlugin],
           animations: [],
@@ -697,8 +943,9 @@ describe("RouteGraphics public API", () => {
       const { app } = await setupRouteGraphics({
         rendererOverrides: { gl },
         pluginsFactory: async () => {
-          const { rectPlugin } =
-            await import("../src/plugins/elements/rect/index.js");
+          const { rectPlugin } = await import(
+            "../src/plugins/elements/rect/index.js"
+          );
           return {
             elements: [rectPlugin],
             animations: [],
@@ -751,8 +998,9 @@ describe("RouteGraphics public API", () => {
     const { app } = await setupRouteGraphics({
       rendererOverrides: { gl },
       pluginsFactory: async () => {
-        const { rectPlugin } =
-          await import("../src/plugins/elements/rect/index.js");
+        const { rectPlugin } = await import(
+          "../src/plugins/elements/rect/index.js"
+        );
         return {
           elements: [rectPlugin],
           animations: [],
@@ -1193,6 +1441,36 @@ describe("RouteGraphics public API", () => {
     }
   });
 
+  it("returns the shared texture for sequential buffer loads", async () => {
+    const {
+      app: firstApp,
+      pixiMock,
+      createRouteGraphics,
+    } = await setupRouteGraphics();
+    const secondApp = createRouteGraphics();
+    await secondApp.init({ width: 320, height: 240 });
+    const bitmap = { width: 8, height: 6, close: vi.fn() };
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue(bitmap));
+    const asset = {
+      buffer: new Uint8Array([1, 2, 3]).buffer,
+      type: "image/png",
+    };
+    try {
+      const [firstTexture] = await firstApp.loadAssets({ portrait: asset });
+      await expect(secondApp.loadAssets({ portrait: asset })).resolves.toEqual([
+        firstTexture,
+      ]);
+      await firstApp.unloadAssets(["portrait"]);
+      expect(pixiMock.Assets.cache.get("portrait")).toBe(firstTexture);
+      expect(firstTexture.destroy).not.toHaveBeenCalled();
+      await secondApp.unloadAssets(["portrait"]);
+      expect(firstTexture.destroy).toHaveBeenCalledTimes(1);
+      expect(bitmap.close).toHaveBeenCalledTimes(1);
+    } finally {
+      secondApp.destroy();
+    }
+  });
+
   it("unloads audio and font assets", async () => {
     const audioAsset = {
       load: vi.fn().mockResolvedValue({ decoded: true }),
@@ -1284,6 +1562,49 @@ describe("RouteGraphics public API", () => {
       ]);
       expect(audioAsset.unload).toHaveBeenCalledTimes(1);
       expect(audioAsset.unload).toHaveBeenCalledWith("click");
+    } finally {
+      secondApp.destroy();
+    }
+  });
+
+  it("reserves shared audio before a concurrent owner can unload it", async () => {
+    const decoded = { decoded: true };
+    let cached;
+    let finishDecode;
+    const decode = new Promise((resolve) => {
+      finishDecode = resolve;
+    });
+    const audioAsset = {
+      load: vi.fn(async () => {
+        await decode;
+        cached = decoded;
+        return decoded;
+      }),
+      getAsset: vi.fn(() => cached),
+      unload: vi.fn(() => {
+        cached = undefined;
+        return true;
+      }),
+    };
+    const { app: firstApp, createRouteGraphics } = await setupRouteGraphics({
+      audioAsset,
+    });
+    const secondApp = createRouteGraphics();
+    await secondApp.init({ width: 320, height: 240 });
+    const asset = {
+      buffer: new Uint8Array([1, 2, 3]).buffer,
+      type: "audio/mpeg",
+    };
+    try {
+      const firstLoad = firstApp.loadAssets({ click: asset });
+      const secondLoad = secondApp.loadAssets({ click: asset });
+      const firstUnload = firstApp.unloadAssets(["click"]);
+      finishDecode();
+      await Promise.all([firstLoad, secondLoad, firstUnload]);
+      expect(audioAsset.getAsset("click")).toBe(decoded);
+      expect(audioAsset.unload).not.toHaveBeenCalled();
+      await secondApp.unloadAssets(["click"]);
+      expect(audioAsset.unload).toHaveBeenCalledTimes(1);
     } finally {
       secondApp.destroy();
     }
@@ -1762,8 +2083,9 @@ describe("RouteGraphics public API", () => {
         eventHandler,
       },
       pluginsFactory: async () => {
-        const { videoPlugin } =
-          await import("../src/plugins/elements/video/index.js");
+        const { videoPlugin } = await import(
+          "../src/plugins/elements/video/index.js"
+        );
 
         return {
           elements: [videoPlugin],
@@ -1856,8 +2178,9 @@ describe("RouteGraphics public API", () => {
   it("updates lazy video texture when first mounted after frame data is ready", async () => {
     const { app, pixiMock } = await setupRouteGraphics({
       pluginsFactory: async () => {
-        const { videoPlugin } =
-          await import("../src/plugins/elements/video/index.js");
+        const { videoPlugin } = await import(
+          "../src/plugins/elements/video/index.js"
+        );
 
         return {
           elements: [videoPlugin],
@@ -1962,8 +2285,9 @@ describe("RouteGraphics public API", () => {
   it("preserves video sprite dimensions when lazy frame data resizes the texture", async () => {
     const { app, pixiMock } = await setupRouteGraphics({
       pluginsFactory: async () => {
-        const { videoPlugin } =
-          await import("../src/plugins/elements/video/index.js");
+        const { videoPlugin } = await import(
+          "../src/plugins/elements/video/index.js"
+        );
 
         return {
           elements: [videoPlugin],
@@ -2522,6 +2846,175 @@ describe("RouteGraphics public API", () => {
       width: 4,
     });
   });
+
+  it.each([
+    ["tween", false],
+    ["tween", true],
+    ["gsap", false],
+    ["gsap", true],
+  ])(
+    "reconciles mixed-direction %s updates (reverse finishes last: %s)",
+    async (kind, reverseLast) => {
+      let fillAtCompletion;
+      const events = vi.fn((event, payload) => {
+        if (event === "renderComplete" && payload.id === "moving") {
+          fillAtCompletion = app.findElementByLabel("box").lastFill;
+        }
+      });
+      const { app, pixiMock } = await setupRouteGraphics({
+        initOptions: { eventHandler: events },
+        pluginsFactory: async () => ({
+          elements: [
+            (await import("../src/plugins/elements/rect/index.js")).rectPlugin,
+          ],
+        }),
+      });
+      const rect = {
+        id: "box",
+        type: "rect",
+        width: 20,
+        height: 20,
+        x: 0,
+        y: 0,
+        fill: "#ff0000",
+      };
+      app.render({ id: "initial", elements: [rect] });
+      app.render({
+        id: "moving",
+        elements: [{ ...rect, x: 100, y: 200, fill: "#00ff00" }],
+        animations: ["x", "y"].map((property) => ({
+          id: property,
+          targetId: "box",
+          type: "update",
+          ...(kind === "gsap"
+            ? {
+                gsap: {
+                  profile: "portable-v1",
+                  steps: [
+                    {
+                      kind: "to",
+                      values: { [property]: property === "x" ? 100 : 200 },
+                      duration: property === "x" ? 100 : 200,
+                      easing: "linear",
+                    },
+                  ],
+                },
+              }
+            : {
+                tween: {
+                  [property]: {
+                    auto: { duration: property === "x" ? 100 : 200 },
+                  },
+                },
+              }),
+        })),
+      });
+      const tick = getAutoAnimationTick(pixiMock);
+      const elapsed = reverseLast ? 100 : 25;
+      tick({ deltaMS: elapsed });
+      expect(app.findElementByLabel("box").lastFill).toBe("#ff0000");
+      expect(app.reverseAnimation("y")).toBe(true);
+      tick({ deltaMS: elapsed });
+      if (!reverseLast) tick({ deltaMS: 50 });
+      await vi.waitFor(() =>
+        expect(events).toHaveBeenCalledWith("renderComplete", {
+          id: "moving",
+          aborted: false,
+        }),
+      );
+      expect(fillAtCompletion).toBe("#00ff00");
+      expect(app.findElementByLabel("box").lastFill).toBe("#00ff00");
+    },
+  );
+
+  it.each(["tween", "gsap"])(
+    "reconciles finite persistent %s updates after compatible renders",
+    async (kind) => {
+      const eventHandler = vi.fn();
+      const { app, pixiMock } = await setupRouteGraphics({
+        initOptions: { eventHandler },
+        pluginsFactory: async () => ({
+          elements: [
+            (await import("../src/plugins/elements/rect/index.js")).rectPlugin,
+          ],
+        }),
+      });
+      const tick = getAutoAnimationTick(pixiMock);
+      const rect = (x, fill) => ({
+        id: "box",
+        type: "rect",
+        x,
+        y: 0,
+        width: 100,
+        height: 100,
+        fill,
+      });
+      const motion = (duration, values) =>
+        kind === "gsap"
+          ? {
+              gsap: {
+                profile: "portable-v1",
+                steps: [{ kind: "to", values, duration, easing: "linear" }],
+              },
+            }
+          : {
+              tween: Object.fromEntries(
+                Object.entries(values).map(([property, value]) => [
+                  property,
+                  { keyframes: [{ value, duration, easing: "linear" }] },
+                ]),
+              ),
+            };
+      const animations = [
+        {
+          id: "move-x",
+          type: "update",
+          targetId: "box",
+          playback: { continuity: "persistent" },
+          ...motion(100, { x: 100 }),
+        },
+        {
+          id: "move-y",
+          type: "update",
+          targetId: "box",
+          playback: { continuity: "persistent" },
+          ...motion(200, { y: 200 }),
+        },
+      ];
+      app.render({ id: "initial", elements: [rect(0, "#ff0000")] });
+      const target = { ...rect(100, "#00ff00"), y: 200 };
+      app.render({ id: "moving", elements: [target], animations });
+      tick({ deltaMS: 50 });
+      const live = app.findElementByLabel("box");
+      app.render({
+        id: "adopted",
+        elements: [target, { ...rect(0, "#0000ff"), id: "other" }],
+        animations,
+      });
+      expect(live.x).toBeCloseTo(50);
+      tick({ deltaMS: 50 });
+      expect(live.y).toBeCloseTo(100);
+      const eventCount = eventHandler.mock.calls.length;
+      tick({ deltaMS: 100 });
+      expect(live.x).toBe(100);
+      expect(live.y).toBe(200);
+      expect(live.lastFill).toBe("#00ff00");
+      expect(eventHandler.mock.calls).toHaveLength(eventCount);
+      // Canceling an adopted player must not later reconcile its old state.
+      app.render({ id: "restart", elements: [rect(0, "#ff0000")] });
+      app.render({ id: "moving-again", elements: [target], animations });
+      tick({ deltaMS: 50 });
+      app.render({
+        id: "adopted-again",
+        elements: [target, { ...rect(0, "#0000ff"), id: "other" }],
+        animations,
+      });
+      app.render({ id: "cancelled", elements: [rect(300, "#0000ff")] });
+      tick({ deltaMS: 200 });
+      expect(app.findElementByLabel("box").x).toBe(300);
+      expect(app.findElementByLabel("box").lastFill).toBe("#0000ff");
+    },
+  );
 
   it("continues persistent update animations across unrelated renders without restarting", async () => {
     const { app, pixiMock } = await setupRouteGraphics({
@@ -3901,8 +4394,9 @@ describe("RouteGraphics public API", () => {
 
     const { app } = await setupRouteGraphics({
       pluginsFactory: async ({ pixiMock }) => {
-        const { containerPlugin } =
-          await import("../src/plugins/elements/container/index.js");
+        const { containerPlugin } = await import(
+          "../src/plugins/elements/container/index.js"
+        );
         const createChild = (parent, element) => {
           const child = new pixiMock.Container();
           child.label = element.id;

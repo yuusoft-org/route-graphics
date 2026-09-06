@@ -1469,7 +1469,7 @@ describe("shader filter resources", () => {
         {
           skip: false,
           bounds: { minX: 50, minY: 80 },
-          previousRenderSurface: output,
+          outputRenderSurface: output,
         },
       ],
       _filterGlobalUniforms: filterUniforms,

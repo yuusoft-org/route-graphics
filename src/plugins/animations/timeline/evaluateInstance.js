@@ -125,10 +125,9 @@ export const sampleBoundTrack = (
         rootTime,
         domainCache,
       );
-      const reachedTrim =
-        trimState.direction === "reverse"
-          ? trimState.localTime <= segment.trimAt
-          : trimState.localTime >= segment.trimAt;
+      // Overwrite is a boundary in authored timeline coordinates. Reversing
+      // traversal must restore contributions on the earlier side of it.
+      const reachedTrim = trimState.localTime >= segment.trimAt;
       if (trimState.active && reachedTrim) continue;
     } else if (
       !ignoreTrim &&

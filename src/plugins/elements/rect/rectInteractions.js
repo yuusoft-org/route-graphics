@@ -30,11 +30,11 @@ const getPayload = (config) =>
 const hasInteractionConfig = (element) =>
   Boolean(
     element.hover ||
-    element.click ||
-    element.rightClick ||
-    element.scrollUp ||
-    element.scrollDown ||
-    element.drag,
+      element.click ||
+      element.rightClick ||
+      element.scrollUp ||
+      element.scrollDown ||
+      element.drag,
   );
 
 const emit = (eventHandler, eventName, rect, config, eventData = {}) => {

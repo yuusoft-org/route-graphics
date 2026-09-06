@@ -28,20 +28,19 @@ export const createCompletionTracker = (eventHandler) => {
    * @param {string|undefined} id - The new state's id
    */
   const reset = (id) => {
-    // If there were pending completions, the previous render was aborted
-    if (
-      pendingCount > 0 &&
-      currentStateId !== null &&
-      !emittedForCurrentState
-    ) {
-      eventHandler?.("renderComplete", { id: currentStateId, aborted: true });
-    }
-
+    const abortedId =
+      pendingCount > 0 && currentStateId !== null && !emittedForCurrentState
+        ? currentStateId
+        : null;
     stateVersion++;
     pendingCount = 0;
     currentStateId = id;
     renderInProgress = true;
     emittedForCurrentState = false;
+    // Establish the new generation before notifying a handler that can render again.
+    if (abortedId !== null) {
+      eventHandler?.("renderComplete", { id: abortedId, aborted: true });
+    }
   };
 
   /**
@@ -72,6 +71,18 @@ export const createCompletionTracker = (eventHandler) => {
    */
   const getVersion = () => stateVersion;
 
+  const fail = (version, error) => {
+    if (version !== stateVersion || emittedForCurrentState) return;
+    pendingCount = 0;
+    renderInProgress = false;
+    emitRenderComplete({
+      id: currentStateId,
+      aborted: true,
+      failed: true,
+      error,
+    });
+  };
+
   /**
    * If nothing is being tracked, fire renderComplete immediately.
    * Called after render to handle states with no animations.
@@ -89,6 +100,7 @@ export const createCompletionTracker = (eventHandler) => {
     track,
     complete,
     getVersion,
+    fail,
     completeIfEmpty,
   };
 };

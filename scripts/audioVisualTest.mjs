@@ -376,7 +376,12 @@ const main = async () => {
     await mkdir(REFERENCE_DIRECTORY, { recursive: true });
   }
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.ROUTE_GRAPHICS_TEST_BROWSER
+      ? { executablePath: process.env.ROUTE_GRAPHICS_TEST_BROWSER }
+      : {}),
+  });
   const harness = await createPageHarness({ browser, bundle, runner });
   const results = [];
   const mediaByName = new Map();

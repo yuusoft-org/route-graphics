@@ -68,6 +68,21 @@ const setupAudioAsset = async () => {
 };
 
 describe("AudioAsset", () => {
+  it.each(["__proto__", "constructor", "toString"])(
+    "loads and unloads the alias %s",
+    async (key) => {
+      const { AudioAsset, context, decodedBuffer } = await setupAudioAsset();
+      expect(AudioAsset.getAsset(key)).toBeUndefined();
+      await expect(AudioAsset.load(key, new ArrayBuffer(8))).resolves.toBe(
+        decodedBuffer,
+      );
+      expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+      expect(AudioAsset.getAsset(key)).toBe(decodedBuffer);
+      expect(AudioAsset.unload(key)).toBe(true);
+      expect(AudioAsset.getAsset(key)).toBeUndefined();
+    },
+  );
+
   afterEach(() => {
     window.AudioContext = originalAudioContext;
     window.webkitAudioContext = originalWebkitAudioContext;

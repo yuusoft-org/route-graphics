@@ -57,40 +57,54 @@ try {
     });
   };
 
-  await Promise.all([
-    buildCliBundle(),
-    buildBundle({
-      outdir: "./dist",
-      minify: true,
-      sourcemap: false,
-    }),
-    buildBundle({
-      outdir: "./playground/static",
-      minify: true,
-      sourcemap: false,
-    }),
-    buildBundle({
-      outdir: "./vt/static",
-      minify: false,
-      sourcemap: true,
-    }),
-  ]);
-
-  await rm("./.rettangoli/vt/_site/chunks", {
-    force: true,
-    recursive: true,
-  });
-  await mkdir("./.rettangoli/vt/_site", { recursive: true });
-  await Promise.all([
-    cp(
-      "./vt/static/RouteGraphics.js",
-      "./.rettangoli/vt/_site/RouteGraphics.js",
-    ),
-    cp(
-      "./vt/static/RouteGraphics.js.map",
-      "./.rettangoli/vt/_site/RouteGraphics.js.map",
-    ),
-  ]);
+  const target = process.argv[2] ?? "package";
+  if (!["package", "playground", "visual", "all"].includes(target)) {
+    throw new Error(`Unknown build target: ${target}`);
+  }
+  const packageBuild = target === "package" || target === "all";
+  const playgroundBuild = target === "playground" || target === "all";
+  const visualBuild = target === "visual" || target === "all";
+  if (packageBuild) {
+    await rm("./dist", { force: true, recursive: true });
+  }
+  const jobs = [];
+  if (packageBuild || playgroundBuild) {
+    jobs.push(
+      buildBundle({ outdir: "./dist", minify: true, sourcemap: false }).then(
+        async () => {
+          if (playgroundBuild) {
+            await mkdir("./playground/static", { recursive: true });
+            await cp(
+              "./dist/RouteGraphics.js",
+              "./playground/static/RouteGraphics.js",
+            );
+          }
+        },
+      ),
+    );
+  }
+  if (packageBuild) {
+    jobs.push(buildCliBundle());
+  }
+  if (visualBuild) {
+    jobs.push(
+      buildBundle({
+        outdir: "./vt/static",
+        minify: false,
+        sourcemap: true,
+      }).then(async () => {
+        const site = "./.rettangoli/vt/_site";
+        await rm(path.join(site, "chunks"), { force: true, recursive: true });
+        await mkdir(site, { recursive: true });
+        await Promise.all(
+          ["RouteGraphics.js", "RouteGraphics.js.map"].map((name) =>
+            cp(path.join("./vt/static", name), path.join(site, name)),
+          ),
+        );
+      }),
+    );
+  }
+  await Promise.all(jobs);
 } catch (error) {
   console.error(error);
   process.exit(1);
