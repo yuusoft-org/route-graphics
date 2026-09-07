@@ -36,7 +36,10 @@ export const disposeVideoPlayback = (videoElement, completionTracker) => {
   if (videoElement._playbackDisposed) return;
   videoElement._playbackDisposed = true;
   const version = videoElement._playbackStateVersion;
-  const video = videoElement.texture?.source?.resource;
+  const texture = videoElement.texture;
+  const video = texture?.source?.resource;
+  // Pixi 8.10.2 does not detach dynamic texture listeners in Sprite.destroy().
+  texture?.off?.("update", videoElement.onViewUpdate, videoElement);
   clearVideoPlaybackTracking({ videoElement, video });
   video?.pause?.();
   unregisterManagedVideoSprite(videoElement);
