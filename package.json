@@ -1,6 +1,6 @@
 {
   "name": "route-graphics",
-  "version": "1.44.2",
+  "version": "1.44.3",
   "description": "A 2D graphics rendering interface that takes JSON input and renders pixels using PixiJS",
   "main": "dist/RouteGraphics.js",
   "type": "module",
@@ -54,6 +54,7 @@
     "build:playground": "node ./esbuild.js playground",
     "build:visual": "node ./esbuild.js visual",
     "build:all": "node ./esbuild.js all",
+    "test:video": "bun run build && node scripts/testVideoPlayback.mjs",
     "test:runtime": "bun run build && node scripts/testRuntimeLifecycle.mjs",
     "test:package": "node scripts/testPackage.mjs",
     "vt:screenshot:built": "docker run --rm --user $(id -u):$(id -g) -e RTGL_VT_DEBUG=true -e RTGL_VT_CONCURRENCY=${RTGL_VT_CONCURRENCY:-8} -v \"$PWD:/workspace\" docker.io/han4wluc/rtgl:playwright-v1.57.0-rtgl-v1.1.0 rtgl vt screenshot --wait-event vt:ready --concurrency ${RTGL_VT_CONCURRENCY:-8}",

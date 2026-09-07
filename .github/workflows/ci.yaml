@@ -62,6 +62,7 @@ jobs:
         if: matrix.suite == 'browser'
         run: |
           node scripts/testRuntimeLifecycle.mjs
+          node scripts/testVideoPlayback.mjs
           node scripts/testLayoutReport.mjs
       - name: WebGPU integration
         if: matrix.suite == 'webgpu'

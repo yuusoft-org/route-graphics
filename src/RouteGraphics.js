@@ -120,6 +120,7 @@ const createRouteGraphics = () => {
     let frameId;
     let videoFrameCallbackId;
     let lastUpdateTime = 0;
+    let hasUploadedVideoFrame = false;
     const frameIntervalMS = 1000 / VIDEO_TEXTURE_UPDATE_FPS;
 
     const updateSource = ({ force = false } = {}) => {
@@ -130,6 +131,13 @@ const createRouteGraphics = () => {
           : !isRenderableVideoFrameReady(video))
       ) {
         return false;
+      }
+
+      // A metadata-only upload can leave placeholder GPU storage behind. Once
+      // a decoded frame is presented, allocate it again at the real dimensions.
+      if (force && !hasUploadedVideoFrame) {
+        source.unload();
+        hasUploadedVideoFrame = true;
       }
 
       syncVideoTextureSourceSize(source, video);
@@ -1076,6 +1084,8 @@ const createRouteGraphics = () => {
     const alphaMode = await detectVideoAlphaMode();
     const texture = new Texture({
       source: createVideoTextureSource(video, alphaMode),
+      // Lazy video metadata changes the frame and the sprite's geometry.
+      dynamic: true,
     });
     configureManagedVideoTextureUpdates(texture);
 
